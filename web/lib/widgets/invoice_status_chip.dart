@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 
 class InvoiceStatusChip extends StatelessWidget {
@@ -17,7 +18,7 @@ class InvoiceStatusChip extends StatelessWidget {
         );
 
     return Chip(
-      label: Text(status.label, style: labelStyle),
+      label: Text(context.l10n.invoiceStatusLabel(status), style: labelStyle),
       avatar: Icon(status.icon, size: compact ? 14 : 18, color: color),
       side: BorderSide(color: color.withOpacity(0.3)),
       backgroundColor: color.withOpacity(0.08),

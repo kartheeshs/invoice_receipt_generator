@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
 import '../widgets/invoice_preview.dart';
@@ -36,6 +37,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
     final invoices = appState.invoices;
     final query = _searchController.text.trim().toLowerCase();
 
@@ -51,7 +53,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
 
     Invoice? selectedInvoice = appState.selectedInvoice;
     if (selectedInvoice != null &&
-        !filteredInvoices.any((invoice) => invoice.id == selectedInvoice!.id)) {
+        !filteredInvoices.any((invoice) => invoice.id == selectedInvoice.id)) {
       selectedInvoice = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<AppState>().selectInvoice(null);
@@ -65,7 +67,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
       });
     }
 
-    final currency = NumberFormat.currency(locale: 'ja_JP', symbol: '¥', decimalDigits: 0);
+    final NumberFormat currency = l10n.currencyFormat;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -78,6 +80,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
           onEditInvoice: widget.onEditInvoice,
           onDeleteInvoice: widget.onDeleteInvoice,
           currency: currency,
+          l10n: l10n,
         );
 
         return SingleChildScrollView(
@@ -94,10 +97,11 @@ class _InvoicesPageState extends State<InvoicesPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('請求書管理', style: Theme.of(context).textTheme.headlineSmall),
+                          Text(l10n.invoicesHeaderTitle,
+                              style: Theme.of(context).textTheme.headlineSmall),
                           const SizedBox(height: 6),
                           Text(
-                            'クライアント別にフィルタし、ワンクリックでPDFを生成できます。',
+                            l10n.invoicesHeaderSubtitle,
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
                           ),
                         ],
@@ -107,7 +111,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                       FilledButton.icon(
                         onPressed: widget.onCreateInvoice,
                         icon: const Icon(Icons.add),
-                        label: const Text('新規作成'),
+                        label: Text(l10n.newInvoiceShort),
                       ),
                   ],
                 ),
@@ -123,7 +127,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           prefixIcon: const Icon(Icons.search),
-                          hintText: 'クライアント名や請求書番号で検索',
+                          hintText: l10n.invoicesSearchHint,
                         ),
                       ),
                     ),
@@ -131,13 +135,13 @@ class _InvoicesPageState extends State<InvoicesPage> {
                       spacing: 8,
                       children: [
                         ChoiceChip(
-                          label: const Text('すべて'),
+                          label: Text(l10n.filterAll),
                           selected: _statusFilter == null,
                           onSelected: (_) => setState(() => _statusFilter = null),
                         ),
                         ...InvoiceStatus.values.map(
                           (status) => ChoiceChip(
-                            label: Text(status.label),
+                            label: Text(l10n.invoiceStatusLabel(status)),
                             selected: _statusFilter == status,
                             onSelected: (_) => setState(() => _statusFilter = status),
                           ),
@@ -162,7 +166,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                         flex: 2,
                         child: selectedInvoice != null
                             ? InvoicePreview(invoice: selectedInvoice, currency: currency)
-                            : _EmptyPreview(onCreateInvoice: widget.onCreateInvoice),
+                            : _EmptyPreview(onCreateInvoice: widget.onCreateInvoice, l10n: l10n),
                       ),
                     ],
                   ),
@@ -184,6 +188,7 @@ class _InvoicesContent extends StatelessWidget {
     required this.onEditInvoice,
     required this.onDeleteInvoice,
     required this.currency,
+    required this.l10n,
   });
 
   final List<Invoice> invoices;
@@ -193,6 +198,7 @@ class _InvoicesContent extends StatelessWidget {
   final ValueChanged<Invoice> onEditInvoice;
   final ValueChanged<Invoice> onDeleteInvoice;
   final NumberFormat currency;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -206,12 +212,12 @@ class _InvoicesContent extends StatelessWidget {
               children: [
                 const Icon(Icons.inbox_outlined, size: 48, color: Colors.black26),
                 const SizedBox(height: 12),
-                const Text('該当する請求書がありません。'),
+                Text(l10n.noInvoicesFound),
                 const SizedBox(height: 8),
                 FilledButton.icon(
                   onPressed: onCreateInvoice,
                   icon: const Icon(Icons.add),
-                  label: const Text('最初の請求書を作成'),
+                  label: Text(l10n.createFirstInvoice),
                 ),
               ],
             ),
@@ -263,9 +269,9 @@ class _InvoicesContent extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('発行日: ${_formatDate(invoice.issueDate)}'),
+                          Text('${l10n.issueDateLabel}: ${l10n.formatDate(invoice.issueDate)}'),
                           const SizedBox(height: 2),
-                          Text('期限: ${_formatDate(invoice.dueDate)}'),
+                          Text('${l10n.dueDateLabel}: ${l10n.formatDate(invoice.dueDate)}'),
                         ],
                       ),
                     ),
@@ -281,7 +287,7 @@ class _InvoicesContent extends StatelessWidget {
                     InvoiceStatusChip(status: invoice.status, compact: true),
                     const SizedBox(width: 12),
                     PopupMenuButton<String>(
-                      tooltip: '操作',
+                      tooltip: l10n.invoiceActionsTooltip,
                       onSelected: (value) {
                         switch (value) {
                           case 'edit':
@@ -293,19 +299,19 @@ class _InvoicesContent extends StatelessWidget {
                         }
                       },
                       itemBuilder: (context) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'edit',
                           child: ListTile(
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text('編集'),
+                            leading: const Icon(Icons.edit_outlined),
+                            title: Text(l10n.edit),
                             dense: true,
                           ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
                           child: ListTile(
-                            leading: Icon(Icons.delete_outline),
-                            title: Text('削除'),
+                            leading: const Icon(Icons.delete_outline),
+                            title: Text(l10n.delete),
                             dense: true,
                           ),
                         ),
@@ -320,17 +326,13 @@ class _InvoicesContent extends StatelessWidget {
       ),
     );
   }
-
-  String _formatDate(DateTime date) {
-    final formatter = DateFormat('yyyy/MM/dd');
-    return formatter.format(date);
-  }
 }
 
 class _EmptyPreview extends StatelessWidget {
-  const _EmptyPreview({required this.onCreateInvoice});
+  const _EmptyPreview({required this.onCreateInvoice, required this.l10n});
 
   final VoidCallback onCreateInvoice;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -345,14 +347,15 @@ class _EmptyPreview extends StatelessWidget {
                   size: 48, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 16),
               Text(
-                '請求書を選択すると詳細が表示されます。',
+                l10n.selectInvoiceEmptyState,
                 style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onCreateInvoice,
                 icon: const Icon(Icons.add),
-                label: const Text('請求書を作成'),
+                label: Text(l10n.createInvoiceAction),
               ),
             ],
           ),

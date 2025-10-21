@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
 import '../widgets/invoice_status_chip.dart';
@@ -15,6 +16,7 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
     final invoices = appState.invoices;
 
     final nextActions = invoices
@@ -23,7 +25,7 @@ class DashboardPage extends StatelessWidget {
       ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
     final recentInvoices = invoices.take(4).toList();
-    final currency = NumberFormat.currency(locale: 'ja_JP', symbol: '¥', decimalDigits: 0);
+    final NumberFormat currency = l10n.currencyFormat;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -41,12 +43,12 @@ class DashboardPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'おかえりなさい、${appState.ownerName}さん',
+                          l10n.dashboardGreeting(appState.ownerName),
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '今月は${currency.format(appState.totalBilled)}の入金が確認できています。未回収分のフォローアップを行いましょう。',
+                          l10n.dashboardLead(currency.format(appState.totalBilled)),
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.black54),
                         ),
                       ],
@@ -56,7 +58,7 @@ class DashboardPage extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: onCreateInvoice,
                       icon: const Icon(Icons.add),
-                      label: const Text('請求書を作成'),
+                      label: Text(l10n.dashboardCreateInvoiceButton),
                     ),
                 ],
               ),
@@ -66,30 +68,32 @@ class DashboardPage extends StatelessWidget {
                 runSpacing: 20,
                 children: [
                   MetricCard(
-                    title: '入金済み',
+                    title: l10n.metricPaidTitle,
                     value: currency.format(appState.totalBilled),
-                    subtitle: '過去30日で${appState.invoices.where((invoice) => invoice.status == InvoiceStatus.paid).length}件',
+                    subtitle: l10n.metricPaidSubtitle(
+                      appState.invoices.where((invoice) => invoice.status == InvoiceStatus.paid).length,
+                    ),
                     icon: Icons.check_circle_outline,
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   MetricCard(
-                    title: '未入金',
+                    title: l10n.metricOutstandingTitle,
                     value: currency.format(appState.outstandingAmount),
-                    subtitle: '今後7日以内の期限: ${appState.invoicesDueThisWeek}件',
+                    subtitle: l10n.metricOutstandingSubtitle(appState.invoicesDueThisWeek),
                     icon: Icons.pending_actions_outlined,
                     color: Theme.of(context).colorScheme.tertiary,
                   ),
                   MetricCard(
-                    title: '期限切れ',
+                    title: l10n.metricOverdueTitle,
                     value: currency.format(appState.overdueAmount),
-                    subtitle: 'リマインドメール設定: ${appState.sendReminderEmails ? 'ON' : 'OFF'}',
+                    subtitle: l10n.metricOverdueSubtitle(appState.sendReminderEmails),
                     icon: Icons.warning_amber_rounded,
                     color: Theme.of(context).colorScheme.error,
                   ),
                   MetricCard(
-                    title: '下書き',
+                    title: l10n.metricDraftTitle,
                     value: currency.format(appState.draftTotal),
-                    subtitle: '自動採番: ${appState.autoNumberingEnabled ? '有効' : '無効'}',
+                    subtitle: l10n.metricDraftSubtitle(appState.autoNumberingEnabled),
                     icon: Icons.drafts_outlined,
                     color: Theme.of(context).colorScheme.secondary,
                   ),
@@ -103,24 +107,24 @@ class DashboardPage extends StatelessWidget {
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _buildNextStepsCard(context, nextActions, currency)),
+                        Expanded(child: _buildNextStepsCard(context, nextActions, currency, l10n)),
                         const SizedBox(width: 24),
-                        Expanded(child: _buildDownloadsCard(context, appState)),
+                        Expanded(child: _buildDownloadsCard(context, appState, l10n)),
                       ],
                     );
                   }
                   return Column(
                     children: [
-                      _buildNextStepsCard(context, nextActions, currency),
+                      _buildNextStepsCard(context, nextActions, currency, l10n),
                       const SizedBox(height: 24),
-                      _buildDownloadsCard(context, appState),
+                      _buildDownloadsCard(context, appState, l10n),
                     ],
                   );
                 },
               ),
               const SizedBox(height: 32),
               Text(
-                '最近の請求書',
+                l10n.dashboardRecentInvoicesTitle,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -141,7 +145,12 @@ class DashboardPage extends StatelessWidget {
                         ),
                       ),
                       title: Text('${invoice.clientName} / ${invoice.projectName}'),
-                      subtitle: Text('発行日: ${_formatDate(invoice.issueDate)} • 金額: ${currency.format(invoice.total)}'),
+                      subtitle: Text(
+                        l10n.dashboardRecentInvoiceSubtitle(
+                          l10n.formatDate(invoice.issueDate),
+                          currency.format(invoice.total),
+                        ),
+                      ),
                       trailing: InvoiceStatusChip(status: invoice.status),
                     );
                   },
@@ -158,6 +167,7 @@ class DashboardPage extends StatelessWidget {
     BuildContext context,
     List<Invoice> nextActions,
     NumberFormat currency,
+    AppLocalizations l10n,
   ) {
     return Card(
       child: Padding(
@@ -170,14 +180,14 @@ class DashboardPage extends StatelessWidget {
                 Icon(Icons.flag_outlined, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'フォローアップ推奨',
+                  l10n.dashboardFollowUpTitle,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
             const SizedBox(height: 16),
             if (nextActions.isEmpty)
-              const Text('対応が必要な請求書はありません。')
+              Text(l10n.dashboardNoPending)
             else
               ...nextActions.take(3).map(
                 (invoice) => Padding(
@@ -199,13 +209,22 @@ class DashboardPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${invoice.clientName} への請求（${currency.format(invoice.total)}）',
+                              l10n.dashboardFollowUpLine(
+                                invoice.clientName,
+                                currency.format(invoice.total),
+                              ),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '支払期限: ${_formatDate(invoice.dueDate)} • ステータス: ${invoice.status.label}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                              l10n.dashboardFollowUpSubtitle(
+                                l10n.formatDate(invoice.dueDate),
+                                l10n.invoiceStatusLabel(invoice.status),
+                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: Colors.black54),
                             ),
                           ],
                         ),
@@ -217,7 +236,7 @@ class DashboardPage extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onCreateInvoice,
               icon: const Icon(Icons.add),
-              label: const Text('新しい請求書を作成'),
+              label: Text(l10n.dashboardNewInvoiceCta),
             ),
           ],
         ),
@@ -225,7 +244,7 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDownloadsCard(BuildContext context, AppState appState) {
+  Widget _buildDownloadsCard(BuildContext context, AppState appState, AppLocalizations l10n) {
     final used = appState.monthlyDownloadsUsed;
     final limit = appState.monthlyDownloadLimit;
     final ratio = limit == 0 ? 0.0 : (used / limit).clamp(0, 1).toDouble();
@@ -244,7 +263,7 @@ class DashboardPage extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'PDF ダウンロード上限',
+                  l10n.dashboardDownloadsTitle,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -259,8 +278,8 @@ class DashboardPage extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               appState.isPremium
-                  ? 'プレミアムプランのため上限はありません。'
-                  : '今月は${limit}件中${used}件ダウンロード済みです。',
+                  ? l10n.dashboardDownloadsUnlimited
+                  : l10n.dashboardDownloadsUsage(used, limit),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -268,21 +287,16 @@ class DashboardPage extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () => context.read<AppState>().markAsPremium(),
                 icon: const Icon(Icons.workspace_premium_outlined),
-                label: const Text('プレミアムにアップグレード'),
+                label: Text(l10n.upgradeToPremiumCta),
               )
             else
               OutlinedButton(
                 onPressed: () => context.read<AppState>().downgradeToFreePlan(),
-                child: const Text('フリープランにダウングレード'),
+                child: Text(l10n.downgradeToFreeCta),
               ),
           ],
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final formatter = DateFormat('yyyy/MM/dd');
-    return formatter.format(date);
   }
 }

@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
 import '../widgets/invoice_form_dialog.dart';
@@ -21,84 +23,130 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
     final isWide = MediaQuery.of(context).size.width >= 1024;
     final destinations = [
       _NavigationDestination(
-        label: 'ダッシュボード',
+        label: l10n.dashboardNav,
         icon: Icons.space_dashboard_outlined,
         selectedIcon: Icons.space_dashboard,
       ),
       _NavigationDestination(
-        label: '請求書',
+        label: l10n.invoicesNav,
         icon: Icons.description_outlined,
         selectedIcon: Icons.description,
       ),
       _NavigationDestination(
-        label: '設定',
+        label: l10n.settingsNav,
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings,
       ),
     ];
 
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('和式請求書ジェネレーター'),
+        title: Text(l10n.appTitle),
         actions: [
           if (!appState.isPremium)
             FilledButton.icon(
               onPressed: () => _showUpgradeDialog(context),
               icon: const Icon(Icons.workspace_premium_outlined),
-              label: const Text('プレミアムへアップグレード'),
+              label: Text(l10n.upgradeToPremiumButton),
             )
           else
             FilledButton.icon(
               onPressed: () => context.read<AppState>().downgradeToFreePlan(),
               icon: const Icon(Icons.check_circle_outline),
-              label: const Text('プレミアム適用中'),
+              label: Text(l10n.premiumActiveLabel),
             ),
           const SizedBox(width: 12),
           IconButton(
-            tooltip: '通知',
+            tooltip: l10n.notificationsTooltip,
             onPressed: () => _showNotifications(context),
             icon: const Icon(Icons.notifications_none),
           ),
           const SizedBox(width: 4),
-          CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-            child: const Text('山'),
+          PopupMenuButton<String>(
+            tooltip: l10n.accountMenuTooltip,
+            onSelected: (value) {
+              if (value == 'sign-out') {
+                FirebaseAuth.instance.signOut();
+              }
+            },
+            itemBuilder: (context) => [
+              if (user?.email != null)
+                PopupMenuItem<String>(
+                  enabled: false,
+                  value: 'email',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user!.email!,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.appTitle,
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+              const PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'sign-out',
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.logout),
+                  title: Text(l10n.signOut),
+                ),
+              ),
+            ],
+            child: CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+              child: Text(_userInitial(user)),
+            ),
           ),
           const SizedBox(width: 16),
         ],
       ),
-      drawer: isWide ? null : Drawer(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Text(
-                  'メニュー',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      drawer: isWide
+          ? null
+          : Drawer(
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Text(
+                        l10n.menuTitle,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Divider(),
+                    for (var i = 0; i < destinations.length; i++)
+                      ListTile(
+                        leading: Icon(i == _selectedIndex
+                            ? destinations[i].selectedIcon
+                            : destinations[i].icon),
+                        title: Text(destinations[i].label),
+                        selected: i == _selectedIndex,
+                        onTap: () {
+                          setState(() => _selectedIndex = i);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                  ],
                 ),
               ),
-              const Divider(),
-              for (var i = 0; i < destinations.length; i++)
-                ListTile(
-                  leading: Icon(i == _selectedIndex
-                      ? destinations[i].selectedIcon
-                      : destinations[i].icon),
-                  title: Text(destinations[i].label),
-                  selected: i == _selectedIndex,
-                  onTap: () {
-                    setState(() => _selectedIndex = i);
-                    Navigator.of(context).pop();
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
+            ),
       bottomNavigationBar: isWide
           ? null
           : NavigationBar(
@@ -117,7 +165,7 @@ class _HomeShellState extends State<HomeShell> {
           ? FloatingActionButton.extended(
               onPressed: () => _openInvoiceForm(context),
               icon: const Icon(Icons.add),
-              label: const Text('新しい請求書'),
+              label: Text(l10n.newInvoiceAction),
             )
           : null,
       body: SafeArea(
@@ -197,25 +245,27 @@ class _HomeShellState extends State<HomeShell> {
 
     if (result != null) {
       appState.saveInvoice(result);
+      final l10n = context.l10n;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text(invoice == null ? '請求書を作成しました。' : '請求書を更新しました。'),
+          content: Text(invoice == null ? l10n.invoiceCreatedSnack : l10n.invoiceUpdatedSnack),
         ),
       );
     }
   }
 
   Future<void> _confirmDeleteInvoice(BuildContext context, Invoice invoice) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('請求書の削除'),
-        content: Text('${invoice.clientName}向けの請求書（${invoice.number}）を削除しますか？'),
+        title: Text(l10n.deleteInvoiceTitle),
+        content: Text(l10n.deleteInvoiceMessage(invoice.clientName, invoice.number)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('キャンセル'),
+            child: Text(l10n.cancelAction),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -223,7 +273,7 @@ class _HomeShellState extends State<HomeShell> {
               backgroundColor: Theme.of(context).colorScheme.error,
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            child: const Text('削除する'),
+            child: Text(l10n.deleteAction),
           ),
         ],
       ),
@@ -232,24 +282,25 @@ class _HomeShellState extends State<HomeShell> {
     if (confirmed ?? false) {
       context.read<AppState>().deleteInvoice(invoice.id);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text('請求書を削除しました。'),
+          content: Text(l10n.invoiceDeletedSnack),
         ),
       );
     }
   }
 
   void _showUpgradeDialog(BuildContext context) {
+    final l10n = context.l10n;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('プレミアムプラン'),
-        content: const Text('月額¥500でPDFダウンロード無制限・ブランドロゴ設定などの機能が利用できます。アップグレードしますか？'),
+        title: Text(l10n.upgradeDialogTitle),
+        content: Text(l10n.upgradeDialogMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
+            child: Text(l10n.closeAction),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -257,7 +308,7 @@ class _HomeShellState extends State<HomeShell> {
               context.read<AppState>().markAsPremium();
             },
             icon: const Icon(Icons.workspace_premium_outlined),
-            label: const Text('アップグレード'),
+            label: Text(l10n.upgradeDialogCta),
           ),
         ],
       ),
@@ -265,36 +316,49 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _showNotifications(BuildContext context) {
+    final l10n = context.l10n;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('最新のお知らせ'),
+        title: Text(l10n.notificationsTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.campaign_outlined),
-              title: Text('請求書テンプレートに「軽減税率」項目を追加しました。'),
-              subtitle: Text('2024/05/20'),
+              leading: const Icon(Icons.campaign_outlined),
+              title: Text(l10n.notificationTaxUpdateTitle),
+              subtitle: const Text('2024/05/20'),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.campaign_outlined),
-              title: Text('Stripe 決済がプレミアムプランでも利用可能になりました。'),
-              subtitle: Text('2024/05/12'),
+              leading: const Icon(Icons.campaign_outlined),
+              title: Text(l10n.notificationPremiumUpdateTitle),
+              subtitle: const Text('2024/05/12'),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
+            child: Text(l10n.closeAction),
           ),
         ],
       ),
     );
+  }
+
+  String _userInitial(User? user) {
+    final displayName = user?.displayName;
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName.trim().substring(0, 1).toUpperCase();
+    }
+    final email = user?.email;
+    if (email != null && email.isNotEmpty) {
+      return email.trim().substring(0, 1).toUpperCase();
+    }
+    return 'A';
   }
 }
 

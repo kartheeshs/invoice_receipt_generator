@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../l10n/app_language.dart';
 import '../models/invoice.dart';
 
 class AppState extends ChangeNotifier {
@@ -17,6 +18,7 @@ class AppState extends ChangeNotifier {
   Invoice? _selectedInvoice;
 
   bool _isPremium = false;
+  AppLanguage _language = AppLanguage.japanese;
   int monthlyDownloadLimit = 3;
   int monthlyDownloadsUsed = 1;
 
@@ -37,6 +39,10 @@ class AppState extends ChangeNotifier {
   Invoice? get selectedInvoice => _selectedInvoice;
 
   bool get isPremium => _isPremium;
+
+  AppLanguage get language => _language;
+
+  Locale get locale => _language.locale;
 
   double get totalBilled => _sumFor((invoice) => invoice.status == InvoiceStatus.paid);
 
@@ -110,6 +116,14 @@ class AppState extends ChangeNotifier {
     if (monthlyDownloadsUsed > monthlyDownloadLimit) {
       monthlyDownloadsUsed = monthlyDownloadLimit;
     }
+    notifyListeners();
+  }
+
+  void updateLanguage(AppLanguage language) {
+    if (_language == language) {
+      return;
+    }
+    _language = language;
     notifyListeners();
   }
 

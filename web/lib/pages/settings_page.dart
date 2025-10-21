@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_language.dart';
+import '../l10n/app_localizations.dart';
 import '../state/app_state.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -9,16 +11,17 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
 
     return SingleChildScrollView(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('ワークスペース設定', style: Theme.of(context).textTheme.headlineSmall),
+          Text(l10n.settingsTitle, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
           Text(
-            '請求書テンプレートや課金ステータスの管理を行います。',
+            l10n.settingsSubtitle,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
           ),
           const SizedBox(height: 24),
@@ -29,25 +32,25 @@ class SettingsPage extends StatelessWidget {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _BusinessCard(appState: appState)),
+                    Expanded(child: _BusinessCard(appState: appState, l10n: l10n)),
                     const SizedBox(width: 24),
-                    Expanded(child: _PlanCard(appState: appState)),
+                    Expanded(child: _PlanCard(appState: appState, l10n: l10n)),
                   ],
                 );
               }
               return Column(
                 children: [
-                  _BusinessCard(appState: appState),
+                  _BusinessCard(appState: appState, l10n: l10n),
                   const SizedBox(height: 24),
-                  _PlanCard(appState: appState),
+                  _PlanCard(appState: appState, l10n: l10n),
                 ],
               );
             },
           ),
           const SizedBox(height: 24),
-          _PreferencesCard(appState: appState),
+          _PreferencesCard(appState: appState, l10n: l10n),
           const SizedBox(height: 24),
-          _SupportCard(appState: appState),
+          _SupportCard(appState: appState, l10n: l10n),
         ],
       ),
     );
@@ -55,9 +58,10 @@ class SettingsPage extends StatelessWidget {
 }
 
 class _BusinessCard extends StatelessWidget {
-  const _BusinessCard({required this.appState});
+  const _BusinessCard({required this.appState, required this.l10n});
 
   final AppState appState;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -71,21 +75,21 @@ class _BusinessCard extends StatelessWidget {
               children: [
                 Icon(Icons.apartment, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('事業者情報', style: Theme.of(context).textTheme.titleMedium),
+                Text(l10n.settingsBusinessSectionTitle, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
-            _InfoRow(label: '事業者名', value: appState.businessName),
-            _InfoRow(label: '担当者', value: appState.ownerName),
-            _InfoRow(label: '所在地', value: appState.address),
-            _InfoRow(label: '郵便番号', value: appState.postalCode),
-            _InfoRow(label: 'メールアドレス', value: appState.email),
-            _InfoRow(label: '電話番号', value: appState.phoneNumber),
+            _InfoRow(label: l10n.businessNameLabel, value: appState.businessName),
+            _InfoRow(label: l10n.ownerLabel, value: appState.ownerName),
+            _InfoRow(label: l10n.addressLabel, value: appState.address),
+            _InfoRow(label: l10n.postalCodeLabel, value: appState.postalCode),
+            _InfoRow(label: l10n.emailLabel, value: appState.email),
+            _InfoRow(label: l10n.phoneLabel, value: appState.phoneNumber),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.edit_outlined),
-              label: const Text('プロフィールを編集'),
+              label: Text(l10n.editProfile),
             ),
           ],
         ),
@@ -95,12 +99,14 @@ class _BusinessCard extends StatelessWidget {
 }
 
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.appState});
+  const _PlanCard({required this.appState, required this.l10n});
 
   final AppState appState;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
+    final isPremium = appState.isPremium;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -111,7 +117,7 @@ class _PlanCard extends StatelessWidget {
               children: [
                 Icon(Icons.workspace_premium_outlined, color: Theme.of(context).colorScheme.secondary),
                 const SizedBox(width: 8),
-                Text('プラン', style: Theme.of(context).textTheme.titleMedium),
+                Text(l10n.settingsPlanSectionTitle, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
@@ -120,33 +126,29 @@ class _PlanCard extends StatelessWidget {
               leading: CircleAvatar(
                 backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
                 child: Icon(
-                  appState.isPremium ? Icons.star : Icons.lock_open,
+                  isPremium ? Icons.star : Icons.lock_open,
                   color: Theme.of(context).colorScheme.secondary,
                 ),
               ),
-              title: Text(appState.isPremium ? 'プレミアムプラン（¥500/月）' : '無料プラン'),
-              subtitle: Text(
-                appState.isPremium
-                    ? 'PDFダウンロード無制限 / カスタムブランド / 優先サポート'
-                    : '月3件までPDFダウンロード / 基本テンプレート',
-              ),
+              title: Text(isPremium ? l10n.premiumPlanName : l10n.freePlanName),
+              subtitle: Text(isPremium ? l10n.premiumPlanDescription : l10n.freePlanDescription),
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: appState.isPremium
+                    onPressed: isPremium
                         ? () => context.read<AppState>().downgradeToFreePlan()
                         : () => context.read<AppState>().markAsPremium(),
-                    child: Text(appState.isPremium ? 'フリープランに戻す' : 'プレミアムにアップグレード'),
+                    child: Text(isPremium ? l10n.downgradeToFreePlanButton : l10n.upgradeToPremiumCta),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
-              'Stripe 決済は有効化済みです。請求書テンプレートに表示される課金情報は自動で更新されます。',
+              l10n.planStripeNotice(),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
             ),
           ],
@@ -157,9 +159,10 @@ class _PlanCard extends StatelessWidget {
 }
 
 class _PreferencesCard extends StatelessWidget {
-  const _PreferencesCard({required this.appState});
+  const _PreferencesCard({required this.appState, required this.l10n});
 
   final AppState appState;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -173,30 +176,59 @@ class _PreferencesCard extends StatelessWidget {
               children: [
                 Icon(Icons.tune, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('請求書テンプレート', style: Theme.of(context).textTheme.titleMedium),
+                Text(l10n.settingsTemplateSectionTitle, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.languageSettingLabel,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                DropdownButton<AppLanguage>(
+                  value: appState.language,
+                  items: [
+                    DropdownMenuItem(
+                      value: AppLanguage.japanese,
+                      child: Text(l10n.languageJapanese),
+                    ),
+                    DropdownMenuItem(
+                      value: AppLanguage.english,
+                      child: Text(l10n.languageEnglish),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      context.read<AppState>().updateLanguage(value);
+                    }
+                  },
+                ),
+              ],
+            ),
+            const Divider(height: 24),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: const Text('請求書番号を自動採番する'),
-              subtitle: const Text('「INV-YYYYMM-001」の形式で連番を採番します。'),
+              title: Text(l10n.autoNumberingTitle),
+              subtitle: Text(l10n.autoNumberingSubtitle),
               value: appState.autoNumberingEnabled,
               onChanged: (value) => context.read<AppState>().updateAutoNumbering(value),
             ),
             const Divider(height: 24),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: const Text('支払期限メールを自動送信'),
-              subtitle: const Text('期限切れの請求書に対して、1日後にリマインドメールを送信します。'),
+              title: Text(l10n.reminderEmailsTitle),
+              subtitle: Text(l10n.reminderEmailsSubtitle),
               value: appState.sendReminderEmails,
               onChanged: (value) => context.read<AppState>().updateReminderEmails(value),
             ),
             const Divider(height: 24),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
-              title: const Text('日付を和暦表示にする'),
-              subtitle: const Text('請求書上の日付を令和表記に変更します。'),
+              title: Text(l10n.japaneseEraTitle),
+              subtitle: Text(l10n.japaneseEraSubtitle),
               value: appState.showJapaneseEra,
               onChanged: (value) => context.read<AppState>().updateJapaneseEraDisplay(value),
             ),
@@ -205,15 +237,15 @@ class _PreferencesCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '標準税率',
+                    l10n.defaultTaxRateLabel,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
                 DropdownButton<double>(
                   value: appState.defaultTaxRate,
                   items: const [
-                    DropdownMenuItem(value: 0.08, child: Text('8%')), 
-                    DropdownMenuItem(value: 0.1, child: Text('10%')), 
+                    DropdownMenuItem(value: 0.08, child: Text('8%')),
+                    DropdownMenuItem(value: 0.1, child: Text('10%')),
                     DropdownMenuItem(value: 0.2, child: Text('20%')),
                   ],
                   onChanged: (value) {
@@ -232,9 +264,10 @@ class _PreferencesCard extends StatelessWidget {
 }
 
 class _SupportCard extends StatelessWidget {
-  const _SupportCard({required this.appState});
+  const _SupportCard({required this.appState, required this.l10n});
 
   final AppState appState;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -248,22 +281,22 @@ class _SupportCard extends StatelessWidget {
               children: [
                 Icon(Icons.help_outline, color: Theme.of(context).colorScheme.secondary),
                 const SizedBox(width: 8),
-                Text('サポートとリソース', style: Theme.of(context).textTheme.titleMedium),
+                Text(l10n.supportSectionTitle, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.library_books_outlined),
-              title: const Text('ヘルプセンター'),
-              subtitle: const Text('FAQや使い方ガイドを確認できます。'),
+              title: Text(l10n.helpCenter),
+              subtitle: Text(l10n.helpCenterSubtitle),
               trailing: const Icon(Icons.open_in_new),
               onTap: () {},
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.mail_outline),
-              title: const Text('サポートへ問い合わせ'),
+              title: Text(l10n.supportContact),
               subtitle: Text(appState.email),
               trailing: const Icon(Icons.open_in_new),
               onTap: () {},
@@ -271,8 +304,8 @@ class _SupportCard extends StatelessWidget {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.forum_outlined),
-              title: const Text('コミュニティ'),
-              subtitle: const Text('Slackで他のユーザーと情報交換しましょう。'),
+              title: Text(l10n.community),
+              subtitle: Text(l10n.communitySubtitle),
               trailing: const Icon(Icons.open_in_new),
               onTap: () {},
             ),
@@ -297,7 +330,7 @@ class _InfoRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 120,
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),

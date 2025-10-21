@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 
 class InvoiceFormDialog extends StatefulWidget {
@@ -85,7 +86,8 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final currency = NumberFormat.currency(locale: 'ja_JP', symbol: '¥', decimalDigits: 0);
+    final l10n = context.l10n;
+    final NumberFormat currency = l10n.currencyFormat;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -100,7 +102,9 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
               Row(
                 children: [
                   Text(
-                    widget.initialInvoice == null ? '請求書を作成' : '請求書を編集',
+                    widget.initialInvoice == null
+                        ? l10n.invoiceDialogTitleCreate
+                        : l10n.invoiceDialogTitleEdit,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const Spacer(),
@@ -127,13 +131,13 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                               child: TextFormField(
                                 controller: _numberController,
                                 readOnly: widget.autoNumberingEnabled && widget.initialInvoice == null,
-                                decoration: const InputDecoration(
-                                  labelText: '請求書番号',
-                                  hintText: 'INV-202405-001',
+                                decoration: InputDecoration(
+                                  labelText: l10n.invoiceNumberLabel,
+                                  hintText: l10n.invoiceNumberHint,
                                 ),
                                 validator: (value) {
                                   if ((value ?? '').trim().isEmpty) {
-                                    return '請求書番号を入力してください。';
+                                    return l10n.invoiceNumberRequired;
                                   }
                                   return null;
                                 },
@@ -147,7 +151,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                                     .map(
                                       (status) => DropdownMenuItem(
                                         value: status,
-                                        child: Text(status.label),
+                                        child: Text(l10n.invoiceStatusLabel(status)),
                                       ),
                                     )
                                     .toList(),
@@ -156,7 +160,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                                     setState(() => _status = value);
                                   }
                                 },
-                                decoration: const InputDecoration(labelText: 'ステータス'),
+                                decoration: InputDecoration(labelText: l10n.statusLabel),
                               ),
                             ),
                           ],
@@ -164,10 +168,10 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _clientController,
-                          decoration: const InputDecoration(labelText: '請求先（会社名）'),
+                          decoration: InputDecoration(labelText: l10n.clientLabel),
                           validator: (value) {
                             if ((value ?? '').trim().isEmpty) {
-                              return '請求先を入力してください。';
+                              return l10n.clientRequired;
                             }
                             return null;
                           },
@@ -175,10 +179,10 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _projectController,
-                          decoration: const InputDecoration(labelText: '案件名 / 件名'),
+                          decoration: InputDecoration(labelText: l10n.projectLabel),
                           validator: (value) {
                             if ((value ?? '').trim().isEmpty) {
-                              return '案件名を入力してください。';
+                              return l10n.projectRequired;
                             }
                             return null;
                           },
@@ -192,9 +196,9 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                               width: 320,
                               child: TextFormField(
                                 controller: _emailController,
-                                decoration: const InputDecoration(
-                                  labelText: '請求書送付先メールアドレス',
-                                  hintText: 'billing@example.jp',
+                                decoration: InputDecoration(
+                                  labelText: l10n.billingEmailLabel,
+                                  hintText: l10n.billingEmailHint,
                                 ),
                               ),
                             ),
@@ -202,12 +206,12 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                               width: 320,
                               child: DropdownButtonFormField<double>(
                                 value: _taxRate,
-                                decoration: const InputDecoration(labelText: '税率'),
-                                items: const [
-                                  DropdownMenuItem(value: 0.0, child: Text('0%')), 
-                                  DropdownMenuItem(value: 0.08, child: Text('8% (軽減税率)')), 
-                                  DropdownMenuItem(value: 0.1, child: Text('10% (標準税率)')), 
-                                  DropdownMenuItem(value: 0.2, child: Text('20%')), 
+                                decoration: InputDecoration(labelText: l10n.taxRateLabel),
+                                items: [
+                                  DropdownMenuItem(value: 0.0, child: Text(l10n.taxOptionZero)),
+                                  DropdownMenuItem(value: 0.08, child: Text(l10n.taxOptionReduced)),
+                                  DropdownMenuItem(value: 0.1, child: Text(l10n.taxOptionStandard)),
+                                  DropdownMenuItem(value: 0.2, child: Text(l10n.taxOptionTwenty)),
                                 ],
                                 onChanged: (value) {
                                   if (value != null) {
@@ -223,23 +227,25 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                           children: [
                             Expanded(
                               child: _DateField(
-                                label: '発行日',
+                                label: l10n.issueDateField,
                                 value: _issueDate,
                                 onTap: () => _selectDate(context, isIssueDate: true),
+                                l10n: l10n,
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: _DateField(
-                                label: '支払期限',
+                                label: l10n.dueDateField,
                                 value: _dueDate,
                                 onTap: () => _selectDate(context, isIssueDate: false),
+                                l10n: l10n,
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 24),
-                        Text('請求内容', style: Theme.of(context).textTheme.titleMedium),
+                        Text(l10n.lineItemsTitle, style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 12),
                         ..._itemEntries.map((entry) => _ItemCard(
                               entry: entry,
@@ -250,13 +256,14 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                                         entry.dispose();
                                       })
                                   : null,
+                              l10n: l10n,
                             )),
                         if (_itemError != null)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Text(
                               _itemError!,
-                              style: const TextStyle(color: Colors.red),
+                              style: TextStyle(color: Theme.of(context).colorScheme.error),
                             ),
                           ),
                         Align(
@@ -267,16 +274,16 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                               _itemEntries.add(entry);
                             }),
                             icon: const Icon(Icons.add),
-                            label: const Text('品目を追加'),
+                            label: Text(l10n.addItem),
                           ),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _notesController,
                           maxLines: 3,
-                          decoration: const InputDecoration(
-                            labelText: '備考・メッセージ',
-                            hintText: '例: お振込手数料は貴社負担にてお願いいたします。',
+                          decoration: InputDecoration(
+                            labelText: l10n.notesLabel,
+                            hintText: l10n.notesHint,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -289,6 +296,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                               subtotal: currency.format(subtotal),
                               tax: currency.format(tax),
                               total: currency.format(total),
+                              l10n: l10n,
                             );
                           },
                         ),
@@ -303,12 +311,12 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('キャンセル'),
+                    child: Text(l10n.cancelAction),
                   ),
                   const SizedBox(width: 12),
                   FilledButton(
                     onPressed: _handleSubmit,
-                    child: Text(widget.initialInvoice == null ? '作成する' : '更新する'),
+                    child: Text(widget.initialInvoice == null ? l10n.createButton : l10n.updateButton),
                   ),
                 ],
               ),
@@ -352,6 +360,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
   }
 
   void _handleSubmit() {
+    final l10n = context.l10n;
     final formValid = _formKey.currentState?.validate() ?? false;
     if (!formValid) {
       return;
@@ -367,7 +376,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
         continue;
       }
       if (quantity <= 0) {
-        setState(() => _itemError = '数量は1以上で入力してください。');
+        setState(() => _itemError = l10n.quantityMustBePositive);
         return;
       }
       items.add(InvoiceItem(
@@ -379,7 +388,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
     }
 
     if (items.isEmpty) {
-      setState(() => _itemError = '品目を1件以上追加してください。');
+      setState(() => _itemError = l10n.addAtLeastOneItem);
       return;
     }
 
@@ -405,15 +414,15 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
 }
 
 class _DateField extends StatelessWidget {
-  const _DateField({required this.label, required this.value, required this.onTap});
+  const _DateField({required this.label, required this.value, required this.onTap, required this.l10n});
 
   final String label;
   final DateTime value;
   final VoidCallback onTap;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
-    final formatter = DateFormat('yyyy/MM/dd');
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -424,7 +433,7 @@ class _DateField extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text(formatter.format(value)),
+          child: Text(l10n.formatDate(value)),
         ),
       ),
     );
@@ -432,11 +441,12 @@ class _DateField extends StatelessWidget {
 }
 
 class _ItemCard extends StatelessWidget {
-  const _ItemCard({required this.entry, required this.onChanged, this.onRemove});
+  const _ItemCard({required this.entry, required this.onChanged, this.onRemove, required this.l10n});
 
   final _InvoiceItemEntry entry;
   final VoidCallback onChanged;
   final VoidCallback? onRemove;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -454,10 +464,10 @@ class _ItemCard extends StatelessWidget {
                 Expanded(
                   child: TextFormField(
                     controller: entry.descriptionController,
-                    decoration: const InputDecoration(labelText: '品目名'),
+                    decoration: InputDecoration(labelText: l10n.itemDescriptionLabel),
                     validator: (value) {
                       if ((value ?? '').trim().isEmpty) {
-                        return '品目名を入力してください。';
+                        return l10n.itemDescriptionRequired;
                       }
                       return null;
                     },
@@ -467,7 +477,7 @@ class _ItemCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 if (onRemove != null)
                   IconButton(
-                    tooltip: '削除',
+                    tooltip: l10n.removeItemTooltip,
                     onPressed: onRemove,
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -479,7 +489,7 @@ class _ItemCard extends StatelessWidget {
                 Expanded(
                   child: TextFormField(
                     controller: entry.quantityController,
-                    decoration: const InputDecoration(labelText: '数量'),
+                    decoration: InputDecoration(labelText: l10n.quantityLabel),
                     keyboardType: TextInputType.number,
                     onChanged: (_) => onChanged(),
                   ),
@@ -488,7 +498,7 @@ class _ItemCard extends StatelessWidget {
                 Expanded(
                   child: TextFormField(
                     controller: entry.unitPriceController,
-                    decoration: const InputDecoration(labelText: '単価 (¥)'),
+                    decoration: InputDecoration(labelText: l10n.unitPriceLabel),
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => onChanged(),
                   ),
@@ -503,11 +513,17 @@ class _ItemCard extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.subtotal, required this.tax, required this.total});
+  const _SummaryCard({
+    required this.subtotal,
+    required this.tax,
+    required this.total,
+    required this.l10n,
+  });
 
   final String subtotal;
   final String tax;
   final String total;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -520,11 +536,11 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _SummaryRow(label: '小計', value: subtotal),
-            _SummaryRow(label: '消費税', value: tax),
+            _SummaryRow(label: l10n.summarySubtotal, value: subtotal),
+            _SummaryRow(label: l10n.summaryTax, value: tax),
             const Divider(height: 24),
             _SummaryRow(
-              label: '合計',
+              label: l10n.summaryTotal,
               value: total,
               isEmphasized: true,
             ),

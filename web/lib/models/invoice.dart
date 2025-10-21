@@ -3,19 +3,6 @@ import 'package:flutter/material.dart';
 enum InvoiceStatus { draft, sent, paid, overdue }
 
 extension InvoiceStatusX on InvoiceStatus {
-  String get label {
-    switch (this) {
-      case InvoiceStatus.draft:
-        return '下書き';
-      case InvoiceStatus.sent:
-        return '送信済み';
-      case InvoiceStatus.paid:
-        return '支払い済み';
-      case InvoiceStatus.overdue:
-        return '期限切れ';
-    }
-  }
-
   Color get color {
     switch (this) {
       case InvoiceStatus.draft:

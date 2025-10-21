@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import 'invoice_status_chip.dart';
 
@@ -12,6 +13,7 @@ class InvoicePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -26,16 +28,16 @@ class InvoicePreview extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '請求書 ${invoice.number.isEmpty ? '（番号未設定）' : invoice.number}',
+                        l10n.invoiceTitle(invoice.number),
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '請求先: ${invoice.clientName}',
+                        l10n.previewClient(invoice.clientName),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       Text(
-                        '案件名: ${invoice.projectName}',
+                        l10n.previewProject(invoice.projectName),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],
@@ -49,25 +51,25 @@ class InvoicePreview extends StatelessWidget {
               spacing: 16,
               runSpacing: 12,
               children: [
-                _PreviewInfo(label: '発行日', value: _formatDate(invoice.issueDate)),
-                _PreviewInfo(label: '支払期限', value: _formatDate(invoice.dueDate)),
-                _PreviewInfo(label: '請求金額', value: currency.format(invoice.total)),
-                _PreviewInfo(label: '税率', value: '${(invoice.taxRate * 100).toStringAsFixed(0)}%'),
+                _PreviewInfo(label: l10n.issueDateLabel, value: l10n.formatDate(invoice.issueDate)),
+                _PreviewInfo(label: l10n.dueDateLabel, value: l10n.formatDate(invoice.dueDate)),
+                _PreviewInfo(label: l10n.previewAmountLabel, value: currency.format(invoice.total)),
+                _PreviewInfo(label: l10n.previewTaxRateLabel, value: '${(invoice.taxRate * 100).toStringAsFixed(0)}%'),
               ],
             ),
             const SizedBox(height: 20),
-            _ItemsTable(invoice: invoice, currency: currency),
+            _ItemsTable(invoice: invoice, currency: currency, l10n: l10n),
             const SizedBox(height: 20),
             Align(
               alignment: Alignment.centerRight,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _TotalRow(label: '小計', value: currency.format(invoice.subtotal)),
-                  _TotalRow(label: '消費税', value: currency.format(invoice.tax)),
+                  _TotalRow(label: l10n.summarySubtotal, value: currency.format(invoice.subtotal)),
+                  _TotalRow(label: l10n.summaryTax, value: currency.format(invoice.tax)),
                   const Divider(height: 24),
                   _TotalRow(
-                    label: '合計',
+                    label: l10n.summaryTotal,
                     value: currency.format(invoice.total),
                     isEmphasized: true,
                   ),
@@ -91,13 +93,13 @@ class InvoicePreview extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () {},
                   icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: const Text('PDFをダウンロード'),
+                  label: Text(l10n.downloadPdf),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: () {},
                   icon: const Icon(Icons.mail_outline),
-                  label: const Text('リマインドを送る'),
+                  label: Text(l10n.sendReminder),
                 ),
               ],
             ),
@@ -105,11 +107,6 @@ class InvoicePreview extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final formatter = DateFormat('yyyy/MM/dd');
-    return formatter.format(date);
   }
 }
 
@@ -142,10 +139,11 @@ class _PreviewInfo extends StatelessWidget {
 }
 
 class _ItemsTable extends StatelessWidget {
-  const _ItemsTable({required this.invoice, required this.currency});
+  const _ItemsTable({required this.invoice, required this.currency, required this.l10n});
 
   final Invoice invoice;
   final NumberFormat currency;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -158,11 +156,11 @@ class _ItemsTable extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              children: const [
-                Expanded(flex: 4, child: Text('品目')),
-                Expanded(flex: 2, child: Text('数量')),
-                Expanded(flex: 2, child: Text('単価')),
-                Expanded(flex: 2, child: Text('金額')),
+              children: [
+                Expanded(flex: 4, child: Text(l10n.itemsHeaderDescription)),
+                Expanded(flex: 2, child: Text(l10n.itemsHeaderQuantity)),
+                Expanded(flex: 2, child: Text(l10n.itemsHeaderUnitPrice)),
+                Expanded(flex: 2, child: Text(l10n.itemsHeaderAmount)),
               ],
             ),
             const Divider(height: 24),
@@ -209,14 +207,15 @@ class _TotalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = isEmphasized
-        ? Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)
-        : Theme.of(context).textTheme.titleMedium;
+        ? Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)
+        : Theme.of(context).textTheme.bodyLarge;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(label),
+          const SizedBox(width: 12),
           Text(value, style: style),
         ],
       ),
