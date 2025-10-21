@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_language.dart';
 import '../l10n/app_localizations.dart';
+import '../services/crisp_subscription_service.dart';
 import '../state/app_state.dart';
+import '../widgets/profile_edit_dialog.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -87,7 +89,20 @@ class _BusinessCard extends StatelessWidget {
             _InfoRow(label: l10n.phoneLabel, value: appState.phoneNumber),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () async {
+                final updated = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => const ProfileEditDialog(),
+                );
+                if (updated == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      behavior: SnackBarBehavior.floating,
+                      content: Text(l10n.profileUpdatedMessage),
+                    ),
+                  );
+                }
+              },
               icon: const Icon(Icons.edit_outlined),
               label: Text(l10n.editProfile),
             ),
@@ -107,6 +122,7 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPremium = appState.isPremium;
+    final planName = appState.subscriptionPlanName ?? l10n.crispPlanName;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -130,31 +146,94 @@ class _PlanCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.secondary,
                 ),
               ),
-              title: Text(isPremium ? l10n.premiumPlanName : l10n.freePlanName),
-              subtitle: Text(isPremium ? l10n.premiumPlanDescription : l10n.freePlanDescription),
+              title: Text(planName),
+              subtitle: Text(
+                isPremium ? l10n.premiumPlanDescription : l10n.freePlanDescription,
+              ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    onPressed: isPremium
-                        ? () => context.read<AppState>().downgradeToFreePlan()
-                        : () => context.read<AppState>().markAsPremium(),
-                    child: Text(isPremium ? l10n.downgradeToFreePlanButton : l10n.upgradeToPremiumCta),
+            if (!isPremium) ...[
+              Text(
+                l10n.crispPlanDescription,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _startCrispCheckout(context),
+                      icon: const Icon(Icons.lock_open),
+                      label: Text(l10n.crispSubscribeCta),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.planStripeNotice(),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
-            ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.crispPlanNotice,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+              ),
+            ] else ...[
+              Text(
+                l10n.premiumActiveDetails(planName),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.read<AppState>().downgradeToFreePlan(),
+                      icon: const Icon(Icons.undo),
+                      label: Text(l10n.downgradeToFreePlanButton),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _startCrispCheckout(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    final appState = context.read<AppState>();
+
+    try {
+      await CrispSubscriptionService().startCheckout(email: appState.email);
+      appState.markAsPremium(provider: 'crisp', planName: l10n.crispPlanName);
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutLaunched),
+        ),
+      );
+    } on CrispConfigurationException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispMissingConfig(error.message)),
+        ),
+      );
+    } on CrispCheckoutException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutError(error.message)),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutError(error.toString())),
+        ),
+      );
+    }
   }
 }
 

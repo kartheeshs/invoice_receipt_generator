@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
+import '../services/crisp_subscription_service.dart';
 import '../state/app_state.dart';
 import '../widgets/invoice_status_chip.dart';
 import '../widgets/metric_card.dart';
@@ -285,7 +286,7 @@ class DashboardPage extends StatelessWidget {
             const SizedBox(height: 16),
             if (!appState.isPremium)
               FilledButton.icon(
-                onPressed: () => context.read<AppState>().markAsPremium(),
+                onPressed: () => _startCrispCheckout(context),
                 icon: const Icon(Icons.workspace_premium_outlined),
                 label: Text(l10n.upgradeToPremiumCta),
               )
@@ -298,5 +299,43 @@ class DashboardPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _startCrispCheckout(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = context.l10n;
+    final appState = context.read<AppState>();
+
+    try {
+      await CrispSubscriptionService().startCheckout(email: appState.email);
+      appState.markAsPremium(provider: 'crisp', planName: l10n.crispPlanName);
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutLaunched),
+        ),
+      );
+    } on CrispConfigurationException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispMissingConfig(error.message)),
+        ),
+      );
+    } on CrispCheckoutException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutError(error.message)),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutError(error.toString())),
+        ),
+      );
+    }
   }
 }

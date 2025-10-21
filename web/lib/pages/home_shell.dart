@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
+import '../services/crisp_subscription_service.dart';
 import '../state/app_state.dart';
 import '../widgets/invoice_form_dialog.dart';
 import 'dashboard_page.dart';
@@ -294,9 +295,25 @@ class _HomeShellState extends State<HomeShell> {
     final l10n = context.l10n;
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.upgradeDialogTitle),
-        content: Text(l10n.upgradeDialogMessage),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.upgradeDialogMessage),
+            const SizedBox(height: 12),
+            Text(
+              l10n.crispPlanDescription,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.crispPlanNotice,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -304,15 +321,53 @@ class _HomeShellState extends State<HomeShell> {
           ),
           FilledButton.icon(
             onPressed: () {
-              Navigator.of(context).pop();
-              context.read<AppState>().markAsPremium();
+              _startCrispCheckout(context, dialogContext);
             },
             icon: const Icon(Icons.workspace_premium_outlined),
-            label: Text(l10n.upgradeDialogCta),
+            label: Text(l10n.crispSubscribeCta),
           ),
         ],
       ),
     );
+  }
+
+  void _startCrispCheckout(BuildContext parentContext, BuildContext dialogContext) async {
+    final messenger = ScaffoldMessenger.of(parentContext);
+    final l10n = parentContext.l10n;
+    final appState = parentContext.read<AppState>();
+
+    try {
+      await CrispSubscriptionService().startCheckout(email: appState.email);
+      appState.markAsPremium(provider: 'crisp', planName: l10n.crispPlanName);
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutLaunched),
+        ),
+      );
+      Navigator.of(dialogContext).pop();
+    } on CrispConfigurationException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispMissingConfig(error.message)),
+        ),
+      );
+    } on CrispCheckoutException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutError(error.message)),
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.crispCheckoutError(error.toString())),
+        ),
+      );
+    }
   }
 
   void _showNotifications(BuildContext context) {

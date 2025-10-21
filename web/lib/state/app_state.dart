@@ -18,6 +18,8 @@ class AppState extends ChangeNotifier {
   Invoice? _selectedInvoice;
 
   bool _isPremium = false;
+  String? _subscriptionProvider;
+  String? _subscriptionPlanName;
   AppLanguage _language = AppLanguage.japanese;
   int monthlyDownloadLimit = 3;
   int monthlyDownloadsUsed = 1;
@@ -40,9 +42,15 @@ class AppState extends ChangeNotifier {
 
   bool get isPremium => _isPremium;
 
+  String? get subscriptionProvider => _subscriptionProvider;
+
+  String? get subscriptionPlanName => _subscriptionPlanName;
+
   AppLanguage get language => _language;
 
   Locale get locale => _language.locale;
+
+  bool get hasDownloadQuota => isPremium || monthlyDownloadsUsed < monthlyDownloadLimit;
 
   double get totalBilled => _sumFor((invoice) => invoice.status == InvoiceStatus.paid);
 
@@ -84,9 +92,6 @@ class AppState extends ChangeNotifier {
     final index = _invoices.indexWhere((element) => element.id == invoice.id);
     if (index == -1) {
       _invoices = [..._invoices, invoice];
-      if (!_isPremium && monthlyDownloadsUsed < monthlyDownloadLimit) {
-        monthlyDownloadsUsed += 1;
-      }
     } else {
       final updated = [..._invoices];
       updated[index] = invoice;
@@ -104,18 +109,51 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markAsPremium() {
+  void markAsPremium({String provider = 'manual', String? planName}) {
     _isPremium = true;
     monthlyDownloadLimit = 999;
+    _subscriptionProvider = provider;
+    _subscriptionPlanName = planName;
     notifyListeners();
   }
 
   void downgradeToFreePlan() {
     _isPremium = false;
     monthlyDownloadLimit = 3;
+    _subscriptionProvider = null;
+    _subscriptionPlanName = null;
     if (monthlyDownloadsUsed > monthlyDownloadLimit) {
       monthlyDownloadsUsed = monthlyDownloadLimit;
     }
+    notifyListeners();
+  }
+
+  bool recordInvoiceDownload() {
+    if (_isPremium) {
+      return true;
+    }
+    if (monthlyDownloadsUsed >= monthlyDownloadLimit) {
+      return false;
+    }
+    monthlyDownloadsUsed += 1;
+    notifyListeners();
+    return true;
+  }
+
+  void updateBusinessProfile({
+    required String newBusinessName,
+    required String newOwnerName,
+    required String newEmail,
+    required String newPhoneNumber,
+    required String newPostalCode,
+    required String newAddress,
+  }) {
+    businessName = newBusinessName.trim();
+    ownerName = newOwnerName.trim();
+    email = newEmail.trim();
+    phoneNumber = newPhoneNumber.trim();
+    postalCode = newPostalCode.trim();
+    address = newAddress.trim();
     notifyListeners();
   }
 

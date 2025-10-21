@@ -36,7 +36,7 @@ class AppLocalizations {
   String get invoicesNav => _select('請求書', 'Invoices');
   String get settingsNav => _select('設定', 'Settings');
   String get upgradeToPremiumButton =>
-      _select('プレミアムへアップグレード', 'Upgrade to Premium');
+      _select('Crispでプレミアム登録', 'Upgrade with Crisp');
   String get premiumActiveLabel =>
       _select('プレミアム適用中', 'Premium Active');
   String get notificationsTooltip => _select('通知', 'Notifications');
@@ -48,12 +48,11 @@ class AppLocalizations {
   String get closeAction => _select('閉じる', 'Close');
   String get deleteAction => _select('削除する', 'Delete');
   String get upgradeDialogTitle =>
-      _select('プレミアムプラン', 'Premium plan');
+      _select('Crisp プレミアムプラン', 'Crisp premium plan');
   String get upgradeDialogMessage => _select(
-        '月額¥500でPDFダウンロード無制限・ブランドロゴ設定などの機能が利用できます。アップグレードしますか？',
-        'Upgrade for ¥500/month to unlock unlimited PDF downloads, brand customization, and priority support. Proceed with the upgrade?',
+        '月額¥600のCrispサブスクリプションでPDFダウンロード無制限と優先サポートが利用できます。',
+        'Subscribe via Crisp for ¥600/month to unlock unlimited PDF downloads and priority support.',
       );
-  String get upgradeDialogCta => _select('アップグレード', 'Upgrade');
   String get notificationsTitle => _select('最新のお知らせ', 'Latest updates');
   String get notificationTaxUpdateTitle => _select(
         '請求書テンプレートに「軽減税率」項目を追加しました。',
@@ -76,7 +75,7 @@ class AppLocalizations {
   String get deleteInvoiceTitle =>
       _select('請求書の削除', 'Delete invoice');
   String get upgradeToPremiumCta =>
-      _select('プレミアムにアップグレード', 'Upgrade to premium');
+      _select('Crispでプレミアム登録', 'Upgrade with Crisp');
   String get downgradeToFreeCta =>
       _select('フリープランにダウングレード', 'Switch to free plan');
   String get downgradeToFreePlanButton =>
@@ -195,20 +194,52 @@ class AppLocalizations {
   String get settingsPlanSectionTitle =>
       _select('プラン', 'Plan');
   String get premiumPlanName =>
-      _select('プレミアムプラン（¥500/月）', 'Premium plan (¥500/mo)');
+      _select('Crispプレミアム（¥600/月）', 'Crisp premium (¥600/mo)');
+  String get crispPlanName => premiumPlanName;
   String get freePlanName => _select('無料プラン', 'Free plan');
   String get premiumPlanDescription => _select(
-        'PDFダウンロード無制限 / カスタムブランド / 優先サポート',
-        'Unlimited PDFs / Custom branding / Priority support',
+        'PDFダウンロード無制限 / 優先サポート / クラウドバックアップ',
+        'Unlimited PDFs / Priority support / Cloud backups',
       );
   String get freePlanDescription => _select(
         '月3件までPDFダウンロード / 基本テンプレート',
         'Up to 3 PDF downloads per month / Basic templates',
       );
-  String planStripeNotice() => _select(
-        'Stripe 決済は有効化済みです。請求書テンプレートに表示される課金情報は自動で更新されます。',
-        'Stripe payments are enabled. Billing details on your invoices update automatically.',
+  String get crispPlanDescription => _select(
+        'Crisp経由の月額¥600サブスクリプションでプレミアム機能を解放できます。',
+        'Unlock premium features for ¥600/month via your Crisp subscription.',
       );
+  String get crispPlanNotice => _select(
+        'Crispのチェックアウトが新しいタブで開きます。決済完了後にこちらへ戻り、ステータスを確認してください。',
+        'Crisp checkout opens in a new tab. Complete payment and return here to confirm your status.',
+      );
+  String get crispSubscribeCta =>
+      _select('Crispで申し込む (¥600/月)', 'Subscribe with Crisp (¥600/mo)');
+  String premiumActiveDetails(String planName) => _select(
+        '現在のプラン: ${planName}。Crispダッシュボードから請求情報を管理できます。',
+        'Active plan: $planName. Manage billing from your Crisp dashboard.',
+      );
+  String get crispCheckoutLaunched =>
+      _select('Crispの決済タブを開きました。完了後にこちらへ戻ってください。',
+          'Opened Crisp checkout in a new tab. Return here once payment is complete.');
+  String crispMissingConfig(String reason) => _select(
+        'Crisp連携が未設定です: ${reason}',
+        'Crisp integration is not configured: $reason',
+      );
+  String crispCheckoutError(String reason) => _select(
+        'Crispの決済リンクを開けませんでした: ${reason}',
+        'Could not launch the Crisp checkout link: $reason',
+      );
+  String get profileDialogTitle =>
+      _select('事業者プロフィールを編集', 'Edit business profile');
+  String get profileDialogSubtitle => _select(
+        '請求書やPDFに表示される事業者情報を更新します。',
+        'Update the company details displayed on invoices and PDFs.',
+      );
+  String get saveChanges => _select('変更を保存', 'Save changes');
+  String get fieldRequired => _select('必須項目です。', 'This field is required.');
+  String get profileUpdatedMessage =>
+      _select('プロフィールを更新しました。', 'Profile updated successfully.');
   String get settingsTemplateSectionTitle =>
       _select('請求書テンプレート', 'Invoice template');
   String get autoNumberingTitle =>
@@ -317,6 +348,14 @@ class AppLocalizations {
   String get itemsHeaderAmount => _select('金額', 'Amount');
   String get downloadPdf => _select('PDFをダウンロード', 'Download PDF');
   String get sendReminder => _select('リマインドを送る', 'Send reminder');
+  String get pdfDownloadSuccess =>
+      _select('PDFをダウンロードしました。', 'Invoice PDF downloaded.');
+  String get pdfDownloadError =>
+      _select('PDFの生成に失敗しました。', 'Failed to generate the PDF.');
+  String pdfDownloadLimitReached(int limit) => _select(
+        '無料プランでは月${limit}件までPDFをダウンロードできます。',
+        'The free plan allows up to $limit PDF downloads per month.',
+      );
 
   // Authentication
   String get signInTitle => _select('アカウントにサインイン', 'Sign in to your account');
@@ -326,6 +365,10 @@ class AppLocalizations {
       );
   String get registerTitle =>
       _select('アカウントを作成', 'Create an account');
+  String get registerSubtitle => _select(
+        '事業者情報を登録すると請求書テンプレートが自動で設定されます。',
+        'Register your business details to prefill invoice templates automatically.',
+      );
   String get emailFieldLabel => _select('メールアドレス', 'Email');
   String get emailRequired =>
       _select('メールアドレスを入力してください。', 'Enter your email.');
@@ -340,6 +383,14 @@ class AppLocalizations {
       _select('アカウントをお持ちでない場合はこちら', 'Need an account? Register');
   String get toggleToSignIn =>
       _select('すでにアカウントをお持ちの場合はこちら', 'Already have an account? Sign in');
+  String get signUpBusinessNameLabel =>
+      _select('事業者名', 'Business name');
+  String get signUpBusinessNameHint =>
+      _select('例: 和式デザイン合同会社', 'e.g. Wafu Studio Inc.');
+  String get signUpOwnerNameLabel =>
+      _select('担当者名', 'Owner name');
+  String get signUpOwnerNameHint =>
+      _select('例: 山田 太郎', 'e.g. Jane Doe');
   String get authGenericError =>
       _select('認証に失敗しました。時間をおいて再度お試しください。',
           'Authentication failed. Please try again later.');

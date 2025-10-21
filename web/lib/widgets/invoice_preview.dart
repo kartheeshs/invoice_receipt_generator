@@ -1,19 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
+import '../services/pdf_service.dart';
+import '../state/app_state.dart';
 import 'invoice_status_chip.dart';
 
-class InvoicePreview extends StatelessWidget {
+class InvoicePreview extends StatefulWidget {
   const InvoicePreview({super.key, required this.invoice, required this.currency});
 
   final Invoice invoice;
   final NumberFormat currency;
 
   @override
+  State<InvoicePreview> createState() => _InvoicePreviewState();
+}
+
+class _InvoicePreviewState extends State<InvoicePreview> {
+  bool _isDownloading = false;
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final appState = context.watch<AppState>();
+    final canDownload = appState.hasDownloadQuota;
+    final invoice = widget.invoice;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -53,24 +68,24 @@ class InvoicePreview extends StatelessWidget {
               children: [
                 _PreviewInfo(label: l10n.issueDateLabel, value: l10n.formatDate(invoice.issueDate)),
                 _PreviewInfo(label: l10n.dueDateLabel, value: l10n.formatDate(invoice.dueDate)),
-                _PreviewInfo(label: l10n.previewAmountLabel, value: currency.format(invoice.total)),
+                _PreviewInfo(label: l10n.previewAmountLabel, value: widget.currency.format(invoice.total)),
                 _PreviewInfo(label: l10n.previewTaxRateLabel, value: '${(invoice.taxRate * 100).toStringAsFixed(0)}%'),
               ],
             ),
             const SizedBox(height: 20),
-            _ItemsTable(invoice: invoice, currency: currency, l10n: l10n),
+            _ItemsTable(invoice: invoice, currency: widget.currency, l10n: l10n),
             const SizedBox(height: 20),
             Align(
               alignment: Alignment.centerRight,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  _TotalRow(label: l10n.summarySubtotal, value: currency.format(invoice.subtotal)),
-                  _TotalRow(label: l10n.summaryTax, value: currency.format(invoice.tax)),
+                  _TotalRow(label: l10n.summarySubtotal, value: widget.currency.format(invoice.subtotal)),
+                  _TotalRow(label: l10n.summaryTax, value: widget.currency.format(invoice.tax)),
                   const Divider(height: 24),
                   _TotalRow(
                     label: l10n.summaryTotal,
-                    value: currency.format(invoice.total),
+                    value: widget.currency.format(invoice.total),
                     isEmphasized: true,
                   ),
                 ],
@@ -91,8 +106,15 @@ class InvoicePreview extends StatelessWidget {
             Row(
               children: [
                 FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
+                  onPressed:
+                      _isDownloading || !canDownload ? null : () => _downloadPdf(context),
+                  icon: _isDownloading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.picture_as_pdf_outlined),
                   label: Text(l10n.downloadPdf),
                 ),
                 const SizedBox(width: 12),
@@ -103,10 +125,62 @@ class InvoicePreview extends StatelessWidget {
                 ),
               ],
             ),
+            if (!canDownload)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  l10n.pdfDownloadLimitReached(appState.monthlyDownloadLimit),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _downloadPdf(BuildContext context) async {
+    final appState = context.read<AppState>();
+    final l10n = context.l10n;
+
+    if (!appState.hasDownloadQuota) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.pdfDownloadLimitReached(appState.monthlyDownloadLimit)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isDownloading = true);
+
+    try {
+      final service = InvoicePdfService(l10n);
+      final pdfBytes = await service.buildInvoice(invoice: widget.invoice, appState: appState);
+      await Printing.layoutPdf(
+        name: 'invoice-${widget.invoice.number.isNotEmpty ? widget.invoice.number : widget.invoice.id}.pdf',
+        onLayout: (_) async => pdfBytes,
+      );
+      appState.recordInvoiceDownload();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.pdfDownloadSuccess),
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(l10n.pdfDownloadError),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 }
 

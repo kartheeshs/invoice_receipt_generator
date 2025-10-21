@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../state/app_state.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -14,6 +16,8 @@ class _SignInPageState extends State<SignInPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _businessController = TextEditingController();
+  final _ownerController = TextEditingController();
 
   bool _isRegisterMode = false;
   bool _isLoading = false;
@@ -23,6 +27,8 @@ class _SignInPageState extends State<SignInPage> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _businessController.dispose();
+    _ownerController.dispose();
     super.dispose();
   }
 
@@ -56,7 +62,7 @@ class _SignInPageState extends State<SignInPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          l10n.signInSubtitle,
+                          _isRegisterMode ? l10n.registerSubtitle : l10n.signInSubtitle,
                           style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
                           textAlign: TextAlign.center,
                         ),
@@ -95,6 +101,42 @@ class _SignInPageState extends State<SignInPage> {
                             return null;
                           },
                         ),
+                        if (_isRegisterMode) ...[
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _businessController,
+                            decoration: InputDecoration(
+                              labelText: l10n.signUpBusinessNameLabel,
+                              hintText: l10n.signUpBusinessNameHint,
+                            ),
+                            validator: (value) {
+                              if (!_isRegisterMode) {
+                                return null;
+                              }
+                              if ((value ?? '').trim().isEmpty) {
+                                return l10n.fieldRequired;
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _ownerController,
+                            decoration: InputDecoration(
+                              labelText: l10n.signUpOwnerNameLabel,
+                              hintText: l10n.signUpOwnerNameHint,
+                            ),
+                            validator: (value) {
+                              if (!_isRegisterMode) {
+                                return null;
+                              }
+                              if ((value ?? '').trim().isEmpty) {
+                                return l10n.fieldRequired;
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                         if (_error != null) ...[
                           const SizedBox(height: 16),
                           Text(
@@ -118,15 +160,26 @@ class _SignInPageState extends State<SignInPage> {
                           onPressed: _isLoading
                               ? null
                               : () {
+                                  final state = context.read<AppState>();
                                   setState(() {
                                     _isRegisterMode = !_isRegisterMode;
                                     _error = null;
+                                    if (_isRegisterMode) {
+                                      _businessController.text = state.businessName;
+                                      _ownerController.text = state.ownerName;
+                                    }
                                   });
                                 },
                           child: Text(
                             _isRegisterMode ? l10n.toggleToSignIn : l10n.toggleToRegister,
                             textAlign: TextAlign.center,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.crispPlanDescription,
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.black45),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
@@ -159,8 +212,26 @@ class _SignInPageState extends State<SignInPage> {
       final password = _passwordController.text.trim();
       if (_isRegisterMode) {
         await auth.createUserWithEmailAndPassword(email: email, password: password);
+        final appState = context.read<AppState>();
+        appState.updateBusinessProfile(
+          newBusinessName: _businessController.text.trim(),
+          newOwnerName: _ownerController.text.trim(),
+          newEmail: email,
+          newPhoneNumber: appState.phoneNumber,
+          newPostalCode: appState.postalCode,
+          newAddress: appState.address,
+        );
       } else {
         await auth.signInWithEmailAndPassword(email: email, password: password);
+        final appState = context.read<AppState>();
+        appState.updateBusinessProfile(
+          newBusinessName: appState.businessName,
+          newOwnerName: appState.ownerName,
+          newEmail: email,
+          newPhoneNumber: appState.phoneNumber,
+          newPostalCode: appState.postalCode,
+          newAddress: appState.address,
+        );
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
