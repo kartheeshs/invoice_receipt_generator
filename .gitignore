@@ -1,0 +1,9 @@
+node_modules/
+.env
+web/.env
+server/.env
+dist/
+web/dist/
+server/dist/
+.DS_Store
+stripe.log
