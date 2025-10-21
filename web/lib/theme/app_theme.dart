@@ -24,7 +24,7 @@ ThemeData buildAppTheme() {
         fontWeight: FontWeight.w600,
       ),
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       elevation: 0,
       surfaceTintColor: Colors.white,
       color: Colors.white,
