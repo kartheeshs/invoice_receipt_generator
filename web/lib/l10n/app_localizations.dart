@@ -41,6 +41,9 @@ class AppLocalizations {
           'Upgrade via Crisp to unlock unlimited invoices and premium templates.',
       'planFreeBody': 'You are using the free plan. Upgrade any time to unlock unlimited PDF exports.',
       'planPremiumBody': 'You are enjoying premium benefits. Thank you for subscribing!',
+      'guestModeTitle': 'Guest mode active',
+      'guestModeBody':
+          'Create invoices without signing in. Sign in to keep your history, download PDFs, and unlock additional templates.',
       'firebaseBanner': 'Firebase auth is not configured. Provide FIREBASE_API_KEY (or legacy '
           'FIREBASE_APP_KEY) via --dart-define to enable authentication.',
       'subscribeCrisp': 'Subscribe via Crisp',
@@ -63,6 +66,12 @@ class AppLocalizations {
       'invoicesEmptyTitle': 'Create your first invoice',
       'invoicesEmptyBody':
           'Generate invoices and receipts instantly for your clients.',
+      'guestInvoicesLockedTitle': 'Invoice history locked',
+      'guestInvoicesLockedBody':
+          'Sign in to view saved invoices, download PDFs, and switch between invoice templates.',
+      'guestCurrentInvoiceTitle': 'Current invoice',
+      'guestCurrentInvoiceBody':
+          'This invoice is stored for this session only. Sign in to keep it in your history and download it later.',
       'newInvoice': 'New invoice',
       'editInvoice': 'Edit invoice',
       'invoiceFormTitle': 'Invoice details',
@@ -75,6 +84,11 @@ class AppLocalizations {
       'dueDateLabel': 'Due date',
       'notesLabel': 'Notes',
       'statusLabel': 'Status',
+      'templateFieldLabel': 'Template',
+      'templateClassic': 'Classic',
+      'templateModern': 'Modern',
+      'templateMinimal': 'Minimal',
+      'templatesLocked': 'Sign in to access more templates.',
       'saveButton': 'Save',
       'cancelButton': 'Cancel',
       'deleteButton': 'Delete',
@@ -97,6 +111,7 @@ class AppLocalizations {
       'invoiceSaved': 'Invoice saved',
       'invoiceDeleted': 'Invoice deleted',
       'pdfReady': 'Invoice PDF is ready to download.',
+      'downloadRequiresAccount': 'Sign in to download invoices as PDF.',
       'errorUnknown': 'Something went wrong. Please try again.',
       'firebaseMissing': 'Firebase auth is not configured. Provide FIREBASE_API_KEY (or '
           'FIREBASE_APP_KEY) via --dart-define to enable password reset.',
@@ -108,6 +123,11 @@ class AppLocalizations {
       'signOut': 'Sign out',
       'confirmSignOut': 'Do you want to sign out?',
       'confirm': 'Confirm',
+      'authRequiredTitle': 'Sign in required',
+      'authRequiredBody':
+          'Sign in to download invoices, view history, and access additional templates.',
+      'notNow': 'Not now',
+      'settingsGuestCta': 'Sign in to manage your account and subscription.',
     },
     'ja': {
       'appTitle': '請求書・領収書ジェネレーター',
@@ -139,6 +159,9 @@ class AppLocalizations {
           'Crisp経由でアップグレードすると、無制限の請求書とプレミアムテンプレートが利用できます。',
       'planFreeBody': '現在はフリープランをご利用中です。必要になったらいつでもアップグレードしてください。',
       'planPremiumBody': 'プレミアム特典をご利用いただきありがとうございます！',
+      'guestModeTitle': 'ゲストモードで利用中',
+      'guestModeBody':
+          'ログインせずに請求書を作成できます。履歴を保存し、PDFをダウンロードし、追加テンプレートを利用するにはログインしてください。',
       'firebaseBanner':
           'Firebase認証が設定されていません。--dart-define で FIREBASE_API_KEY または FIREBASE_APP_KEY を設定してください。',
       'subscribeCrisp': 'Crispで購読',
@@ -159,6 +182,10 @@ class AppLocalizations {
       'recentInvoices': '最近の請求書',
       'invoicesEmptyTitle': '最初の請求書を作成しましょう',
       'invoicesEmptyBody': 'クライアント向けの請求書や領収書をすぐに生成できます。',
+      'guestInvoicesLockedTitle': '請求書の履歴はロックされています',
+      'guestInvoicesLockedBody': '保存した請求書の閲覧やPDFのダウンロード、テンプレートの切り替えにはログインが必要です。',
+      'guestCurrentInvoiceTitle': '現在の請求書',
+      'guestCurrentInvoiceBody': 'この請求書は現在のセッションでのみ保持されます。履歴に保存して後からダウンロードするにはログインしてください。',
       'newInvoice': '新しい請求書',
       'editInvoice': '請求書を編集',
       'invoiceFormTitle': '請求書の詳細',
@@ -171,6 +198,11 @@ class AppLocalizations {
       'dueDateLabel': '支払期日',
       'notesLabel': 'メモ',
       'statusLabel': 'ステータス',
+      'templateFieldLabel': 'テンプレート',
+      'templateClassic': 'クラシック',
+      'templateModern': 'モダン',
+      'templateMinimal': 'ミニマル',
+      'templatesLocked': 'その他のテンプレートを利用するにはログインしてください。',
       'saveButton': '保存',
       'cancelButton': 'キャンセル',
       'deleteButton': '削除',
@@ -193,6 +225,7 @@ class AppLocalizations {
       'invoiceSaved': '請求書を保存しました',
       'invoiceDeleted': '請求書を削除しました',
       'pdfReady': 'PDFファイルをダウンロードできます。',
+      'downloadRequiresAccount': 'PDFをダウンロードするにはログインしてください。',
       'errorUnknown': '問題が発生しました。再度お試しください。',
       'firebaseMissing':
           'Firebaseの設定が必要です。--dart-define で FIREBASE_API_KEY もしくは FIREBASE_APP_KEY を設定してください。',
@@ -204,6 +237,10 @@ class AppLocalizations {
       'signOut': 'サインアウト',
       'confirmSignOut': 'サインアウトしますか？',
       'confirm': '確認',
+      'authRequiredTitle': 'ログインが必要です',
+      'authRequiredBody': 'PDFのダウンロードや履歴の閲覧、テンプレートの利用にはログインが必要です。',
+      'notNow': '後で',
+      'settingsGuestCta': 'アカウント情報やサブスクリプションを管理するにはログインしてください。',
     }
   };
 
@@ -228,6 +265,8 @@ class AppLocalizations {
   }
 
   String invoiceStatusLabel(InvoiceStatus status) => _lookup('status_${status.name}');
+
+  String invoiceTemplateLabel(InvoiceTemplate template) => _lookup('template_${template.name}');
 
   NumberFormat currencyFormat(String currencyCode, String symbol) =>
       NumberFormat.currency(locale: locale.toLanguageTag(), name: currencyCode, symbol: symbol);

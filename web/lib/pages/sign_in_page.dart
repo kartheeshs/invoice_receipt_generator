@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,28 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../state/app_state.dart';
 
 class SignInPage extends StatefulWidget {
-  const SignInPage({
-    super.key,
-    required this.isLoading,
-    required this.onSignIn,
-    required this.onSignUp,
-    required this.onForgotPassword,
-    required this.errorMessage,
-    required this.clearError,
-    required this.hasFirebase,
-    required this.locale,
-    required this.onLocaleChanged,
-  });
-
-  final bool isLoading;
-  final Future<void> Function(String email, String password) onSignIn;
-  final Future<void> Function(String name, String email, String password) onSignUp;
-  final Future<void> Function(String email) onForgotPassword;
-  final String? errorMessage;
-  final VoidCallback clearError;
-  final bool hasFirebase;
-  final Locale locale;
-  final ValueChanged<Locale> onLocaleChanged;
+  const SignInPage({super.key});
 
   @override
   State<SignInPage> createState() => _SignInPageState();
@@ -39,22 +17,10 @@ class _SignInPageState extends State<SignInPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
   bool _isSignUp = false;
   bool _obscurePassword = true;
-
-  @override
-  void didUpdateWidget(covariant SignInPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.errorMessage != null && widget.errorMessage != oldWidget.errorMessage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.errorMessage!)),
-        );
-        widget.clearError();
-      });
-    }
-  }
+  String? _lastError;
 
   @override
   void dispose() {
@@ -67,8 +33,24 @@ class _SignInPageState extends State<SignInPage> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final isLoading = appState.isLoading;
+    final hasFirebase = appState.hasFirebase;
+    final locale = appState.locale;
+
+    final errorMessage = appState.errorMessage;
+    if (errorMessage != null && errorMessage != _lastError) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+        context.read<AppState>().clearError();
+      });
+      _lastError = errorMessage;
+    }
 
     return Scaffold(
       body: Center(
@@ -88,9 +70,9 @@ class _SignInPageState extends State<SignInPage> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: DropdownButton<Locale>(
-                        value: widget.locale,
+                        value: locale,
                         onChanged: (value) {
-                          if (value != null) widget.onLocaleChanged(value);
+                          if (value != null) context.read<AppState>().setLocale(value);
                         },
                         items: const [
                           DropdownMenuItem(value: Locale('en'), child: Text('English')),
@@ -104,7 +86,7 @@ class _SignInPageState extends State<SignInPage> {
                       style: theme.textTheme.headlineMedium,
                     ),
                     const SizedBox(height: 24),
-                    if (!widget.hasFirebase)
+                    if (!hasFirebase)
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(12),
@@ -195,8 +177,8 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
-                      onPressed: widget.isLoading ? null : _submit,
-                      child: widget.isLoading
+                      onPressed: isLoading ? null : _submit,
+                      child: isLoading
                           ? SizedBox(
                               width: 20,
                               height: 20,
@@ -211,32 +193,29 @@ class _SignInPageState extends State<SignInPage> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton(
-                        onPressed: widget.isLoading
+                        onPressed: isLoading
                             ? null
                             : () async {
                                 final email = _emailController.text.trim();
                                 if (email.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(l10n.text('validationEmail'))),
-                                  );
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(content: Text(l10n.text('validationEmail'))));
                                   return;
                                 }
-                                if (!widget.hasFirebase) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(l10n.text('firebaseMissing'))),
-                                  );
+                                if (!hasFirebase) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(content: Text(l10n.text('firebaseMissing'))));
                                   return;
                                 }
                                 try {
-                                  await widget.onForgotPassword(email);
+                                  await context.read<AppState>().sendPasswordReset(email);
                                   if (!mounted) return;
-                                  final error = context.read<AppState>().errorMessage;
-                                  if (error == null) {
+                                  if (context.read<AppState>().errorMessage == null) {
                                     ScaffoldMessenger.of(context)
                                         .showSnackBar(SnackBar(content: Text(l10n.text('resetPasswordSent'))));
                                   }
                                 } catch (_) {
-                                  // Errors are reported via AppState.errorMessage
+                                  // Errors handled via AppState.errorMessage.
                                 }
                               },
                         child: Text(l10n.text('forgotPassword')),
@@ -244,12 +223,13 @@ class _SignInPageState extends State<SignInPage> {
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: widget.isLoading
+                      onPressed: isLoading
                           ? null
                           : () {
                               setState(() {
                                 _isSignUp = !_isSignUp;
                               });
+                              context.read<AppState>().clearError();
                             },
                       child: Text(
                         _isSignUp ? l10n.text('haveAccountPrompt') : l10n.text('noAccountPrompt'),
@@ -269,13 +249,21 @@ class _SignInPageState extends State<SignInPage> {
     if (_formKey.currentState?.validate() != true) {
       return;
     }
+
+    final appState = context.read<AppState>();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+
     if (_isSignUp) {
       final name = _nameController.text.trim();
-      await widget.onSignUp(name, email, password);
+      await appState.signUp(displayName: name, email: email, password: password);
     } else {
-      await widget.onSignIn(email, password);
+      await appState.signIn(email: email, password: password);
+    }
+
+    if (!mounted) return;
+    if (appState.isAuthenticated) {
+      Navigator.of(context).pop();
     }
   }
 }

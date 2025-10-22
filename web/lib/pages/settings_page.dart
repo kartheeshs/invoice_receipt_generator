@@ -13,13 +13,15 @@ class SettingsPage extends StatelessWidget {
     required this.onSignOut,
     required this.onManageSubscription,
     required this.onCancelSubscription,
+    required this.onSignIn,
   });
 
   final VoidCallback onEditProfile;
   final ValueChanged<Locale> onLanguageChanged;
   final Future<void> Function() onSignOut;
-  final VoidCallback onManageSubscription;
+  final Future<void> Function() onManageSubscription;
   final VoidCallback onCancelSubscription;
+  final Future<void> Function() onSignIn;
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +31,17 @@ class SettingsPage extends StatelessWidget {
       builder: (context, appState, child) {
         final profile = appState.profile;
         final locale = appState.locale;
+        final isGuest = appState.isGuest;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (isGuest) ...[
+                Text(l10n.text('settingsGuestCta'), style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 16),
+              ],
               Card(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 child: Padding(
@@ -114,14 +121,15 @@ class SettingsPage extends StatelessWidget {
                       Row(
                         children: [
                           FilledButton.icon(
-                            onPressed: onManageSubscription,
+                            onPressed: () =>
+                                isGuest ? onSignIn() : onManageSubscription(),
                             icon: const Icon(Icons.workspace_premium),
                             label: Text(appState.isPremium
                                 ? l10n.text('manageSubscription')
                                 : l10n.text('subscribeCrisp')),
                           ),
                           const SizedBox(width: 12),
-                          if (appState.isPremium)
+                          if (appState.isPremium && !isGuest)
                             OutlinedButton(
                               onPressed: onCancelSubscription,
                               child: Text(l10n.text('cancelSubscription')),
@@ -135,27 +143,37 @@ class SettingsPage extends StatelessWidget {
               const SizedBox(height: 24),
               Align(
                 alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final shouldSignOut = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(l10n.text('signOut')),
-                            content: Text(l10n.text('confirmSignOut')),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.text('cancelButton'))),
-                              FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.text('confirm'))),
-                            ],
-                          ),
-                        ) ??
-                        false;
-                    if (shouldSignOut) {
-                      await onSignOut();
-                    }
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: Text(l10n.text('signOut')),
-                ),
+                child: isGuest
+                    ? FilledButton.icon(
+                        onPressed: () => onSignIn(),
+                        icon: const Icon(Icons.login),
+                        label: Text(l10n.text('signInButton')),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () async {
+                          final shouldSignOut = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text(l10n.text('signOut')),
+                                  content: Text(l10n.text('confirmSignOut')),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () => Navigator.of(context).pop(false),
+                                        child: Text(l10n.text('cancelButton'))),
+                                    FilledButton(
+                                        onPressed: () => Navigator.of(context).pop(true),
+                                        child: Text(l10n.text('confirm'))),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+                          if (shouldSignOut) {
+                            await onSignOut();
+                          }
+                        },
+                        icon: const Icon(Icons.logout),
+                        label: Text(l10n.text('signOut')),
+                      ),
               ),
             ],
           ),

@@ -11,10 +11,12 @@ class DashboardPage extends StatelessWidget {
     super.key,
     required this.onCreateInvoice,
     required this.onOpenSubscription,
+    required this.onRequestSignIn,
   });
 
   final VoidCallback onCreateInvoice;
-  final VoidCallback onOpenSubscription;
+  final Future<void> Function() onOpenSubscription;
+  final Future<void> Function() onRequestSignIn;
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +30,41 @@ class DashboardPage extends StatelessWidget {
         final priceText = l10n.textWithReplacement('planPriceLabelLocalized', {
           'price': currency.format(appState.planPrice),
         });
+        final isGuest = appState.isGuest;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (isGuest) ...[
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(l10n.text('guestModeTitle'),
+                                  style: Theme.of(context).textTheme.titleMedium),
+                              const SizedBox(height: 8),
+                              Text(l10n.text('guestModeBody')),
+                            ],
+                          ),
+                        ),
+                        FilledButton(
+                          onPressed: () => onRequestSignIn(),
+                          child: Text(l10n.text('signInButton')),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
               Wrap(
                 spacing: 24,
                 runSpacing: 24,
@@ -104,7 +135,7 @@ class DashboardPage extends StatelessWidget {
                             ),
                           ),
                           FilledButton.icon(
-                            onPressed: onOpenSubscription,
+                            onPressed: () => onOpenSubscription(),
                             icon: const Icon(Icons.workspace_premium),
                             label: Text(appState.isPremium
                                 ? l10n.text('manageSubscription')
@@ -147,7 +178,28 @@ class DashboardPage extends StatelessWidget {
               const SizedBox(height: 32),
               Text(l10n.text('recentInvoices'), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
-              if (appState.recentInvoices.isEmpty)
+              if (isGuest)
+                Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(l10n.text('guestInvoicesLockedTitle'),
+                            style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        Text(l10n.text('guestInvoicesLockedBody')),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: () => onRequestSignIn(),
+                          child: Text(l10n.text('signInButton')),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (appState.recentInvoices.isEmpty)
                 Text(l10n.text('invoicesEmptyBody'))
               else
                 Column(

@@ -10,6 +10,15 @@ import '../services/auth_service.dart';
 import '../services/crisp_service.dart';
 import '../services/pdf_service.dart';
 
+class AccessDeniedException implements Exception {
+  const AccessDeniedException(this.reasonKey);
+
+  final String reasonKey;
+
+  @override
+  String toString() => 'AccessDeniedException(reasonKey: $reasonKey)';
+}
+
 class AppState extends ChangeNotifier {
   AppState({
     required AppConfig config,
@@ -20,7 +29,7 @@ class AppState extends ChangeNotifier {
         _authService = authService ?? FirebaseAuthService(apiKey: config.firebaseApiKey),
         _pdfService = pdfService ?? PdfService(),
         _crispService = crispService ?? CrispService(config.crispSubscriptionUrl) {
-    _profile = UserProfile(
+    _guestProfile = UserProfile(
       displayName: 'Guest',
       email: '',
       companyName: 'Freelance Studio',
@@ -30,6 +39,7 @@ class AppState extends ChangeNotifier {
       currencyCode: config.currencyCode,
       currencySymbol: config.currencySymbol,
     );
+    _profile = _guestProfile;
     _invoices.addAll(_seedInvoices());
   }
 
@@ -41,17 +51,9 @@ class AppState extends ChangeNotifier {
 
   final Uuid _uuid = const Uuid();
 
+  late final UserProfile _guestProfile;
   AuthUser? _user;
-  UserProfile _profile = const UserProfile(
-    displayName: 'Guest',
-    email: '',
-    companyName: 'Freelance Studio',
-    address: '1-2-3 Shibuya, Tokyo, Japan',
-    phone: '+81 3-1234-5678',
-    taxId: 'TAX-0001',
-    currencyCode: 'JPY',
-    currencySymbol: '¥',
-  );
+  late UserProfile _profile;
   Invoice? _selectedInvoice;
   Locale _locale = const Locale('en');
   bool _isLoading = false;
@@ -65,9 +67,14 @@ class AppState extends ChangeNotifier {
   bool get isPremium => _isPremium;
   String? get errorMessage => _errorMessage;
   bool get hasFirebase => _config.hasFirebase;
+  bool get isAuthenticated => _user != null;
+  bool get isGuest => _user == null;
 
   UnmodifiableListView<Invoice> get invoices => UnmodifiableListView(_invoices);
   Invoice? get selectedInvoice => _selectedInvoice;
+
+  List<InvoiceTemplate> get availableTemplates =>
+      isGuest ? const [InvoiceTemplate.classic] : InvoiceTemplate.values;
 
   double get outstandingTotal => _invoices
       .where((invoice) => invoice.status != InvoiceStatus.paid)
@@ -131,6 +138,7 @@ class AppState extends ChangeNotifier {
     _user = null;
     _isPremium = false;
     _selectedInvoice = null;
+    _profile = _guestProfile;
     notifyListeners();
   }
 
@@ -154,6 +162,7 @@ class AppState extends ChangeNotifier {
           id: _uuid.v4(),
           currencyCode: _profile.currencyCode,
           currencySymbol: _profile.currencySymbol,
+          template: availableTemplates.first,
         );
   }
 
@@ -182,6 +191,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> downloadInvoicePdf(Invoice invoice) async {
+    if (isGuest) {
+      throw const AccessDeniedException('downloadRequiresAccount');
+    }
     await _pdfService.downloadInvoice(invoice: invoice, profile: _profile, locale: _locale);
   }
 
@@ -212,6 +224,7 @@ class AppState extends ChangeNotifier {
         issueDate: now.subtract(const Duration(days: 12)),
         dueDate: now.add(const Duration(days: 18)),
         status: InvoiceStatus.sent,
+        template: InvoiceTemplate.classic,
         notes: 'Payable within 30 days via bank transfer.',
       ),
       Invoice(
@@ -226,6 +239,7 @@ class AppState extends ChangeNotifier {
         issueDate: now.subtract(const Duration(days: 35)),
         dueDate: now.subtract(const Duration(days: 5)),
         status: InvoiceStatus.paid,
+        template: InvoiceTemplate.modern,
         notes: 'Thank you for your business!',
       ),
     ];

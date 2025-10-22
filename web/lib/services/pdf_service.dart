@@ -22,6 +22,8 @@ class PdfService {
       symbol: invoice.currencySymbol,
     );
     final dateFormat = DateFormat.yMMMMd(locale.toLanguageTag());
+    final accentColor = _accentColorFor(invoice.template);
+    final surfaceColor = _surfaceColorFor(invoice.template);
 
     final pdf = pw.Document();
 
@@ -38,7 +40,7 @@ class PdfService {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(profile.companyName,
-                      style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                      style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: accentColor)),
                   pw.Text(profile.displayName),
                   if (profile.address.isNotEmpty) pw.Text(profile.address),
                   if (profile.phone.isNotEmpty) pw.Text(profile.phone),
@@ -48,7 +50,8 @@ class PdfService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text('Invoice', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('Invoice',
+                      style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: accentColor)),
                   pw.SizedBox(height: 4),
                   pw.Text(invoice.number, style: const pw.TextStyle(fontSize: 16)),
                   pw.SizedBox(height: 12),
@@ -60,7 +63,7 @@ class PdfService {
           ),
           pw.SizedBox(height: 24),
           pw.Container(
-            decoration: pw.BoxDecoration(color: PdfColors.grey200, borderRadius: pw.BorderRadius.circular(8)),
+            decoration: pw.BoxDecoration(color: surfaceColor, borderRadius: pw.BorderRadius.circular(8)),
             padding: const pw.EdgeInsets.all(16),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -82,15 +85,18 @@ class PdfService {
             },
             children: [
               pw.TableRow(
-                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                decoration: pw.BoxDecoration(color: accentColor),
                 children: [
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(8),
-                    child: pw.Text('Description', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    child: pw.Text('Description',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
                   ),
                   pw.Padding(
                     padding: const pw.EdgeInsets.all(8),
-                    child: pw.Text('Amount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    child: pw.Text('Amount',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                        textAlign: pw.TextAlign.right),
                   ),
                 ],
               ),
@@ -117,7 +123,7 @@ class PdfService {
                 padding: const pw.EdgeInsets.all(12),
                 decoration: pw.BoxDecoration(
                   borderRadius: pw.BorderRadius.circular(8),
-                  border: pw.Border.all(color: PdfColors.grey400),
+                  border: pw.Border.all(color: accentColor),
                 ),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -125,7 +131,7 @@ class PdfService {
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: accentColor)),
                         pw.Text(format.format(invoice.amount)),
                       ],
                     ),
@@ -141,7 +147,8 @@ class PdfService {
             pw.Text(invoice.notes),
           ],
           pw.SizedBox(height: 24),
-          pw.Text('Status: ${invoice.status.name.toUpperCase()}'),
+          pw.Text('Status: ${invoice.status.name.toUpperCase()}',
+              style: pw.TextStyle(color: accentColor, fontWeight: pw.FontWeight.bold)),
         ],
       ),
     );
@@ -160,5 +167,27 @@ class PdfService {
     anchor.click();
     anchor.remove();
     html.Url.revokeObjectUrl(url);
+  }
+
+  PdfColor _accentColorFor(InvoiceTemplate template) {
+    switch (template) {
+      case InvoiceTemplate.classic:
+        return PdfColor.fromInt(0xFF37474F);
+      case InvoiceTemplate.modern:
+        return PdfColor.fromInt(0xFF6A1B9A);
+      case InvoiceTemplate.minimal:
+        return PdfColor.fromInt(0xFF1F2933);
+    }
+  }
+
+  PdfColor _surfaceColorFor(InvoiceTemplate template) {
+    switch (template) {
+      case InvoiceTemplate.classic:
+        return PdfColor.fromInt(0xFFECEFF1);
+      case InvoiceTemplate.modern:
+        return PdfColor.fromInt(0xFFF3E5F5);
+      case InvoiceTemplate.minimal:
+        return PdfColor.fromInt(0xFFF5F5F5);
+    }
   }
 }

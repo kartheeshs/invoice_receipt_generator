@@ -10,6 +10,7 @@ import '../widgets/profile_form_dialog.dart';
 import 'dashboard_page.dart';
 import 'invoices_page.dart';
 import 'settings_page.dart';
+import 'sign_in_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -26,36 +27,28 @@ class _HomeShellState extends State<HomeShell> {
     final appState = context.watch<AppState>();
     final l10n = context.l10n;
     final theme = Theme.of(context);
+    final isGuest = appState.isGuest;
 
     final pages = [
       DashboardPage(
         onCreateInvoice: _createInvoice,
-        onOpenSubscription: appState.openSubscription,
+        onOpenSubscription: _handleManageSubscription,
+        onRequestSignIn: () => _openAuthFlow(),
       ),
       InvoicesPage(
         onCreateInvoice: _createInvoice,
         onEditInvoice: _editInvoice,
-        onDeleteInvoice: (invoice) {
-          context.read<AppState>().deleteInvoice(invoice.id);
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(l10n.text('invoiceDeleted'))));
-        },
-        onDownloadInvoice: (invoice) async {
-          await context.read<AppState>().downloadInvoicePdf(invoice);
-          if (!mounted) return;
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(l10n.text('pdfReady'))));
-        },
+        onDeleteInvoice: _deleteInvoice,
+        onDownloadInvoice: _handleDownloadInvoice,
+        onRequestSignIn: () => _openAuthFlow(),
       ),
       SettingsPage(
         onEditProfile: _editProfile,
         onLanguageChanged: context.read<AppState>().setLocale,
         onSignOut: context.read<AppState>().signOut,
-        onManageSubscription: () {
-          context.read<AppState>().openSubscription();
-          context.read<AppState>().markPremium(true);
-        },
+        onManageSubscription: _handleManageSubscription,
         onCancelSubscription: () => context.read<AppState>().markPremium(false),
+        onSignIn: () => _openAuthFlow(),
       ),
     ];
 
@@ -73,25 +66,31 @@ class _HomeShellState extends State<HomeShell> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  appState.profile.displayName,
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(width: 12),
-                CircleAvatar(
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: Text(
-                    _initials(appState.profile.displayName),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
+            child: isGuest
+                ? FilledButton.icon(
+                    onPressed: () => _openAuthFlow(),
+                    icon: const Icon(Icons.login),
+                    label: Text(l10n.text('signInButton')),
+                  )
+                : Row(
+                    children: [
+                      Text(
+                        appState.profile.displayName,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(width: 12),
+                      CircleAvatar(
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        child: Text(
+                          _initials(appState.profile.displayName),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -136,6 +135,12 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  void _deleteInvoice(Invoice invoice) {
+    context.read<AppState>().deleteInvoice(invoice.id);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.text('invoiceDeleted'))));
+  }
+
   Future<void> _createInvoice() async {
     final appState = context.read<AppState>();
     final invoice = appState.prepareInvoice();
@@ -166,6 +171,27 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Future<void> _handleDownloadInvoice(Invoice invoice) async {
+    final authenticated = await _ensureAuthenticated(messageKey: 'downloadRequiresAccount');
+    if (!authenticated) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.text('downloadRequiresAccount'))));
+      return;
+    }
+    try {
+      await context.read<AppState>().downloadInvoicePdf(invoice);
+    } on AccessDeniedException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.text(error.reasonKey))));
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.text('pdfReady'))));
+  }
+
   Future<void> _editProfile() async {
     final appState = context.read<AppState>();
     await showDialog<void>(
@@ -179,6 +205,59 @@ class _HomeShellState extends State<HomeShell> {
         },
       ),
     );
+  }
+
+  Future<void> _handleManageSubscription() async {
+    final authenticated = await _ensureAuthenticated();
+    if (!authenticated) return;
+    context.read<AppState>().openSubscription();
+    context.read<AppState>().markPremium(true);
+  }
+
+  Future<void> _openAuthFlow() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SignInPage(),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  Future<bool> _ensureAuthenticated({String? messageKey}) async {
+    final appState = context.read<AppState>();
+    if (appState.isAuthenticated) {
+      return true;
+    }
+
+    final l10n = context.l10n;
+    final shouldSignIn = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(l10n.text('authRequiredTitle')),
+            content: Text(l10n.text(messageKey ?? 'authRequiredBody')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(l10n.text('notNow')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(l10n.text('signInButton')),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!mounted || !shouldSignIn) {
+      return false;
+    }
+
+    await _openAuthFlow();
+    if (!mounted) {
+      return false;
+    }
+    return context.read<AppState>().isAuthenticated;
   }
 
   String _initials(String name) {

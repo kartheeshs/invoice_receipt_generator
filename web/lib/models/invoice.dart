@@ -1,5 +1,7 @@
 enum InvoiceStatus { draft, sent, paid, overdue }
 
+enum InvoiceTemplate { classic, modern, minimal }
+
 class Invoice {
   const Invoice({
     required this.id,
@@ -13,6 +15,7 @@ class Invoice {
     required this.issueDate,
     required this.dueDate,
     required this.status,
+    required this.template,
     this.notes = '',
   });
 
@@ -20,6 +23,7 @@ class Invoice {
     required String id,
     required String currencyCode,
     required String currencySymbol,
+    InvoiceTemplate template = InvoiceTemplate.classic,
   }) {
     final now = DateTime.now();
     return Invoice(
@@ -34,6 +38,7 @@ class Invoice {
       issueDate: now,
       dueDate: now.add(const Duration(days: 30)),
       status: InvoiceStatus.draft,
+      template: template,
     );
   }
 
@@ -49,6 +54,7 @@ class Invoice {
     DateTime? issueDate,
     DateTime? dueDate,
     InvoiceStatus? status,
+    InvoiceTemplate? template,
     String? notes,
   }) {
     return Invoice(
@@ -63,6 +69,7 @@ class Invoice {
       issueDate: issueDate ?? this.issueDate,
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
+      template: template ?? this.template,
       notes: notes ?? this.notes,
     );
   }
@@ -78,6 +85,7 @@ class Invoice {
   final DateTime issueDate;
   final DateTime dueDate;
   final InvoiceStatus status;
+  final InvoiceTemplate template;
   final String notes;
 
   bool get isOverdue => status == InvoiceStatus.overdue;

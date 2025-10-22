@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
+import '../state/app_state.dart';
 
 class InvoiceFormDialog extends StatefulWidget {
   const InvoiceFormDialog({
@@ -29,6 +31,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
   late DateTime _issueDate;
   late DateTime _dueDate;
   late InvoiceStatus _status;
+  late InvoiceTemplate _template;
 
   @override
   void initState() {
@@ -45,6 +48,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
     _issueDate = invoice.issueDate;
     _dueDate = invoice.dueDate;
     _status = invoice.status;
+    _template = invoice.template;
   }
 
   @override
@@ -61,6 +65,12 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final appState = context.watch<AppState>();
+    final availableTemplates = appState.availableTemplates;
+    final templateOptions = InvoiceTemplate.values
+        .where((template) => availableTemplates.contains(template) || template == _template)
+        .toList();
+    final isGuest = appState.isGuest;
 
     return AlertDialog(
       title: Text(l10n.text(widget.invoice.clientName.isEmpty ? 'newInvoice' : 'editInvoice')),
@@ -114,6 +124,34 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
                   controller: _numberController,
                   decoration: InputDecoration(labelText: l10n.text('invoiceNumberLabel')),
                 ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<InvoiceTemplate>(
+                  value: _template,
+                  decoration: InputDecoration(labelText: l10n.text('templateFieldLabel')),
+                  items: templateOptions
+                      .map(
+                        (template) => DropdownMenuItem(
+                          value: template,
+                          child: Text(l10n.invoiceTemplateLabel(template)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _template = value);
+                    }
+                  },
+                ),
+                if (isGuest && availableTemplates.length == 1) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      l10n.text('templatesLocked'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -209,6 +247,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
         issueDate: _issueDate,
         dueDate: _dueDate,
         status: _status,
+        template: _template,
         notes: _notesController.text.trim(),
       ),
     );
