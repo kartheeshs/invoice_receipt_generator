@@ -1,341 +1,228 @@
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
-import '../models/invoice.dart';
-import '../services/crisp_subscription_service.dart';
 import '../state/app_state.dart';
-import '../widgets/invoice_status_chip.dart';
 import '../widgets/metric_card.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key, required this.onCreateInvoice});
+  const DashboardPage({
+    super.key,
+    required this.onCreateInvoice,
+    required this.onOpenSubscription,
+  });
 
   final VoidCallback onCreateInvoice;
+  final VoidCallback onOpenSubscription;
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
     final l10n = context.l10n;
-    final invoices = appState.invoices;
 
-    final nextActions = invoices
-        .where((invoice) => invoice.status != InvoiceStatus.paid)
-        .toList()
-      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    return Consumer<AppState>(
+      builder: (context, appState, child) {
+        final currency = l10n.currencyFormat(appState.profile.currencyCode, appState.profile.currencySymbol);
+        final planLabel = appState.isPremium ? l10n.text('planStatusPremium') : l10n.text('planStatusFree');
+        final planBody = appState.isPremium ? l10n.text('planPremiumBody') : l10n.text('planFreeBody');
+        final priceText = l10n.textWithReplacement('planPriceLabelLocalized', {
+          'price': currency.format(appState.planPrice),
+        });
 
-    final recentInvoices = invoices.take(4).toList();
-    final NumberFormat currency = l10n.currencyFormat;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 1100;
         return SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 40),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.dashboardGreeting(appState.ownerName),
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l10n.dashboardLead(currency.format(appState.totalBilled)),
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isWide)
-                    FilledButton.icon(
-                      onPressed: onCreateInvoice,
-                      icon: const Icon(Icons.add),
-                      label: Text(l10n.dashboardCreateInvoiceButton),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 24),
               Wrap(
-                spacing: 20,
-                runSpacing: 20,
+                spacing: 24,
+                runSpacing: 24,
                 children: [
-                  MetricCard(
-                    title: l10n.metricPaidTitle,
-                    value: currency.format(appState.totalBilled),
-                    subtitle: l10n.metricPaidSubtitle(
-                      appState.invoices.where((invoice) => invoice.status == InvoiceStatus.paid).length,
+                  SizedBox(
+                    width: 320,
+                    child: MetricCard(
+                      title: l10n.text('totalInvoices'),
+                      value: appState.invoices.length.toString(),
+                      subtitle: l10n.text('quickActions'),
+                      icon: Icons.receipt_long,
                     ),
-                    icon: Icons.check_circle_outline,
-                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  MetricCard(
-                    title: l10n.metricOutstandingTitle,
-                    value: currency.format(appState.outstandingAmount),
-                    subtitle: l10n.metricOutstandingSubtitle(appState.invoicesDueThisWeek),
-                    icon: Icons.pending_actions_outlined,
-                    color: Theme.of(context).colorScheme.tertiary,
+                  SizedBox(
+                    width: 320,
+                    child: MetricCard(
+                      title: l10n.text('outstanding'),
+                      value: currency.format(appState.outstandingTotal),
+                      icon: Icons.pending_actions,
+                    ),
                   ),
-                  MetricCard(
-                    title: l10n.metricOverdueTitle,
-                    value: currency.format(appState.overdueAmount),
-                    subtitle: l10n.metricOverdueSubtitle(appState.sendReminderEmails),
-                    icon: Icons.warning_amber_rounded,
-                    color: Theme.of(context).colorScheme.error,
+                  SizedBox(
+                    width: 320,
+                    child: MetricCard(
+                      title: l10n.text('paid'),
+                      value: currency.format(appState.paidTotal),
+                      icon: Icons.payments,
+                    ),
                   ),
-                  MetricCard(
-                    title: l10n.metricDraftTitle,
-                    value: currency.format(appState.draftTotal),
-                    subtitle: l10n.metricDraftSubtitle(appState.autoNumberingEnabled),
-                    icon: Icons.drafts_outlined,
-                    color: Theme.of(context).colorScheme.secondary,
+                  SizedBox(
+                    width: 320,
+                    child: MetricCard(
+                      title: l10n.text('averageInvoice'),
+                      value: currency.format(appState.averageInvoice),
+                      icon: Icons.trending_up,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 32),
-              LayoutBuilder(
-                builder: (context, innerConstraints) {
-                  final showTwoColumns = innerConstraints.maxWidth > 1000;
-                  if (showTwoColumns) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildNextStepsCard(context, nextActions, currency, l10n)),
-                        const SizedBox(width: 24),
-                        Expanded(child: _buildDownloadsCard(context, appState, l10n)),
-                      ],
-                    );
-                  }
-                  return Column(
-                    children: [
-                      _buildNextStepsCard(context, nextActions, currency, l10n),
-                      const SizedBox(height: 24),
-                      _buildDownloadsCard(context, appState, l10n),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
-              Text(
-                l10n.dashboardRecentInvoicesTitle,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
               Card(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: recentInvoices.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final invoice = recentInvoices[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                        child: Icon(
-                          invoice.status.icon,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.text('subscriptionTitle'),
+                                  style: Theme.of(context).textTheme.headlineSmall,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  planLabel,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(planBody),
+                                const SizedBox(height: 12),
+                                Text('${l10n.text('monthlyPrice')}: $priceText'),
+                              ],
+                            ),
+                          ),
+                          FilledButton.icon(
+                            onPressed: onOpenSubscription,
+                            icon: const Icon(Icons.workspace_premium),
+                            label: Text(appState.isPremium
+                                ? l10n.text('manageSubscription')
+                                : l10n.text('subscribeCrisp')),
+                          ),
+                        ],
                       ),
-                      title: Text('${invoice.clientName} / ${invoice.projectName}'),
-                      subtitle: Text(
-                        l10n.dashboardRecentInvoiceSubtitle(
-                          l10n.formatDate(invoice.issueDate),
-                          currency.format(invoice.total),
-                        ),
-                      ),
-                      trailing: InvoiceStatusChip(status: invoice.status),
-                    );
-                  },
+                      const SizedBox(height: 12),
+                      Text(l10n.text('planBenefits'), style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(l10n.text('planBenefitsBody')),
+                    ],
+                  ),
                 ),
               ),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: _QuickActionTile(
+                      icon: Icons.receipt_long,
+                      title: l10n.text('createInvoiceAction'),
+                      subtitle: l10n.text('invoicesEmptyBody'),
+                      onPressed: onCreateInvoice,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _QuickActionTile(
+                      icon: Icons.language,
+                      title: l10n.text('languageSectionLabel'),
+                      subtitle: l10n.text('languageLabel'),
+                      onPressed: () => context.read<AppState>().setLocale(
+                            appState.locale.languageCode == 'en' ? const Locale('ja') : const Locale('en'),
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              Text(l10n.text('recentInvoices'), style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              if (appState.recentInvoices.isEmpty)
+                Text(l10n.text('invoicesEmptyBody'))
+              else
+                Column(
+                  children: appState.recentInvoices
+                      .map(
+                        (invoice) => ListTile(
+                          contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                          title: Text(invoice.clientName.isEmpty ? invoice.number : invoice.clientName),
+                          subtitle: Text('${invoice.projectName} • ${l10n.dateFormat.format(invoice.issueDate)}'),
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(currency.format(invoice.amount)),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  l10n.invoiceStatusLabel(invoice.status),
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
             ],
           ),
         );
       },
     );
   }
+}
 
-  Widget _buildNextStepsCard(
-    BuildContext context,
-    List<Invoice> nextActions,
-    NumberFormat currency,
-    AppLocalizations l10n,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.flag_outlined, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.dashboardFollowUpTitle,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (nextActions.isEmpty)
-              Text(l10n.dashboardNoPending)
-            else
-              ...nextActions.take(3).map(
-                (invoice) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.only(top: 10, right: 12),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFF6750A4),
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.dashboardFollowUpLine(
-                                invoice.clientName,
-                                currency.format(invoice.total),
-                              ),
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              l10n.dashboardFollowUpSubtitle(
-                                l10n.formatDate(invoice.dueDate),
-                                l10n.invoiceStatusLabel(invoice.status),
-                              ),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(color: Colors.black54),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            OutlinedButton.icon(
-              onPressed: onCreateInvoice,
-              icon: const Icon(Icons.add),
-              label: Text(l10n.dashboardNewInvoiceCta),
-            ),
-          ],
+class _QuickActionTile extends StatelessWidget {
+  const _QuickActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(20),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(20),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDownloadsCard(BuildContext context, AppState appState, AppLocalizations l10n) {
-    final used = appState.monthlyDownloadsUsed;
-    final limit = appState.monthlyDownloadLimit;
-    final ratio = limit == 0 ? 0.0 : (used / limit).clamp(0, 1).toDouble();
-
-    return Card(
-      child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.picture_as_pdf_outlined,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.dashboardDownloadsTitle,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            LinearProgressIndicator(
-              value: appState.isPremium ? 1 : ratio,
-              minHeight: 10,
-              borderRadius: BorderRadius.circular(999),
-              backgroundColor: const Color(0xFFE5DEFF),
-            ),
+            Icon(icon, size: 32),
             const SizedBox(height: 12),
-            Text(
-              appState.isPremium
-                  ? l10n.dashboardDownloadsUnlimited
-                  : l10n.dashboardDownloadsUsage(used, limit),
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            if (!appState.isPremium)
-              FilledButton.icon(
-                onPressed: () => _startCrispCheckout(context),
-                icon: const Icon(Icons.workspace_premium_outlined),
-                label: Text(l10n.upgradeToPremiumCta),
-              )
-            else
-              OutlinedButton(
-                onPressed: () => context.read<AppState>().downgradeToFreePlan(),
-                child: Text(l10n.downgradeToFreeCta),
-              ),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(subtitle),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _startCrispCheckout(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = context.l10n;
-    final appState = context.read<AppState>();
-
-    try {
-      await CrispSubscriptionService().startCheckout(email: appState.email);
-      appState.markAsPremium(provider: 'crisp', planName: l10n.crispPlanName);
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutLaunched),
-        ),
-      );
-    } on CrispConfigurationException catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispMissingConfig(error.message)),
-        ),
-      );
-    } on CrispCheckoutException catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutError(error.message)),
-        ),
-      );
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutError(error.toString())),
-        ),
-      );
-    }
   }
 }

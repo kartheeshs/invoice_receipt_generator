@@ -1,86 +1,179 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../l10n/app_language.dart';
+import '../config/app_config.dart';
 import '../models/invoice.dart';
+import '../models/user_profile.dart';
+import '../services/auth_service.dart';
+import '../services/crisp_service.dart';
+import '../services/pdf_service.dart';
 
 class AppState extends ChangeNotifier {
-  AppState() {
-    _invoices = _createSampleInvoices();
-    if (_invoices.isNotEmpty) {
-      _selectedInvoice = _invoices.first;
+  AppState({
+    required AppConfig config,
+    FirebaseAuthService? authService,
+    PdfService? pdfService,
+    CrispService? crispService,
+  })  : _config = config,
+        _authService = authService ?? FirebaseAuthService(apiKey: config.firebaseApiKey),
+        _pdfService = pdfService ?? PdfService(),
+        _crispService = crispService ?? CrispService(config.crispSubscriptionUrl) {
+    _profile = UserProfile(
+      displayName: 'Guest',
+      email: '',
+      companyName: 'Freelance Studio',
+      address: '1-2-3 Shibuya, Tokyo, Japan',
+      phone: '+81 3-1234-5678',
+      taxId: 'TAX-0001',
+      currencyCode: config.currencyCode,
+      currencySymbol: config.currencySymbol,
+    );
+    _invoices.addAll(_seedInvoices());
+  }
+
+  final AppConfig _config;
+  final FirebaseAuthService _authService;
+  final PdfService _pdfService;
+  final CrispService _crispService;
+  final List<Invoice> _invoices = [];
+
+  final Uuid _uuid = const Uuid();
+
+  AuthUser? _user;
+  UserProfile _profile = const UserProfile(
+    displayName: 'Guest',
+    email: '',
+    companyName: 'Freelance Studio',
+    address: '1-2-3 Shibuya, Tokyo, Japan',
+    phone: '+81 3-1234-5678',
+    taxId: 'TAX-0001',
+    currencyCode: 'JPY',
+    currencySymbol: '¥',
+  );
+  Invoice? _selectedInvoice;
+  Locale _locale = const Locale('en');
+  bool _isLoading = false;
+  bool _isPremium = false;
+  String? _errorMessage;
+
+  Locale get locale => _locale;
+  AuthUser? get user => _user;
+  UserProfile get profile => _profile;
+  bool get isLoading => _isLoading;
+  bool get isPremium => _isPremium;
+  String? get errorMessage => _errorMessage;
+  bool get hasFirebase => _config.hasFirebase;
+
+  UnmodifiableListView<Invoice> get invoices => UnmodifiableListView(_invoices);
+  Invoice? get selectedInvoice => _selectedInvoice;
+
+  double get outstandingTotal => _invoices
+      .where((invoice) => invoice.status != InvoiceStatus.paid)
+      .fold(0, (total, invoice) => total + invoice.amount);
+
+  double get paidTotal =>
+      _invoices.where((invoice) => invoice.status == InvoiceStatus.paid).fold(0, (total, invoice) => total + invoice.amount);
+
+  double get averageInvoice =>
+      _invoices.isEmpty ? 0 : _invoices.map((invoice) => invoice.amount).reduce((a, b) => a + b) / _invoices.length;
+
+  List<Invoice> get recentInvoices {
+    final sorted = [..._invoices];
+    sorted.sort((a, b) => b.issueDate.compareTo(a.issueDate));
+    return sorted.take(5).toList();
+  }
+
+  void setLocale(Locale locale) {
+    if (_locale == locale) return;
+    _locale = locale;
+    notifyListeners();
+  }
+
+  Future<void> signIn({required String email, required String password}) async {
+    await _runAsync(() async {
+      final user = await _authService.signIn(email: email, password: password);
+      _user = await _authService.refreshUser(user);
+      _profile = _profile.copyWith(email: _user!.email, displayName: _user!.displayName ?? _profile.displayName);
+    });
+  }
+
+  Future<void> signUp({
+    required String displayName,
+    required String email,
+    required String password,
+  }) async {
+    await _runAsync(() async {
+      final user = await _authService.signUp(displayName: displayName, email: email, password: password);
+      _user = user;
+      _profile = _profile.copyWith(displayName: displayName, email: email);
+    });
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    try {
+      await _authService.sendPasswordReset(email: email);
+      _errorMessage = null;
+      notifyListeners();
+    } on FirebaseAuthException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+      rethrow;
+    } catch (error) {
+      _errorMessage = error.toString();
+      notifyListeners();
+      rethrow;
     }
   }
 
-  final _uuid = const Uuid();
-
-  late List<Invoice> _invoices;
-  Invoice? _selectedInvoice;
-
-  bool _isPremium = false;
-  String? _subscriptionProvider;
-  String? _subscriptionPlanName;
-  AppLanguage _language = AppLanguage.japanese;
-  int monthlyDownloadLimit = 3;
-  int monthlyDownloadsUsed = 1;
-
-  String businessName = '和式デザイン合同会社';
-  String ownerName = '山田 太郎';
-  String email = 'hello@example.jp';
-  String phoneNumber = '03-1234-5678';
-  String postalCode = '150-0002';
-  String address = '東京都渋谷区渋谷1-2-3 さくらビル5F';
-
-  bool autoNumberingEnabled = true;
-  bool showJapaneseEra = false;
-  bool sendReminderEmails = true;
-  double defaultTaxRate = 0.1;
-
-  List<Invoice> get invoices => List.unmodifiable(_invoices);
-
-  Invoice? get selectedInvoice => _selectedInvoice;
-
-  bool get isPremium => _isPremium;
-
-  String? get subscriptionProvider => _subscriptionProvider;
-
-  String? get subscriptionPlanName => _subscriptionPlanName;
-
-  AppLanguage get language => _language;
-
-  Locale get locale => _language.locale;
-
-  bool get hasDownloadQuota => isPremium || monthlyDownloadsUsed < monthlyDownloadLimit;
-
-  double get totalBilled => _sumFor((invoice) => invoice.status == InvoiceStatus.paid);
-
-  double get outstandingAmount =>
-      _sumFor((invoice) => invoice.status == InvoiceStatus.sent);
-
-  double get overdueAmount => _sumFor((invoice) => invoice.isOverdue);
-
-  double get draftTotal => _sumFor((invoice) => invoice.status == InvoiceStatus.draft);
-
-  int get activeClients =>
-      _invoices.map((invoice) => invoice.clientName).toSet().length;
-
-  int get invoicesDueThisWeek {
-    final now = DateTime.now();
-    final end = now.add(const Duration(days: 7));
-    return _invoices
-        .where(
-          (invoice) =>
-              invoice.status != InvoiceStatus.paid &&
-              invoice.dueDate.isAfter(now.subtract(const Duration(days: 1))) &&
-              invoice.dueDate.isBefore(end),
-        )
-        .length;
+  Future<void> signOut() async {
+    _user = null;
+    _isPremium = false;
+    _selectedInvoice = null;
+    notifyListeners();
   }
 
-  double _sumFor(bool Function(Invoice invoice) test) {
-    return _invoices
-        .where(test)
-        .fold<double>(0, (previousValue, invoice) => previousValue + invoice.total);
+  void clearError() {
+    if (_errorMessage == null) return;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  void updateProfile(UserProfile profile) {
+    _profile = profile;
+    if (_user != null && profile.displayName.isNotEmpty) {
+      _authService.updateProfile(idToken: _user!.idToken, displayName: profile.displayName);
+    }
+    notifyListeners();
+  }
+
+  Invoice prepareInvoice([Invoice? existing]) {
+    return existing ??
+        Invoice.create(
+          id: _uuid.v4(),
+          currencyCode: _profile.currencyCode,
+          currencySymbol: _profile.currencySymbol,
+        );
+  }
+
+  void saveInvoice(Invoice invoice) {
+    final index = _invoices.indexWhere((element) => element.id == invoice.id);
+    if (index >= 0) {
+      _invoices[index] = invoice;
+    } else {
+      _invoices.add(invoice);
+    }
+    _selectedInvoice = invoice;
+    notifyListeners();
+  }
+
+  void deleteInvoice(String id) {
+    _invoices.removeWhere((invoice) => invoice.id == id);
+    if (_selectedInvoice?.id == id) {
+      _selectedInvoice = null;
+    }
+    notifyListeners();
   }
 
   void selectInvoice(Invoice? invoice) {
@@ -88,242 +181,69 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void saveInvoice(Invoice invoice) {
-    final index = _invoices.indexWhere((element) => element.id == invoice.id);
-    if (index == -1) {
-      _invoices = [..._invoices, invoice];
-    } else {
-      final updated = [..._invoices];
-      updated[index] = invoice;
-      _invoices = updated;
-    }
-    _selectedInvoice = invoice;
+  Future<void> downloadInvoicePdf(Invoice invoice) async {
+    await _pdfService.downloadInvoice(invoice: invoice, profile: _profile, locale: _locale);
+  }
+
+  void openSubscription() {
+    _crispService.openSubscription();
+  }
+
+  void markPremium(bool value) {
+    if (_isPremium == value) return;
+    _isPremium = value;
     notifyListeners();
   }
 
-  void deleteInvoice(String id) {
-    _invoices = _invoices.where((invoice) => invoice.id != id).toList();
-    if (_selectedInvoice?.id == id) {
-      _selectedInvoice = _invoices.isNotEmpty ? _invoices.first : null;
-    }
-    notifyListeners();
-  }
+  double get planPrice => _config.monthlyPlanPrice;
 
-  void markAsPremium({String provider = 'manual', String? planName}) {
-    _isPremium = true;
-    monthlyDownloadLimit = 999;
-    _subscriptionProvider = provider;
-    _subscriptionPlanName = planName;
-    notifyListeners();
-  }
-
-  void downgradeToFreePlan() {
-    _isPremium = false;
-    monthlyDownloadLimit = 3;
-    _subscriptionProvider = null;
-    _subscriptionPlanName = null;
-    if (monthlyDownloadsUsed > monthlyDownloadLimit) {
-      monthlyDownloadsUsed = monthlyDownloadLimit;
-    }
-    notifyListeners();
-  }
-
-  bool recordInvoiceDownload() {
-    if (_isPremium) {
-      return true;
-    }
-    if (monthlyDownloadsUsed >= monthlyDownloadLimit) {
-      return false;
-    }
-    monthlyDownloadsUsed += 1;
-    notifyListeners();
-    return true;
-  }
-
-  void updateBusinessProfile({
-    required String newBusinessName,
-    required String newOwnerName,
-    required String newEmail,
-    required String newPhoneNumber,
-    required String newPostalCode,
-    required String newAddress,
-  }) {
-    businessName = newBusinessName.trim();
-    ownerName = newOwnerName.trim();
-    email = newEmail.trim();
-    phoneNumber = newPhoneNumber.trim();
-    postalCode = newPostalCode.trim();
-    address = newAddress.trim();
-    notifyListeners();
-  }
-
-  void updateLanguage(AppLanguage language) {
-    if (_language == language) {
-      return;
-    }
-    _language = language;
-    notifyListeners();
-  }
-
-  void updateAutoNumbering(bool value) {
-    autoNumberingEnabled = value;
-    notifyListeners();
-  }
-
-  void updateJapaneseEraDisplay(bool value) {
-    showJapaneseEra = value;
-    notifyListeners();
-  }
-
-  void updateReminderEmails(bool value) {
-    sendReminderEmails = value;
-    notifyListeners();
-  }
-
-  void updateDefaultTaxRate(double value) {
-    defaultTaxRate = value;
-    notifyListeners();
-  }
-
-  String createInvoiceId() => _uuid.v4();
-
-  String generateInvoiceNumber() {
-    if (!autoNumberingEnabled) {
-      return '';
-    }
+  List<Invoice> _seedInvoices() {
     final now = DateTime.now();
-    final monthKey = '${now.year}${now.month.toString().padLeft(2, '0')}';
-    final monthlyCount = _invoices
-            .where((invoice) => invoice.number.startsWith('INV-$monthKey'))
-            .length +
-        1;
-    return 'INV-$monthKey-${monthlyCount.toString().padLeft(3, '0')}';
-  }
-
-  List<Invoice> _createSampleInvoices() {
-    final now = DateTime.now();
-    final invoices = <Invoice>[
+    return [
       Invoice(
         id: _uuid.v4(),
-        number: 'INV-202405-001',
-        clientName: '株式会社さくらテック',
-        projectName: 'コーポレートサイト改修',
-        issueDate: now.subtract(const Duration(days: 25)),
-        dueDate: now.subtract(const Duration(days: 8)),
-        status: InvoiceStatus.paid,
-        taxRate: 0.1,
-        billingEmail: 'accounting@sakura-tech.jp',
-        downloadCount: 4,
-        notes: '銀行振込のご対応ありがとうございました。',
-        items: const [
-          InvoiceItem(
-            id: 'item-1',
-            description: 'デザインリニューアル一式',
-            quantity: 1,
-            unitPrice: 350000,
-          ),
-          InvoiceItem(
-            id: 'item-2',
-            description: 'CMS テンプレート調整',
-            quantity: 1,
-            unitPrice: 120000,
-          ),
-        ],
-      ),
-      Invoice(
-        id: _uuid.v4(),
-        number: 'INV-202405-002',
-        clientName: 'GREEN株式会社',
-        projectName: 'ブランド撮影ディレクション',
+        number: '#INV-1001',
+        clientName: 'Shibuya Design Co.',
+        projectName: 'Brand identity refresh',
+        description: 'Brand strategy and identity redesign services.',
+        amount: 125000,
+        currencyCode: _profile.currencyCode,
+        currencySymbol: _profile.currencySymbol,
         issueDate: now.subtract(const Duration(days: 12)),
-        dueDate: now.add(const Duration(days: 5)),
+        dueDate: now.add(const Duration(days: 18)),
         status: InvoiceStatus.sent,
-        taxRate: 0.1,
-        billingEmail: 'finance@green.co.jp',
-        downloadCount: 2,
-        notes: '請求書受領後、10営業日以内でのご入金をお願いいたします。',
-        items: const [
-          InvoiceItem(
-            id: 'item-3',
-            description: '撮影ディレクション費',
-            quantity: 1,
-            unitPrice: 180000,
-          ),
-          InvoiceItem(
-            id: 'item-4',
-            description: 'スタジオ手配・ロケハン',
-            quantity: 1,
-            unitPrice: 65000,
-          ),
-          InvoiceItem(
-            id: 'item-5',
-            description: '交通費・諸経費',
-            quantity: 1,
-            unitPrice: 15000,
-          ),
-        ],
+        notes: 'Payable within 30 days via bank transfer.',
       ),
       Invoice(
         id: _uuid.v4(),
-        number: 'INV-202405-003',
-        clientName: 'Hikari Apps',
-        projectName: 'UI コンポーネント設計',
-        issueDate: now.subtract(const Duration(days: 20)),
-        dueDate: now.subtract(const Duration(days: 2)),
-        status: InvoiceStatus.overdue,
-        taxRate: 0.1,
-        billingEmail: 'keiri@hikariapps.com',
-        downloadCount: 1,
-        notes: 'お支払期限を過ぎております。ご確認をお願いいたします。',
-        items: const [
-          InvoiceItem(
-            id: 'item-6',
-            description: 'UI デザイン制作',
-            quantity: 1,
-            unitPrice: 220000,
-          ),
-          InvoiceItem(
-            id: 'item-7',
-            description: 'デザインシステム設計ワークショップ',
-            quantity: 1,
-            unitPrice: 80000,
-          ),
-        ],
-      ),
-      Invoice(
-        id: _uuid.v4(),
-        number: 'INV-202405-004',
-        clientName: '株式会社ミライ',
-        projectName: 'ランディングページ制作',
-        issueDate: now.subtract(const Duration(days: 5)),
-        dueDate: now.add(const Duration(days: 20)),
-        status: InvoiceStatus.draft,
-        taxRate: 0.1,
-        billingEmail: 'info@mirai.co.jp',
-        notes: '原稿確定後に正式請求予定。',
-        items: const [
-          InvoiceItem(
-            id: 'item-8',
-            description: 'ディレクション費',
-            quantity: 1,
-            unitPrice: 60000,
-          ),
-          InvoiceItem(
-            id: 'item-9',
-            description: 'デザイン制作費',
-            quantity: 1,
-            unitPrice: 140000,
-          ),
-          InvoiceItem(
-            id: 'item-10',
-            description: 'コーディング費',
-            quantity: 1,
-            unitPrice: 90000,
-          ),
-        ],
+        number: '#INV-1002',
+        clientName: 'Osaka Startup Studio',
+        projectName: 'Mobile app prototype',
+        description: 'Clickable mobile prototype and user testing sessions.',
+        amount: 98000,
+        currencyCode: _profile.currencyCode,
+        currencySymbol: _profile.currencySymbol,
+        issueDate: now.subtract(const Duration(days: 35)),
+        dueDate: now.subtract(const Duration(days: 5)),
+        status: InvoiceStatus.paid,
+        notes: 'Thank you for your business!',
       ),
     ];
+  }
 
-    return invoices;
+  Future<void> _runAsync(Future<void> Function() action) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await action();
+    } on FirebaseAuthException catch (error) {
+      _errorMessage = error.message;
+    } catch (error) {
+      _errorMessage = error.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

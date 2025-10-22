@@ -5,58 +5,66 @@ class MetricCard extends StatelessWidget {
     super.key,
     required this.title,
     required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
+    this.subtitle,
+    this.icon,
+    this.color,
   });
 
   final String title;
   final String value;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
+  final String? subtitle;
+  final IconData? icon;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 260,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black54,
-                    ),
-              ),
-            ],
+    final theme = Theme.of(context);
+    final cardColor = color ?? theme.colorScheme.primaryContainer;
+    final textColor = theme.colorScheme.onPrimaryContainer;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-        ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (icon != null)
+            Icon(
+              icon,
+              color: textColor,
+              size: 32,
+            ),
+          if (icon != null) const SizedBox(height: 12),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(color: textColor.withOpacity(0.8)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle!,
+              style: theme.textTheme.bodyMedium?.copyWith(color: textColor.withOpacity(0.7)),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -1,396 +1,166 @@
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../l10n/app_language.dart';
 import '../l10n/app_localizations.dart';
-import '../services/crisp_subscription_service.dart';
 import '../state/app_state.dart';
-import '../widgets/profile_edit_dialog.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({
+    super.key,
+    required this.onEditProfile,
+    required this.onLanguageChanged,
+    required this.onSignOut,
+    required this.onManageSubscription,
+    required this.onCancelSubscription,
+  });
+
+  final VoidCallback onEditProfile;
+  final ValueChanged<Locale> onLanguageChanged;
+  final Future<void> Function() onSignOut;
+  final VoidCallback onManageSubscription;
+  final VoidCallback onCancelSubscription;
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
     final l10n = context.l10n;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.settingsTitle, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-            l10n.settingsSubtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
-          ),
-          const SizedBox(height: 24),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 1000;
-              if (isWide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _BusinessCard(appState: appState, l10n: l10n)),
-                    const SizedBox(width: 24),
-                    Expanded(child: _PlanCard(appState: appState, l10n: l10n)),
-                  ],
-                );
-              }
-              return Column(
-                children: [
-                  _BusinessCard(appState: appState, l10n: l10n),
-                  const SizedBox(height: 24),
-                  _PlanCard(appState: appState, l10n: l10n),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          _PreferencesCard(appState: appState, l10n: l10n),
-          const SizedBox(height: 24),
-          _SupportCard(appState: appState, l10n: l10n),
-        ],
-      ),
-    );
-  }
-}
+    return Consumer<AppState>(
+      builder: (context, appState, child) {
+        final profile = appState.profile;
+        final locale = appState.locale;
 
-class _BusinessCard extends StatelessWidget {
-  const _BusinessCard({required this.appState, required this.l10n});
-
-  final AppState appState;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.apartment, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.settingsBusinessSectionTitle, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _InfoRow(label: l10n.businessNameLabel, value: appState.businessName),
-            _InfoRow(label: l10n.ownerLabel, value: appState.ownerName),
-            _InfoRow(label: l10n.addressLabel, value: appState.address),
-            _InfoRow(label: l10n.postalCodeLabel, value: appState.postalCode),
-            _InfoRow(label: l10n.emailLabel, value: appState.email),
-            _InfoRow(label: l10n.phoneLabel, value: appState.phoneNumber),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final updated = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => const ProfileEditDialog(),
-                );
-                if (updated == true) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      behavior: SnackBarBehavior.floating,
-                      content: Text(l10n.profileUpdatedMessage),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(l10n.editProfile),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.appState, required this.l10n});
-
-  final AppState appState;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    final isPremium = appState.isPremium;
-    final planName = appState.subscriptionPlanName ?? l10n.crispPlanName;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.workspace_premium_outlined, color: Theme.of(context).colorScheme.secondary),
-                const SizedBox(width: 8),
-                Text(l10n.settingsPlanSectionTitle, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                child: Icon(
-                  isPremium ? Icons.star : Icons.lock_open,
-                  color: Theme.of(context).colorScheme.secondary,
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(l10n.text('profileTitle'), style: Theme.of(context).textTheme.headlineSmall),
+                                const SizedBox(height: 8),
+                                Text(profile.displayName, style: Theme.of(context).textTheme.titleMedium),
+                                Text(profile.email.isEmpty ? '-' : profile.email),
+                              ],
+                            ),
+                          ),
+                          FilledButton.icon(
+                            onPressed: onEditProfile,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: Text(l10n.text('editProfile')),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _InfoRow(label: l10n.text('profileCompanyLabel'), value: profile.companyName),
+                      _InfoRow(label: l10n.text('profileAddressLabel'), value: profile.address),
+                      _InfoRow(label: l10n.text('profilePhoneLabel'), value: profile.phone),
+                      _InfoRow(label: l10n.text('profileTaxIdLabel'), value: profile.taxId),
+                      _InfoRow(
+                        label: l10n.text('amountLabel'),
+                        value: '${profile.currencySymbol} (${profile.currencyCode})',
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              title: Text(planName),
-              subtitle: Text(
-                isPremium ? l10n.premiumPlanDescription : l10n.freePlanDescription,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (!isPremium) ...[
-              Text(
-                l10n.crispPlanDescription,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _startCrispCheckout(context),
-                      icon: const Icon(Icons.lock_open),
-                      label: Text(l10n.crispSubscribeCta),
-                    ),
+              const SizedBox(height: 24),
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.text('languageSectionLabel'), style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 12),
+                      DropdownButton<Locale>(
+                        value: locale,
+                        onChanged: (value) {
+                          if (value != null) onLanguageChanged(value);
+                        },
+                        items: const [
+                          DropdownMenuItem(value: Locale('en'), child: Text('English')),
+                          DropdownMenuItem(value: Locale('ja'), child: Text('日本語')),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                l10n.crispPlanNotice,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
-              ),
-            ] else ...[
-              Text(
-                l10n.premiumActiveDetails(planName),
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.read<AppState>().downgradeToFreePlan(),
-                      icon: const Icon(Icons.undo),
-                      label: Text(l10n.downgradeToFreePlanButton),
-                    ),
+              const SizedBox(height: 24),
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.text('subscriptionTitle'), style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Text(appState.isPremium ? l10n.text('planPremiumBody') : l10n.text('planFreeBody')),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          FilledButton.icon(
+                            onPressed: onManageSubscription,
+                            icon: const Icon(Icons.workspace_premium),
+                            label: Text(appState.isPremium
+                                ? l10n.text('manageSubscription')
+                                : l10n.text('subscribeCrisp')),
+                          ),
+                          const SizedBox(width: 12),
+                          if (appState.isPremium)
+                            OutlinedButton(
+                              onPressed: onCancelSubscription,
+                              child: Text(l10n.text('cancelSubscription')),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final shouldSignOut = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text(l10n.text('signOut')),
+                            content: Text(l10n.text('confirmSignOut')),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.text('cancelButton'))),
+                              FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.text('confirm'))),
+                            ],
+                          ),
+                        ) ??
+                        false;
+                    if (shouldSignOut) {
+                      await onSignOut();
+                    }
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: Text(l10n.text('signOut')),
+                ),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _startCrispCheckout(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = context.l10n;
-    final appState = context.read<AppState>();
-
-    try {
-      await CrispSubscriptionService().startCheckout(email: appState.email);
-      appState.markAsPremium(provider: 'crisp', planName: l10n.crispPlanName);
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutLaunched),
-        ),
-      );
-    } on CrispConfigurationException catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispMissingConfig(error.message)),
-        ),
-      );
-    } on CrispCheckoutException catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutError(error.message)),
-        ),
-      );
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutError(error.toString())),
-        ),
-      );
-    }
-  }
-}
-
-class _PreferencesCard extends StatelessWidget {
-  const _PreferencesCard({required this.appState, required this.l10n});
-
-  final AppState appState;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tune, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(l10n.settingsTemplateSectionTitle, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.languageSettingLabel,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                DropdownButton<AppLanguage>(
-                  value: appState.language,
-                  items: [
-                    DropdownMenuItem(
-                      value: AppLanguage.japanese,
-                      child: Text(l10n.languageJapanese),
-                    ),
-                    DropdownMenuItem(
-                      value: AppLanguage.english,
-                      child: Text(l10n.languageEnglish),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      context.read<AppState>().updateLanguage(value);
-                    }
-                  },
-                ),
-              ],
-            ),
-            const Divider(height: 24),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.autoNumberingTitle),
-              subtitle: Text(l10n.autoNumberingSubtitle),
-              value: appState.autoNumberingEnabled,
-              onChanged: (value) => context.read<AppState>().updateAutoNumbering(value),
-            ),
-            const Divider(height: 24),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.reminderEmailsTitle),
-              subtitle: Text(l10n.reminderEmailsSubtitle),
-              value: appState.sendReminderEmails,
-              onChanged: (value) => context.read<AppState>().updateReminderEmails(value),
-            ),
-            const Divider(height: 24),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l10n.japaneseEraTitle),
-              subtitle: Text(l10n.japaneseEraSubtitle),
-              value: appState.showJapaneseEra,
-              onChanged: (value) => context.read<AppState>().updateJapaneseEraDisplay(value),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.defaultTaxRateLabel,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                DropdownButton<double>(
-                  value: appState.defaultTaxRate,
-                  items: const [
-                    DropdownMenuItem(value: 0.08, child: Text('8%')),
-                    DropdownMenuItem(value: 0.1, child: Text('10%')),
-                    DropdownMenuItem(value: 0.2, child: Text('20%')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      context.read<AppState>().updateDefaultTaxRate(value);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SupportCard extends StatelessWidget {
-  const _SupportCard({required this.appState, required this.l10n});
-
-  final AppState appState;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.help_outline, color: Theme.of(context).colorScheme.secondary),
-                const SizedBox(width: 8),
-                Text(l10n.supportSectionTitle, style: Theme.of(context).textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.library_books_outlined),
-              title: Text(l10n.helpCenter),
-              subtitle: Text(l10n.helpCenterSubtitle),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () {},
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.mail_outline),
-              title: Text(l10n.supportContact),
-              subtitle: Text(appState.email),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () {},
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.forum_outlined),
-              title: Text(l10n.community),
-              subtitle: Text(l10n.communitySubtitle),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () {},
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -404,24 +174,13 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
-            ),
-          ),
+          SizedBox(width: 160, child: Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600))),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
+          Expanded(child: Text(value.isEmpty ? '-' : value)),
         ],
       ),
     );

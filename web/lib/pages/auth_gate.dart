@@ -1,7 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../l10n/app_localizations.dart';
+import '../state/app_state.dart';
 import 'home_shell.dart';
 import 'sign_in_page.dart';
 
@@ -10,29 +10,21 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(l10n.appTitle, style: Theme.of(context).textTheme.titleMedium),
-                ],
-              ),
-            ),
-          );
-        }
-        if (snapshot.hasData) {
-          return const HomeShell();
-        }
-        return const SignInPage();
-      },
-    );
+    final appState = context.watch<AppState>();
+    if (appState.user == null) {
+      return SignInPage(
+        isLoading: appState.isLoading,
+        onSignIn: (email, password) => context.read<AppState>().signIn(email: email, password: password),
+        onSignUp: (name, email, password) =>
+            context.read<AppState>().signUp(displayName: name, email: email, password: password),
+        onForgotPassword: (email) => context.read<AppState>().sendPasswordReset(email),
+        errorMessage: appState.errorMessage,
+        clearError: context.read<AppState>().clearError,
+        hasFirebase: appState.hasFirebase,
+        locale: appState.locale,
+        onLocaleChanged: context.read<AppState>().setLocale,
+      );
+    }
+    return const HomeShell();
   }
 }

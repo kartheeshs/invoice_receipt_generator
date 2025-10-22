@@ -1,12 +1,10 @@
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
-import '../widgets/invoice_preview.dart';
-import '../widgets/invoice_status_chip.dart';
 
 class InvoicesPage extends StatefulWidget {
   const InvoicesPage({
@@ -14,11 +12,13 @@ class InvoicesPage extends StatefulWidget {
     required this.onCreateInvoice,
     required this.onEditInvoice,
     required this.onDeleteInvoice,
+    required this.onDownloadInvoice,
   });
 
   final VoidCallback onCreateInvoice;
   final ValueChanged<Invoice> onEditInvoice;
   final ValueChanged<Invoice> onDeleteInvoice;
+  final ValueChanged<Invoice> onDownloadInvoice;
 
   @override
   State<InvoicesPage> createState() => _InvoicesPageState();
@@ -26,7 +26,7 @@ class InvoicesPage extends StatefulWidget {
 
 class _InvoicesPageState extends State<InvoicesPage> {
   final _searchController = TextEditingController();
-  InvoiceStatus? _statusFilter;
+  InvoiceStatus? _filterStatus;
 
   @override
   void dispose() {
@@ -38,329 +38,160 @@ class _InvoicesPageState extends State<InvoicesPage> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final l10n = context.l10n;
-    final invoices = appState.invoices;
+    final currency = l10n.currencyFormat(appState.profile.currencyCode, appState.profile.currencySymbol);
     final query = _searchController.text.trim().toLowerCase();
 
-    final filteredInvoices = invoices.where((invoice) {
+    final invoices = appState.invoices.where((invoice) {
       final matchesQuery = query.isEmpty ||
           invoice.clientName.toLowerCase().contains(query) ||
           invoice.projectName.toLowerCase().contains(query) ||
           invoice.number.toLowerCase().contains(query);
-      final matchesStatus =
-          _statusFilter == null || invoice.status == _statusFilter;
+      final matchesStatus = _filterStatus == null || invoice.status == _filterStatus;
       return matchesQuery && matchesStatus;
     }).toList();
 
-    Invoice? selectedInvoice = appState.selectedInvoice;
-    if (selectedInvoice != null &&
-        !filteredInvoices.any((invoice) => invoice.id == selectedInvoice.id)) {
-      selectedInvoice = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<AppState>().selectInvoice(null);
-      });
-    }
-    if (selectedInvoice == null && filteredInvoices.isNotEmpty) {
-      final firstInvoice = filteredInvoices.first;
-      selectedInvoice = firstInvoice;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<AppState>().selectInvoice(firstInvoice);
-      });
-    }
-
-    final NumberFormat currency = l10n.currencyFormat;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 1080;
-        final content = _InvoicesContent(
-          invoices: filteredInvoices,
-          selectedInvoice: selectedInvoice,
-          onSelectInvoice: (invoice) => context.read<AppState>().selectInvoice(invoice),
-          onCreateInvoice: widget.onCreateInvoice,
-          onEditInvoice: widget.onEditInvoice,
-          onDeleteInvoice: widget.onDeleteInvoice,
-          currency: currency,
-          l10n: l10n,
-        );
-
-        return SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 32),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(l10n.invoicesHeaderTitle,
-                              style: Theme.of(context).textTheme.headlineSmall),
-                          const SizedBox(height: 6),
-                          Text(
-                            l10n.invoicesHeaderSubtitle,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isWide)
-                      FilledButton.icon(
-                        onPressed: widget.onCreateInvoice,
-                        icon: const Icon(Icons.add),
-                        label: Text(l10n.newInvoiceShort),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 12,
-                  children: [
-                    SizedBox(
-                      width: 320,
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search),
-                          hintText: l10n.invoicesSearchHint,
-                        ),
-                      ),
-                    ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        ChoiceChip(
-                          label: Text(l10n.filterAll),
-                          selected: _statusFilter == null,
-                          onSelected: (_) => setState(() => _statusFilter = null),
-                        ),
-                        ...InvoiceStatus.values.map(
-                          (status) => ChoiceChip(
-                            label: Text(l10n.invoiceStatusLabel(status)),
-                            selected: _statusFilter == status,
-                            onSelected: (_) => setState(() => _statusFilter = status),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                if (!isWide) ...[
-                  content,
-                  const SizedBox(height: 24),
-                  if (selectedInvoice != null)
-                    InvoicePreview(invoice: selectedInvoice, currency: currency),
-                ] else
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 3, child: content),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        flex: 2,
-                        child: selectedInvoice != null
-                            ? InvoicePreview(invoice: selectedInvoice, currency: currency)
-                            : _EmptyPreview(onCreateInvoice: widget.onCreateInvoice, l10n: l10n),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _InvoicesContent extends StatelessWidget {
-  const _InvoicesContent({
-    required this.invoices,
-    required this.selectedInvoice,
-    required this.onSelectInvoice,
-    required this.onCreateInvoice,
-    required this.onEditInvoice,
-    required this.onDeleteInvoice,
-    required this.currency,
-    required this.l10n,
-  });
-
-  final List<Invoice> invoices;
-  final Invoice? selectedInvoice;
-  final ValueChanged<Invoice?> onSelectInvoice;
-  final VoidCallback onCreateInvoice;
-  final ValueChanged<Invoice> onEditInvoice;
-  final ValueChanged<Invoice> onDeleteInvoice;
-  final NumberFormat currency;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    if (invoices.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.inbox_outlined, size: 48, color: Colors.black26),
-                const SizedBox(height: 12),
-                Text(l10n.noInvoicesFound),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: onCreateInvoice,
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n.createFirstInvoice),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: invoices.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final invoice = invoices[index];
-            final isSelected = selectedInvoice?.id == invoice.id;
-
-            return InkWell(
-              onTap: () => onSelectInvoice(invoice),
-              child: Container(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary.withOpacity(0.08)
-                    : Colors.transparent,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            invoice.clientName,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            invoice.projectName,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('${l10n.issueDateLabel}: ${l10n.formatDate(invoice.issueDate)}'),
-                          const SizedBox(height: 2),
-                          Text('${l10n.dueDateLabel}: ${l10n.formatDate(invoice.dueDate)}'),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        currency.format(invoice.total),
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    InvoiceStatusChip(status: invoice.status, compact: true),
-                    const SizedBox(width: 12),
-                    PopupMenuButton<String>(
-                      tooltip: l10n.invoiceActionsTooltip,
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'edit':
-                            onEditInvoice(invoice);
-                            break;
-                          case 'delete':
-                            onDeleteInvoice(invoice);
-                            break;
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: ListTile(
-                            leading: const Icon(Icons.edit_outlined),
-                            title: Text(l10n.edit),
-                            dense: true,
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: ListTile(
-                            leading: const Icon(Icons.delete_outline),
-                            title: Text(l10n.delete),
-                            dense: true,
-                          ),
-                        ),
-                      ],
-                    ),
+                    Text(l10n.text('invoicesTab'), style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(height: 4),
+                    Text(l10n.text('invoicesEmptyBody')),
                   ],
                 ),
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyPreview extends StatelessWidget {
-  const _EmptyPreview({required this.onCreateInvoice, required this.l10n});
-
-  final VoidCallback onCreateInvoice;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.description_outlined,
-                  size: 48, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                l10n.selectInvoiceEmptyState,
-                style: Theme.of(context).textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: onCreateInvoice,
+              FilledButton.icon(
+                onPressed: widget.onCreateInvoice,
                 icon: const Icon(Icons.add),
-                label: Text(l10n.createInvoiceAction),
+                label: Text(l10n.text('newInvoice')),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: 320,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: l10n.text('searchInvoices'),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: Text(l10n.text('filterAll')),
+                    selected: _filterStatus == null,
+                    onSelected: (_) => setState(() => _filterStatus = null),
+                  ),
+                  ...InvoiceStatus.values.map(
+                    (status) => ChoiceChip(
+                      label: Text(l10n.invoiceStatusLabel(status)),
+                      selected: _filterStatus == status,
+                      onSelected: (_) => setState(() => _filterStatus = status),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              child: invoices.isEmpty
+                  ? Center(child: Text(l10n.text('invoicesEmptyTitle')))
+                  : ListView.separated(
+                      itemCount: invoices.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final invoice = invoices[index];
+                        final subtitleText = invoice.projectName.isEmpty
+                            ? l10n.dateFormat.format(invoice.dueDate)
+                            : '${invoice.projectName} • ${l10n.dateFormat.format(invoice.dueDate)}';
+                        return ListTile(
+                          leading: const Icon(Icons.description_outlined),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          title: Text(invoice.clientName.isEmpty ? invoice.number : invoice.clientName),
+                          subtitle: Text(subtitleText),
+                          onTap: () => widget.onEditInvoice(invoice),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(currency.format(invoice.amount)),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.surfaceVariant,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      l10n.invoiceStatusLabel(invoice.status),
+                                      style: Theme.of(context).textTheme.labelSmall,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 16),
+                              PopupMenuButton<_InvoiceAction>(
+                                onSelected: (action) {
+                                  switch (action) {
+                                    case _InvoiceAction.edit:
+                                      widget.onEditInvoice(invoice);
+                                      break;
+                                    case _InvoiceAction.download:
+                                      widget.onDownloadInvoice(invoice);
+                                      break;
+                                    case _InvoiceAction.delete:
+                                      widget.onDeleteInvoice(invoice);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: _InvoiceAction.edit,
+                                    child: Text(l10n.text('editInvoice')),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _InvoiceAction.download,
+                                    child: Text(l10n.text('downloadPdf')),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _InvoiceAction.delete,
+                                    child: Text(l10n.text('deleteButton')),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
+enum _InvoiceAction { edit, download, delete }

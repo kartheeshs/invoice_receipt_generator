@@ -1,434 +1,257 @@
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
 import '../models/invoice.dart';
-import '../state/app_state.dart';
-import 'app_language.dart';
 
 class AppLocalizations {
-  AppLocalizations(this.language);
+  AppLocalizations(this.locale);
 
-  final AppLanguage language;
+  final Locale locale;
 
-  static const supportedLocales = [Locale('ja', 'JP'), Locale('en', 'US')];
+  static const supportedLocales = [Locale('en'), Locale('ja')];
 
-  Locale get locale => language.locale;
-
-  String get _localeTag => language.currencyLocale;
-
-  NumberFormat get currencyFormat =>
-      NumberFormat.currency(locale: _localeTag, symbol: '¥', decimalDigits: 0);
-
-  String formatDate(DateTime date) {
-    if (language == AppLanguage.japanese) {
-      return DateFormat('yyyy/MM/dd', _localeTag).format(date);
+  static const _localizedValues = {
+    'en': {
+      'appTitle': 'Invoice & Receipt Generator',
+      'signInTitle': 'Sign in to continue',
+      'signUpTitle': 'Create your account',
+      'emailLabel': 'Email address',
+      'passwordLabel': 'Password',
+      'confirmPasswordLabel': 'Confirm password',
+      'displayNameLabel': 'Full name',
+      'signInButton': 'Sign in',
+      'signUpButton': 'Create account',
+      'forgotPassword': 'Forgot password?',
+      'sendResetLink': 'Send reset link',
+      'resetPasswordSent': 'Password reset email sent.',
+      'noAccountPrompt': "Don't have an account?", 
+      'haveAccountPrompt': 'Already have an account?',
+      'languageLabel': 'Language',
+      'languageSectionLabel': 'Choose application language',
+      'languageEnglish': 'English',
+      'languageJapanese': 'Japanese',
+      'dashboardTab': 'Dashboard',
+      'invoicesTab': 'Invoices',
+      'settingsTab': 'Settings',
+      'welcomeBack': 'Welcome back, {name}',
+      'planStatusFree': 'Free plan',
+      'planStatusPremium': 'Premium subscriber',
+      'subscriptionTitle': 'Subscription',
+      'subscriptionDescription':
+          'Upgrade via Crisp to unlock unlimited invoices and premium templates.',
+      'planFreeBody': 'You are using the free plan. Upgrade any time to unlock unlimited PDF exports.',
+      'planPremiumBody': 'You are enjoying premium benefits. Thank you for subscribing!',
+      'firebaseBanner':
+          'Firebase auth is not configured. Provide FIREBASE_API_KEY via --dart-define to enable authentication.',
+      'subscribeCrisp': 'Subscribe via Crisp',
+      'manageSubscription': 'Manage subscription',
+      'cancelSubscription': 'Cancel subscription',
+      'monthlyPrice': 'Monthly price',
+      'planPriceLabel': '¥600 / month',
+      'planPriceLabelLocalized': '{price} / month',
+      'planBenefits': 'Benefits',
+      'planBenefitsBody':
+          'Unlimited invoices, premium templates, automated reminders.',
+      'quickActions': 'Quick actions',
+      'createInvoiceAction': 'Create invoice',
+      'viewInvoicesAction': 'View invoices',
+      'totalInvoices': 'Total invoices',
+      'outstanding': 'Outstanding',
+      'paid': 'Paid',
+      'averageInvoice': 'Average invoice',
+      'recentInvoices': 'Recent invoices',
+      'invoicesEmptyTitle': 'Create your first invoice',
+      'invoicesEmptyBody':
+          'Generate invoices and receipts instantly for your clients.',
+      'newInvoice': 'New invoice',
+      'editInvoice': 'Edit invoice',
+      'invoiceFormTitle': 'Invoice details',
+      'clientLabel': 'Client name',
+      'projectLabel': 'Project name',
+      'descriptionLabel': 'Description',
+      'amountLabel': 'Amount',
+      'invoiceNumberLabel': 'Invoice number',
+      'issueDateLabel': 'Issue date',
+      'dueDateLabel': 'Due date',
+      'notesLabel': 'Notes',
+      'statusLabel': 'Status',
+      'saveButton': 'Save',
+      'cancelButton': 'Cancel',
+      'deleteButton': 'Delete',
+      'downloadPdf': 'Download PDF',
+      'searchInvoices': 'Search invoices',
+      'filterAll': 'All',
+      'status_draft': 'Draft',
+      'status_sent': 'Sent',
+      'status_paid': 'Paid',
+      'status_overdue': 'Overdue',
+      'profileTitle': 'Profile',
+      'profileDialogTitle': 'Update profile',
+      'profileNameLabel': 'Name',
+      'profileCompanyLabel': 'Company',
+      'profileAddressLabel': 'Address',
+      'profilePhoneLabel': 'Phone',
+      'profileTaxIdLabel': 'Tax ID',
+      'editProfile': 'Edit profile',
+      'profileUpdated': 'Profile updated',
+      'invoiceSaved': 'Invoice saved',
+      'invoiceDeleted': 'Invoice deleted',
+      'pdfReady': 'Invoice PDF is ready to download.',
+      'errorUnknown': 'Something went wrong. Please try again.',
+      'firebaseMissing':
+          'Firebase auth is not configured. Provide FIREBASE_API_KEY via --dart-define to enable password reset.',
+      'validationRequired': 'This field is required',
+      'validationEmail': 'Enter a valid email address',
+      'validationPasswordLength': 'Password must be at least 6 characters',
+      'validationPasswordMatch': 'Passwords do not match',
+      'validationAmount': 'Enter a valid amount',
+      'signOut': 'Sign out',
+      'confirmSignOut': 'Do you want to sign out?',
+      'confirm': 'Confirm',
+    },
+    'ja': {
+      'appTitle': '請求書・領収書ジェネレーター',
+      'signInTitle': 'ログインして続行',
+      'signUpTitle': 'アカウントを作成',
+      'emailLabel': 'メールアドレス',
+      'passwordLabel': 'パスワード',
+      'confirmPasswordLabel': 'パスワード確認',
+      'displayNameLabel': '氏名',
+      'signInButton': 'ログイン',
+      'signUpButton': 'アカウントを作成',
+      'forgotPassword': 'パスワードをお忘れですか？',
+      'sendResetLink': 'リセットメールを送信',
+      'resetPasswordSent': 'パスワード再設定メールを送信しました。',
+      'noAccountPrompt': 'アカウントをお持ちでない方はこちら',
+      'haveAccountPrompt': 'すでにアカウントをお持ちの方はこちら',
+      'languageLabel': '言語',
+      'languageSectionLabel': 'アプリの言語を選択',
+      'languageEnglish': '英語',
+      'languageJapanese': '日本語',
+      'dashboardTab': 'ダッシュボード',
+      'invoicesTab': '請求書',
+      'settingsTab': '設定',
+      'welcomeBack': '{name}さん、おかえりなさい',
+      'planStatusFree': 'フリープラン',
+      'planStatusPremium': 'プレミアムプラン利用中',
+      'subscriptionTitle': 'サブスクリプション',
+      'subscriptionDescription':
+          'Crisp経由でアップグレードすると、無制限の請求書とプレミアムテンプレートが利用できます。',
+      'planFreeBody': '現在はフリープランをご利用中です。必要になったらいつでもアップグレードしてください。',
+      'planPremiumBody': 'プレミアム特典をご利用いただきありがとうございます！',
+      'firebaseBanner': 'Firebase認証が設定されていません。FIREBASE_API_KEY を設定してください。',
+      'subscribeCrisp': 'Crispで購読',
+      'manageSubscription': 'サブスクリプションを管理',
+      'cancelSubscription': 'サブスクリプションを解約',
+      'monthlyPrice': '月額料金',
+      'planPriceLabel': '月額600円',
+      'planPriceLabelLocalized': '{price}/月',
+      'planBenefits': '特典',
+      'planBenefitsBody': '無制限の請求書、プレミアムテンプレート、自動リマインダー。',
+      'quickActions': 'クイックアクション',
+      'createInvoiceAction': '請求書を作成',
+      'viewInvoicesAction': '請求書一覧',
+      'totalInvoices': '請求書総数',
+      'outstanding': '未回収',
+      'paid': '入金済み',
+      'averageInvoice': '平均請求額',
+      'recentInvoices': '最近の請求書',
+      'invoicesEmptyTitle': '最初の請求書を作成しましょう',
+      'invoicesEmptyBody': 'クライアント向けの請求書や領収書をすぐに生成できます。',
+      'newInvoice': '新しい請求書',
+      'editInvoice': '請求書を編集',
+      'invoiceFormTitle': '請求書の詳細',
+      'clientLabel': 'クライアント名',
+      'projectLabel': '案件名',
+      'descriptionLabel': '内容',
+      'amountLabel': '金額',
+      'invoiceNumberLabel': '請求書番号',
+      'issueDateLabel': '発行日',
+      'dueDateLabel': '支払期日',
+      'notesLabel': 'メモ',
+      'statusLabel': 'ステータス',
+      'saveButton': '保存',
+      'cancelButton': 'キャンセル',
+      'deleteButton': '削除',
+      'downloadPdf': 'PDFをダウンロード',
+      'searchInvoices': '請求書を検索',
+      'filterAll': 'すべて',
+      'status_draft': '下書き',
+      'status_sent': '送信済み',
+      'status_paid': '入金済み',
+      'status_overdue': '期限超過',
+      'profileTitle': 'プロフィール',
+      'profileDialogTitle': 'プロフィールを更新',
+      'profileNameLabel': '氏名',
+      'profileCompanyLabel': '会社名',
+      'profileAddressLabel': '住所',
+      'profilePhoneLabel': '電話番号',
+      'profileTaxIdLabel': '税番号',
+      'editProfile': 'プロフィールを編集',
+      'profileUpdated': 'プロフィールを更新しました',
+      'invoiceSaved': '請求書を保存しました',
+      'invoiceDeleted': '請求書を削除しました',
+      'pdfReady': 'PDFファイルをダウンロードできます。',
+      'errorUnknown': '問題が発生しました。再度お試しください。',
+      'firebaseMissing': 'Firebaseの設定が必要です。FIREBASE_API_KEYを設定してください。',
+      'validationRequired': '必須項目です',
+      'validationEmail': '有効なメールアドレスを入力してください',
+      'validationPasswordLength': 'パスワードは6文字以上で入力してください',
+      'validationPasswordMatch': 'パスワードが一致しません',
+      'validationAmount': '正しい金額を入力してください',
+      'signOut': 'サインアウト',
+      'confirmSignOut': 'サインアウトしますか？',
+      'confirm': '確認',
     }
-    return DateFormat.yMMMd(_localeTag).format(date);
+  };
+
+  static AppLocalizations of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  String _select(String ja, String en) =>
-      language == AppLanguage.japanese ? ja : en;
-
-  // General labels
-  String get appTitle => _select('和式請求書ジェネレーター', 'Invoice Studio');
-  String get dashboardNav => _select('ダッシュボード', 'Dashboard');
-  String get invoicesNav => _select('請求書', 'Invoices');
-  String get settingsNav => _select('設定', 'Settings');
-  String get upgradeToPremiumButton =>
-      _select('Crispでプレミアム登録', 'Upgrade with Crisp');
-  String get premiumActiveLabel =>
-      _select('プレミアム適用中', 'Premium Active');
-  String get notificationsTooltip => _select('通知', 'Notifications');
-  String get menuTitle => _select('メニュー', 'Menu');
-  String get newInvoiceAction =>
-      _select('新しい請求書', 'New invoice');
-  String get newInvoiceShort => _select('新規作成', 'Create');
-  String get cancelAction => _select('キャンセル', 'Cancel');
-  String get closeAction => _select('閉じる', 'Close');
-  String get deleteAction => _select('削除する', 'Delete');
-  String get upgradeDialogTitle =>
-      _select('Crisp プレミアムプラン', 'Crisp premium plan');
-  String get upgradeDialogMessage => _select(
-        '月額¥600のCrispサブスクリプションでPDFダウンロード無制限と優先サポートが利用できます。',
-        'Subscribe via Crisp for ¥600/month to unlock unlimited PDF downloads and priority support.',
-      );
-  String get notificationsTitle => _select('最新のお知らせ', 'Latest updates');
-  String get notificationTaxUpdateTitle => _select(
-        '請求書テンプレートに「軽減税率」項目を追加しました。',
-        'Added a “Reduced tax rate” field to the invoice template.',
-      );
-  String get notificationPremiumUpdateTitle => _select(
-        'Stripe 決済がプレミアムプランでも利用可能になりました。',
-        'Stripe payments are now available on the premium plan.',
-      );
-  String get invoiceCreatedSnack =>
-      _select('請求書を作成しました。', 'Invoice created.');
-  String get invoiceUpdatedSnack =>
-      _select('請求書を更新しました。', 'Invoice updated.');
-  String get invoiceDeletedSnack =>
-      _select('請求書を削除しました。', 'Invoice deleted.');
-  String deleteInvoiceMessage(String client, String number) => _select(
-        '${client}向けの請求書（${number}）を削除しますか？',
-        'Delete the invoice for $client (No. $number)?',
-      );
-  String get deleteInvoiceTitle =>
-      _select('請求書の削除', 'Delete invoice');
-  String get upgradeToPremiumCta =>
-      _select('Crispでプレミアム登録', 'Upgrade with Crisp');
-  String get downgradeToFreeCta =>
-      _select('フリープランにダウングレード', 'Switch to free plan');
-  String get downgradeToFreePlanButton =>
-      _select('フリープランに戻す', 'Switch to free plan');
-  String get premiumPlanActiveLabel =>
-      _select('プレミアム適用中', 'Premium active');
-  String get accountMenuTooltip =>
-      _select('アカウント', 'Account');
-  String get signOut => _select('サインアウト', 'Sign out');
-  String get languageSettingLabel =>
-      _select('表示言語', 'Display language');
-  String get languageJapanese => _select('日本語', 'Japanese');
-  String get languageEnglish => _select('英語', 'English');
-
-  // Dashboard
-  String dashboardGreeting(String ownerName) =>
-      _select('おかえりなさい、${ownerName}さん', 'Welcome back, $ownerName');
-  String dashboardLead(String amount) => _select(
-        '今月は${amount}の入金が確認できています。未回収分のフォローアップを行いましょう。',
-        '$amount has been collected this month. Follow up on the remaining invoices.',
-      );
-  String get dashboardCreateInvoiceButton =>
-      _select('請求書を作成', 'Create invoice');
-  String get metricPaidTitle => _select('入金済み', 'Paid');
-  String metricPaidSubtitle(int count) => _select(
-        '過去30日で${count}件',
-        '$count invoices in the last 30 days',
-      );
-  String get metricOutstandingTitle => _select('未入金', 'Outstanding');
-  String metricOutstandingSubtitle(int dueSoon) => _select(
-        '今後7日以内の期限: ${dueSoon}件',
-        '$dueSoon due within the next 7 days',
-      );
-  String get metricOverdueTitle => _select('期限切れ', 'Overdue');
-  String metricOverdueSubtitle(bool enabled) => _select(
-        'リマインドメール設定: ${enabled ? 'ON' : 'OFF'}',
-        'Reminder emails: ${enabled ? 'On' : 'Off'}',
-      );
-  String get metricDraftTitle => _select('下書き', 'Draft');
-  String metricDraftSubtitle(bool enabled) => _select(
-        '自動採番: ${enabled ? '有効' : '無効'}',
-        'Auto numbering: ${enabled ? 'Enabled' : 'Disabled'}',
-      );
-  String get dashboardFollowUpTitle =>
-      _select('フォローアップ推奨', 'Suggested follow-ups');
-  String get dashboardNoPending =>
-      _select('対応が必要な請求書はありません。', 'No invoices need attention.');
-  String dashboardFollowUpLine(String client, String amount) => _select(
-        '${client} への請求（${amount}）',
-        'Invoice for $client ($amount)',
-      );
-  String dashboardFollowUpSubtitle(String dueDate, String status) => _select(
-        '支払期限: ${dueDate} • ステータス: ${status}',
-        'Due: $dueDate • Status: $status',
-      );
-  String get dashboardNewInvoiceCta =>
-      _select('新しい請求書を作成', 'Create new invoice');
-  String get dashboardDownloadsTitle =>
-      _select('PDF ダウンロード上限', 'PDF download quota');
-  String get dashboardDownloadsUnlimited => _select(
-        'プレミアムプランのため上限はありません。',
-        'Unlimited downloads on the premium plan.',
-      );
-  String dashboardDownloadsUsage(int used, int limit) => _select(
-        '今月は${limit}件中${used}件ダウンロード済みです。',
-        '$used of $limit downloads used this month.',
-      );
-  String get dashboardRecentInvoicesTitle =>
-      _select('最近の請求書', 'Recent invoices');
-  String dashboardRecentInvoiceSubtitle(String issueDate, String amount) =>
-      _select('発行日: ${issueDate} • 金額: ${amount}',
-          'Issued: $issueDate • Total: $amount');
-
-  // Invoices page
-  String get invoicesHeaderTitle => _select('請求書管理', 'Invoice management');
-  String get invoicesHeaderSubtitle => _select(
-        'クライアント別にフィルタし、ワンクリックでPDFを生成できます。',
-        'Filter by client and generate PDFs in one click.',
-      );
-  String get invoicesSearchHint =>
-      _select('クライアント名や請求書番号で検索', 'Search by client or invoice number');
-  String get filterAll => _select('すべて', 'All');
-  String get noInvoicesFound =>
-      _select('該当する請求書がありません。', 'No invoices match your filters.');
-  String get createFirstInvoice =>
-      _select('最初の請求書を作成', 'Create your first invoice');
-  String get issueDateLabel => _select('発行日', 'Issue date');
-  String get dueDateLabel => _select('支払期限', 'Due date');
-  String get invoiceActionsTooltip =>
-      _select('操作', 'Actions');
-  String get edit => _select('編集', 'Edit');
-  String get delete => _select('削除', 'Delete');
-  String get selectInvoiceEmptyState => _select(
-        '請求書を選択すると詳細が表示されます。',
-        'Select an invoice to preview the details.',
-      );
-  String get createInvoiceAction =>
-      _select('請求書を作成', 'Create invoice');
-
-  // Settings page
-  String get settingsTitle => _select('ワークスペース設定', 'Workspace settings');
-  String get settingsSubtitle => _select(
-        '請求書テンプレートや課金ステータスの管理を行います。',
-        'Manage invoice templates and billing preferences.',
-      );
-  String get settingsBusinessSectionTitle =>
-      _select('事業者情報', 'Business information');
-  String get businessNameLabel => _select('事業者名', 'Business name');
-  String get ownerLabel => _select('担当者', 'Owner');
-  String get addressLabel => _select('所在地', 'Address');
-  String get postalCodeLabel => _select('郵便番号', 'Postal code');
-  String get emailLabel => _select('メールアドレス', 'Email');
-  String get phoneLabel => _select('電話番号', 'Phone');
-  String get editProfile =>
-      _select('プロフィールを編集', 'Edit profile');
-  String get settingsPlanSectionTitle =>
-      _select('プラン', 'Plan');
-  String get premiumPlanName =>
-      _select('Crispプレミアム（¥600/月）', 'Crisp premium (¥600/mo)');
-  String get crispPlanName => premiumPlanName;
-  String get freePlanName => _select('無料プラン', 'Free plan');
-  String get premiumPlanDescription => _select(
-        'PDFダウンロード無制限 / 優先サポート / クラウドバックアップ',
-        'Unlimited PDFs / Priority support / Cloud backups',
-      );
-  String get freePlanDescription => _select(
-        '月3件までPDFダウンロード / 基本テンプレート',
-        'Up to 3 PDF downloads per month / Basic templates',
-      );
-  String get crispPlanDescription => _select(
-        'Crisp経由の月額¥600サブスクリプションでプレミアム機能を解放できます。',
-        'Unlock premium features for ¥600/month via your Crisp subscription.',
-      );
-  String get crispPlanNotice => _select(
-        'Crispのチェックアウトが新しいタブで開きます。決済完了後にこちらへ戻り、ステータスを確認してください。',
-        'Crisp checkout opens in a new tab. Complete payment and return here to confirm your status.',
-      );
-  String get crispSubscribeCta =>
-      _select('Crispで申し込む (¥600/月)', 'Subscribe with Crisp (¥600/mo)');
-  String premiumActiveDetails(String planName) => _select(
-        '現在のプラン: ${planName}。Crispダッシュボードから請求情報を管理できます。',
-        'Active plan: $planName. Manage billing from your Crisp dashboard.',
-      );
-  String get crispCheckoutLaunched =>
-      _select('Crispの決済タブを開きました。完了後にこちらへ戻ってください。',
-          'Opened Crisp checkout in a new tab. Return here once payment is complete.');
-  String crispMissingConfig(String reason) => _select(
-        'Crisp連携が未設定です: ${reason}',
-        'Crisp integration is not configured: $reason',
-      );
-  String crispCheckoutError(String reason) => _select(
-        'Crispの決済リンクを開けませんでした: ${reason}',
-        'Could not launch the Crisp checkout link: $reason',
-      );
-  String get profileDialogTitle =>
-      _select('事業者プロフィールを編集', 'Edit business profile');
-  String get profileDialogSubtitle => _select(
-        '請求書やPDFに表示される事業者情報を更新します。',
-        'Update the company details displayed on invoices and PDFs.',
-      );
-  String get saveChanges => _select('変更を保存', 'Save changes');
-  String get fieldRequired => _select('必須項目です。', 'This field is required.');
-  String get profileUpdatedMessage =>
-      _select('プロフィールを更新しました。', 'Profile updated successfully.');
-  String get settingsTemplateSectionTitle =>
-      _select('請求書テンプレート', 'Invoice template');
-  String get autoNumberingTitle =>
-      _select('請求書番号を自動採番する', 'Auto-generate invoice numbers');
-  String get autoNumberingSubtitle => _select(
-        '「INV-YYYYMM-001」の形式で連番を採番します。',
-        'Generate numbers like “INV-YYYYMM-001”.',
-      );
-  String get reminderEmailsTitle =>
-      _select('支払期限メールを自動送信', 'Send due-date reminders automatically');
-  String get reminderEmailsSubtitle => _select(
-        '期限切れの請求書に対して、1日後にリマインドメールを送信します。',
-        'Send reminder emails one day after the due date.',
-      );
-  String get japaneseEraTitle =>
-      _select('日付を和暦表示にする', 'Show Japanese era dates');
-  String get japaneseEraSubtitle => _select(
-        '請求書上の日付を令和表記に変更します。',
-        'Display invoice dates using the Reiwa era style.',
-      );
-  String get defaultTaxRateLabel =>
-      _select('標準税率', 'Default tax rate');
-  String get supportSectionTitle =>
-      _select('サポートとリソース', 'Support and resources');
-  String get helpCenter => _select('ヘルプセンター', 'Help center');
-  String get helpCenterSubtitle =>
-      _select('FAQや使い方ガイドを確認できます。', 'Browse FAQs and guides.');
-  String get supportContact =>
-      _select('サポートへ問い合わせ', 'Contact support');
-  String get community => _select('コミュニティ', 'Community');
-  String get communitySubtitle => _select(
-        'Slackで他のユーザーと情報交換しましょう。',
-        'Connect with other users on Slack.',
-      );
-
-  // Invoice form dialog
-  String get invoiceDialogTitleCreate =>
-      _select('請求書を作成', 'Create invoice');
-  String get invoiceDialogTitleEdit =>
-      _select('請求書を編集', 'Edit invoice');
-  String get invoiceNumberLabel =>
-      _select('請求書番号', 'Invoice number');
-  String get invoiceNumberHint =>
-      _select('INV-202405-001', 'INV-202405-001');
-  String get invoiceNumberRequired =>
-      _select('請求書番号を入力してください。', 'Enter an invoice number.');
-  String get statusLabel => _select('ステータス', 'Status');
-  String get clientLabel =>
-      _select('請求先（会社名）', 'Client (company)');
-  String get clientRequired =>
-      _select('請求先を入力してください。', 'Enter a client name.');
-  String get projectLabel => _select('案件名 / 件名', 'Project / subject');
-  String get projectRequired =>
-      _select('案件名を入力してください。', 'Enter a project name.');
-  String get billingEmailLabel =>
-      _select('請求書送付先メールアドレス', 'Billing email');
-  String get billingEmailHint =>
-      _select('billing@example.jp', 'billing@example.com');
-  String get taxRateLabel => _select('税率', 'Tax rate');
-  String get issueDateField => _select('発行日', 'Issue date');
-  String get dueDateField => _select('支払期限', 'Due date');
-  String get lineItemsTitle => _select('請求内容', 'Line items');
-  String get addItem => _select('品目を追加', 'Add item');
-  String get notesLabel =>
-      _select('備考・メッセージ', 'Notes / message');
-  String get notesHint => _select(
-        '例: お振込手数料は貴社負担にてお願いいたします。',
-        'e.g. Please cover the bank transfer fee.',
-      );
-  String get summarySubtotal => _select('小計', 'Subtotal');
-  String get summaryTax => _select('消費税', 'Tax');
-  String get summaryTotal => _select('合計', 'Total');
-  String get createButton => _select('作成する', 'Create');
-  String get updateButton => _select('更新する', 'Update');
-  String get quantityMustBePositive =>
-      _select('数量は1以上で入力してください。', 'Quantity must be at least 1.');
-  String get addAtLeastOneItem =>
-      _select('品目を1件以上追加してください。', 'Add at least one line item.');
-  String get itemDescriptionLabel =>
-      _select('品目名', 'Item name');
-  String get itemDescriptionRequired =>
-      _select('品目名を入力してください。', 'Enter an item name.');
-  String get quantityLabel => _select('数量', 'Quantity');
-  String get unitPriceLabel => _select('単価 (¥)', 'Unit price (¥)');
-  String get removeItemTooltip => _select('削除', 'Remove');
-  String get taxOptionZero => _select('0%', '0%');
-  String get taxOptionReduced =>
-      _select('8% (軽減税率)', '8% (reduced)');
-  String get taxOptionStandard =>
-      _select('10% (標準税率)', '10% (standard)');
-  String get taxOptionTwenty => _select('20%', '20%');
-
-  // Invoice preview
-  String invoiceTitle(String? number) => number == null || number.isEmpty
-      ? _select('請求書（番号未設定）', 'Invoice (no number)')
-      : _select('請求書 ${number}', 'Invoice $number');
-  String previewClient(String client) =>
-      _select('請求先: ${client}', 'Client: $client');
-  String previewProject(String project) =>
-      _select('案件名: ${project}', 'Project: $project');
-  String get previewAmountLabel => _select('請求金額', 'Amount due');
-  String get previewTaxRateLabel => _select('税率', 'Tax rate');
-  String get itemsHeaderDescription => _select('品目', 'Item');
-  String get itemsHeaderQuantity => _select('数量', 'Qty');
-  String get itemsHeaderUnitPrice => _select('単価', 'Unit price');
-  String get itemsHeaderAmount => _select('金額', 'Amount');
-  String get downloadPdf => _select('PDFをダウンロード', 'Download PDF');
-  String get sendReminder => _select('リマインドを送る', 'Send reminder');
-  String get pdfDownloadSuccess =>
-      _select('PDFをダウンロードしました。', 'Invoice PDF downloaded.');
-  String get pdfDownloadError =>
-      _select('PDFの生成に失敗しました。', 'Failed to generate the PDF.');
-  String pdfDownloadLimitReached(int limit) => _select(
-        '無料プランでは月${limit}件までPDFをダウンロードできます。',
-        'The free plan allows up to $limit PDF downloads per month.',
-      );
-
-  // Authentication
-  String get signInTitle => _select('アカウントにサインイン', 'Sign in to your account');
-  String get signInSubtitle => _select(
-        'Firebaseアカウントでログインし、請求書を管理しましょう。',
-        'Use your Firebase account to manage invoices.',
-      );
-  String get registerTitle =>
-      _select('アカウントを作成', 'Create an account');
-  String get registerSubtitle => _select(
-        '事業者情報を登録すると請求書テンプレートが自動で設定されます。',
-        'Register your business details to prefill invoice templates automatically.',
-      );
-  String get emailFieldLabel => _select('メールアドレス', 'Email');
-  String get emailRequired =>
-      _select('メールアドレスを入力してください。', 'Enter your email.');
-  String get passwordFieldLabel => _select('パスワード', 'Password');
-  String get passwordRequired =>
-      _select('パスワードを入力してください。', 'Enter your password.');
-  String get passwordLengthError =>
-      _select('パスワードは6文字以上で入力してください。', 'Use at least 6 characters.');
-  String get submitSignIn => _select('ログイン', 'Sign in');
-  String get submitRegister => _select('登録する', 'Register');
-  String get toggleToRegister =>
-      _select('アカウントをお持ちでない場合はこちら', 'Need an account? Register');
-  String get toggleToSignIn =>
-      _select('すでにアカウントをお持ちの場合はこちら', 'Already have an account? Sign in');
-  String get signUpBusinessNameLabel =>
-      _select('事業者名', 'Business name');
-  String get signUpBusinessNameHint =>
-      _select('例: 和式デザイン合同会社', 'e.g. Wafu Studio Inc.');
-  String get signUpOwnerNameLabel =>
-      _select('担当者名', 'Owner name');
-  String get signUpOwnerNameHint =>
-      _select('例: 山田 太郎', 'e.g. Jane Doe');
-  String get authGenericError =>
-      _select('認証に失敗しました。時間をおいて再度お試しください。',
-          'Authentication failed. Please try again later.');
-  String authErrorMessage(String code) {
-    switch (code) {
-      case 'user-not-found':
-        return _select('ユーザーが見つかりませんでした。',
-            'No user found with that email.');
-      case 'wrong-password':
-        return _select('パスワードが正しくありません。', 'Incorrect password.');
-      case 'email-already-in-use':
-        return _select('既に登録済みのメールアドレスです。',
-            'That email is already registered.');
-      case 'weak-password':
-        return _select('パスワードが弱すぎます。',
-            'Your password is too weak. Try something stronger.');
-      default:
-        return authGenericError;
-    }
+  String _lookup(String key) {
+    final languageValues = _localizedValues[locale.languageCode] ??
+        _localizedValues[AppLocalizations.supportedLocales.first.languageCode]!;
+    return languageValues[key] ?? key;
   }
 
-  String invoiceStatusLabel(InvoiceStatus status) {
-    switch (status) {
-      case InvoiceStatus.draft:
-        return _select('下書き', 'Draft');
-      case InvoiceStatus.sent:
-        return _select('送信済み', 'Sent');
-      case InvoiceStatus.paid:
-        return _select('支払い済み', 'Paid');
-      case InvoiceStatus.overdue:
-        return _select('期限切れ', 'Overdue');
-    }
+  String text(String key) => _lookup(key);
+
+  String textWithReplacement(String key, Map<String, String> values) {
+    var result = _lookup(key);
+    values.forEach((placeholder, replacement) {
+      result = result.replaceAll('{$placeholder}', replacement);
+    });
+    return result;
   }
+
+  String invoiceStatusLabel(InvoiceStatus status) => _lookup('status_${status.name}');
+
+  NumberFormat currencyFormat(String currencyCode, String symbol) =>
+      NumberFormat.currency(locale: locale.toLanguageTag(), name: currencyCode, symbol: symbol);
+
+  DateFormat get dateFormat => DateFormat.yMMMd(locale.toLanguageTag());
+
+  DateFormat get longDateFormat => DateFormat.yMMMMd(locale.toLanguageTag());
 }
 
-extension AppLocalizationsContext on BuildContext {
-  AppLocalizations get l10n {
-    final language = watch<AppState>().language;
-    return AppLocalizations(language);
+class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+  const AppLocalizationsDelegate();
+
+  @override
+  bool isSupported(Locale locale) =>
+      AppLocalizations.supportedLocales.any((supported) => supported.languageCode == locale.languageCode);
+
+  @override
+  Future<AppLocalizations> load(Locale locale) async {
+    Intl.defaultLocale = locale.toLanguageTag();
+    return AppLocalizations(locale);
   }
+
+  @override
+  bool shouldReload(AppLocalizationsDelegate old) => false;
+}
+
+extension AppLocalizationsX on BuildContext {
+  AppLocalizations get l10n => AppLocalizations.of(this);
 }

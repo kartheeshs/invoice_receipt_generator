@@ -1,12 +1,12 @@
-import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
-import '../services/crisp_subscription_service.dart';
 import '../state/app_state.dart';
 import '../widgets/invoice_form_dialog.dart';
+import '../widgets/profile_form_dialog.dart';
 import 'dashboard_page.dart';
 import 'invoices_page.dart';
 import 'settings_page.dart';
@@ -19,412 +19,174 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _selectedIndex = 0;
+  int _index = 0;
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final l10n = context.l10n;
-    final isWide = MediaQuery.of(context).size.width >= 1024;
-    final destinations = [
-      _NavigationDestination(
-        label: l10n.dashboardNav,
-        icon: Icons.space_dashboard_outlined,
-        selectedIcon: Icons.space_dashboard,
+    final theme = Theme.of(context);
+
+    final pages = [
+      DashboardPage(
+        onCreateInvoice: _createInvoice,
+        onOpenSubscription: appState.openSubscription,
       ),
-      _NavigationDestination(
-        label: l10n.invoicesNav,
-        icon: Icons.description_outlined,
-        selectedIcon: Icons.description,
+      InvoicesPage(
+        onCreateInvoice: _createInvoice,
+        onEditInvoice: _editInvoice,
+        onDeleteInvoice: (invoice) {
+          context.read<AppState>().deleteInvoice(invoice.id);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(l10n.text('invoiceDeleted'))));
+        },
+        onDownloadInvoice: (invoice) async {
+          await context.read<AppState>().downloadInvoicePdf(invoice);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(l10n.text('pdfReady'))));
+        },
       ),
-      _NavigationDestination(
-        label: l10n.settingsNav,
-        icon: Icons.settings_outlined,
-        selectedIcon: Icons.settings,
+      SettingsPage(
+        onEditProfile: _editProfile,
+        onLanguageChanged: context.read<AppState>().setLocale,
+        onSignOut: context.read<AppState>().signOut,
+        onManageSubscription: () {
+          context.read<AppState>().openSubscription();
+          context.read<AppState>().markPremium(true);
+        },
+        onCancelSubscription: () => context.read<AppState>().markPremium(false),
       ),
     ];
 
-    final user = FirebaseAuth.instance.currentUser;
+    final isWide = MediaQuery.of(context).size.width >= 960;
+
+    final navigationDestinations = <NavigationDestination>[
+      NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard), label: l10n.text('dashboardTab')),
+      NavigationDestination(icon: const Icon(Icons.receipt_long_outlined), selectedIcon: const Icon(Icons.receipt_long), label: l10n.text('invoicesTab')),
+      NavigationDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings), label: l10n.text('settingsTab')),
+    ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.appTitle),
+        title: Text(l10n.text('appTitle')),
         actions: [
-          if (!appState.isPremium)
-            FilledButton.icon(
-              onPressed: () => _showUpgradeDialog(context),
-              icon: const Icon(Icons.workspace_premium_outlined),
-              label: Text(l10n.upgradeToPremiumButton),
-            )
-          else
-            FilledButton.icon(
-              onPressed: () => context.read<AppState>().downgradeToFreePlan(),
-              icon: const Icon(Icons.check_circle_outline),
-              label: Text(l10n.premiumActiveLabel),
-            ),
-          const SizedBox(width: 12),
-          IconButton(
-            tooltip: l10n.notificationsTooltip,
-            onPressed: () => _showNotifications(context),
-            icon: const Icon(Icons.notifications_none),
-          ),
-          const SizedBox(width: 4),
-          PopupMenuButton<String>(
-            tooltip: l10n.accountMenuTooltip,
-            onSelected: (value) {
-              if (value == 'sign-out') {
-                FirebaseAuth.instance.signOut();
-              }
-            },
-            itemBuilder: (context) => [
-              if (user?.email != null)
-                PopupMenuItem<String>(
-                  enabled: false,
-                  value: 'email',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user!.email!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        l10n.appTitle,
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(color: Colors.black54),
-                      ),
-                    ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text(
+                  appState.profile.displayName,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(width: 12),
+                CircleAvatar(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Text(
+                    _initials(appState.profile.displayName),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              const PopupMenuDivider(),
-              PopupMenuItem<String>(
-                value: 'sign-out',
-                child: ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.logout),
-                  title: Text(l10n.signOut),
-                ),
-              ),
-            ],
-            child: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-              child: Text(_userInitial(user)),
+              ],
             ),
           ),
-          const SizedBox(width: 16),
         ],
       ),
-      drawer: isWide
-          ? null
-          : Drawer(
-              child: SafeArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Text(
-                        l10n.menuTitle,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                      ),
+      body: Row(
+        children: [
+          if (isWide)
+            NavigationRail(
+              extended: true,
+              selectedIndex: _index,
+              onDestinationSelected: (value) => setState(() => _index = value),
+              destinations: navigationDestinations
+                  .map(
+                    (destination) => NavigationRailDestination(
+                      icon: destination.icon,
+                      selectedIcon: destination.selectedIcon,
+                      label: Text(destination.label),
                     ),
-                    const Divider(),
-                    for (var i = 0; i < destinations.length; i++)
-                      ListTile(
-                        leading: Icon(i == _selectedIndex
-                            ? destinations[i].selectedIcon
-                            : destinations[i].icon),
-                        title: Text(destinations[i].label),
-                        selected: i == _selectedIndex,
-                        onTap: () {
-                          setState(() => _selectedIndex = i);
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                  ],
-                ),
+                  )
+                  .toList(),
+            ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              child: IndexedStack(
+                key: ValueKey(_index),
+                index: _index,
+                children: pages,
               ),
             ),
+          ),
+        ],
+      ),
       bottomNavigationBar: isWide
           ? null
           : NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (value) => setState(() => _selectedIndex = value),
-              destinations: [
-                for (final destination in destinations)
-                  NavigationDestination(
-                    icon: Icon(destination.icon),
-                    selectedIcon: Icon(destination.selectedIcon),
-                    label: destination.label,
-                  ),
-              ],
+              selectedIndex: _index,
+              onDestinationSelected: (value) => setState(() => _index = value),
+              destinations: navigationDestinations,
             ),
-      floatingActionButton: _selectedIndex == 1
-          ? FloatingActionButton.extended(
-              onPressed: () => _openInvoiceForm(context),
-              icon: const Icon(Icons.add),
-              label: Text(l10n.newInvoiceAction),
-            )
-          : null,
-      body: SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isWide)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                child: NavigationRail(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (value) => setState(() => _selectedIndex = value),
-                  extended: true,
-                  minExtendedWidth: 200,
-                  labelType: NavigationRailLabelType.none,
-                  destinations: [
-                    for (final destination in destinations)
-                      NavigationRailDestination(
-                        icon: Icon(destination.icon),
-                        selectedIcon: Icon(destination.selectedIcon),
-                        label: Text(destination.label),
-                      ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: Padding(
-                  key: ValueKey(_selectedIndex),
-                  padding: const EdgeInsets.all(24),
-                  child: _buildPage(appState),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildPage(AppState appState) {
-    switch (_selectedIndex) {
-      case 0:
-        return DashboardPage(
-          onCreateInvoice: () => _openInvoiceForm(context),
-        );
-      case 1:
-        return InvoicesPage(
-          onCreateInvoice: () => _openInvoiceForm(context),
-          onEditInvoice: (invoice) => _openInvoiceForm(context, invoice: invoice),
-          onDeleteInvoice: (invoice) => _confirmDeleteInvoice(context, invoice),
-        );
-      case 2:
-        return const SettingsPage();
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Future<void> _openInvoiceForm(BuildContext context, {Invoice? invoice}) async {
+  Future<void> _createInvoice() async {
     final appState = context.read<AppState>();
-    final invoiceId = invoice?.id ?? appState.createInvoiceId();
-    final generatedNumber = invoice?.number ?? appState.generateInvoiceNumber();
-
-    final result = await showDialog<Invoice>(
+    final invoice = appState.prepareInvoice();
+    await showDialog<void>(
       context: context,
-      barrierDismissible: false,
       builder: (context) => InvoiceFormDialog(
-        invoiceId: invoiceId,
-        initialInvoice: invoice,
-        initialNumber: generatedNumber,
-        autoNumberingEnabled: appState.autoNumberingEnabled,
-        defaultTaxRate: invoice?.taxRate ?? appState.defaultTaxRate,
+        invoice: invoice,
+        onSubmit: (updated) {
+          context.read<AppState>().saveInvoice(updated);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(context.l10n.text('invoiceSaved'))));
+        },
       ),
     );
-
-    if (result != null) {
-      appState.saveInvoice(result);
-      final l10n = context.l10n;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(invoice == null ? l10n.invoiceCreatedSnack : l10n.invoiceUpdatedSnack),
-        ),
-      );
-    }
   }
 
-  Future<void> _confirmDeleteInvoice(BuildContext context, Invoice invoice) async {
-    final l10n = context.l10n;
-    final confirmed = await showDialog<bool>(
+  Future<void> _editInvoice(Invoice invoice) async {
+    await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.deleteInvoiceTitle),
-        content: Text(l10n.deleteInvoiceMessage(invoice.clientName, invoice.number)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancelAction),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            child: Text(l10n.deleteAction),
-          ),
-        ],
+      builder: (context) => InvoiceFormDialog(
+        invoice: invoice,
+        onSubmit: (updated) {
+          context.read<AppState>().saveInvoice(updated);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(context.l10n.text('invoiceSaved'))));
+        },
       ),
     );
-
-    if (confirmed ?? false) {
-      context.read<AppState>().deleteInvoice(invoice.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.invoiceDeletedSnack),
-        ),
-      );
-    }
   }
 
-  void _showUpgradeDialog(BuildContext context) {
-    final l10n = context.l10n;
-    showDialog<void>(
+  Future<void> _editProfile() async {
+    final appState = context.read<AppState>();
+    await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.upgradeDialogTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.upgradeDialogMessage),
-            const SizedBox(height: 12),
-            Text(
-              l10n.crispPlanDescription,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.crispPlanNotice,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.closeAction),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              _startCrispCheckout(context, dialogContext);
-            },
-            icon: const Icon(Icons.workspace_premium_outlined),
-            label: Text(l10n.crispSubscribeCta),
-          ),
-        ],
+      builder: (context) => ProfileFormDialog(
+        profile: appState.profile,
+        onSubmit: (profile) {
+          context.read<AppState>().updateProfile(profile);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(context.l10n.text('profileUpdated'))));
+        },
       ),
     );
   }
 
-  void _startCrispCheckout(BuildContext parentContext, BuildContext dialogContext) async {
-    final messenger = ScaffoldMessenger.of(parentContext);
-    final l10n = parentContext.l10n;
-    final appState = parentContext.read<AppState>();
-
-    try {
-      await CrispSubscriptionService().startCheckout(email: appState.email);
-      appState.markAsPremium(provider: 'crisp', planName: l10n.crispPlanName);
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutLaunched),
-        ),
-      );
-      Navigator.of(dialogContext).pop();
-    } on CrispConfigurationException catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispMissingConfig(error.message)),
-        ),
-      );
-    } on CrispCheckoutException catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutError(error.message)),
-        ),
-      );
-    } catch (error) {
-      messenger.showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(l10n.crispCheckoutError(error.toString())),
-        ),
-      );
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
     }
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
   }
-
-  void _showNotifications(BuildContext context) {
-    final l10n = context.l10n;
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.notificationsTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.campaign_outlined),
-              title: Text(l10n.notificationTaxUpdateTitle),
-              subtitle: const Text('2024/05/20'),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.campaign_outlined),
-              title: Text(l10n.notificationPremiumUpdateTitle),
-              subtitle: const Text('2024/05/12'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.closeAction),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _userInitial(User? user) {
-    final displayName = user?.displayName;
-    if (displayName != null && displayName.isNotEmpty) {
-      return displayName.trim().substring(0, 1).toUpperCase();
-    }
-    final email = user?.email;
-    if (email != null && email.isNotEmpty) {
-      return email.trim().substring(0, 1).toUpperCase();
-    }
-    return 'A';
-  }
-}
-
-class _NavigationDestination {
-  const _NavigationDestination({
-    required this.label,
-    required this.icon,
-    required this.selectedIcon,
-  });
-
-  final String label;
-  final IconData icon;
-  final IconData selectedIcon;
 }
