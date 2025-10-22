@@ -8,8 +8,17 @@ class AppConfig {
   });
 
   factory AppConfig.fromEnvironment() {
+    const primaryKey = String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '');
+    const legacyKey = String.fromEnvironment('FIREBASE_APP_KEY', defaultValue: '');
+    const webKey = String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: '');
+    final resolvedFirebaseKey = primaryKey.isNotEmpty
+        ? primaryKey
+        : legacyKey.isNotEmpty
+            ? legacyKey
+            : webKey;
+
     return AppConfig(
-      firebaseApiKey: const String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
+      firebaseApiKey: resolvedFirebaseKey,
       crispSubscriptionUrl:
           const String.fromEnvironment('CRISP_SUBSCRIPTION_URL', defaultValue: ''),
     );

@@ -41,8 +41,8 @@ class AppLocalizations {
           'Upgrade via Crisp to unlock unlimited invoices and premium templates.',
       'planFreeBody': 'You are using the free plan. Upgrade any time to unlock unlimited PDF exports.',
       'planPremiumBody': 'You are enjoying premium benefits. Thank you for subscribing!',
-      'firebaseBanner':
-          'Firebase auth is not configured. Provide FIREBASE_API_KEY via --dart-define to enable authentication.',
+      'firebaseBanner': 'Firebase auth is not configured. Provide FIREBASE_API_KEY (or legacy '
+          'FIREBASE_APP_KEY) via --dart-define to enable authentication.',
       'subscribeCrisp': 'Subscribe via Crisp',
       'manageSubscription': 'Manage subscription',
       'cancelSubscription': 'Cancel subscription',
@@ -98,8 +98,8 @@ class AppLocalizations {
       'invoiceDeleted': 'Invoice deleted',
       'pdfReady': 'Invoice PDF is ready to download.',
       'errorUnknown': 'Something went wrong. Please try again.',
-      'firebaseMissing':
-          'Firebase auth is not configured. Provide FIREBASE_API_KEY via --dart-define to enable password reset.',
+      'firebaseMissing': 'Firebase auth is not configured. Provide FIREBASE_API_KEY (or '
+          'FIREBASE_APP_KEY) via --dart-define to enable password reset.',
       'validationRequired': 'This field is required',
       'validationEmail': 'Enter a valid email address',
       'validationPasswordLength': 'Password must be at least 6 characters',
@@ -139,7 +139,8 @@ class AppLocalizations {
           'Crisp経由でアップグレードすると、無制限の請求書とプレミアムテンプレートが利用できます。',
       'planFreeBody': '現在はフリープランをご利用中です。必要になったらいつでもアップグレードしてください。',
       'planPremiumBody': 'プレミアム特典をご利用いただきありがとうございます！',
-      'firebaseBanner': 'Firebase認証が設定されていません。FIREBASE_API_KEY を設定してください。',
+      'firebaseBanner':
+          'Firebase認証が設定されていません。--dart-define で FIREBASE_API_KEY または FIREBASE_APP_KEY を設定してください。',
       'subscribeCrisp': 'Crispで購読',
       'manageSubscription': 'サブスクリプションを管理',
       'cancelSubscription': 'サブスクリプションを解約',
@@ -193,7 +194,8 @@ class AppLocalizations {
       'invoiceDeleted': '請求書を削除しました',
       'pdfReady': 'PDFファイルをダウンロードできます。',
       'errorUnknown': '問題が発生しました。再度お試しください。',
-      'firebaseMissing': 'Firebaseの設定が必要です。FIREBASE_API_KEYを設定してください。',
+      'firebaseMissing':
+          'Firebaseの設定が必要です。--dart-define で FIREBASE_API_KEY もしくは FIREBASE_APP_KEY を設定してください。',
       'validationRequired': '必須項目です',
       'validationEmail': '有効なメールアドレスを入力してください',
       'validationPasswordLength': 'パスワードは6文字以上で入力してください',
