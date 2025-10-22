@@ -38,7 +38,7 @@ class _InvoiceFormDialogState extends State<InvoiceFormDialog> {
     _projectController = TextEditingController(text: invoice.projectName);
     _descriptionController = TextEditingController(text: invoice.description);
     _amountController = TextEditingController(
-      invoice.amount == 0 ? '' : invoice.amount.toStringAsFixed(2),
+      text: invoice.amount == 0 ? '' : invoice.amount.toStringAsFixed(2),
     );
     _numberController = TextEditingController(text: invoice.number);
     _notesController = TextEditingController(text: invoice.notes);

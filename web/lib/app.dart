@@ -69,7 +69,7 @@ class InvoiceApp extends StatelessWidget {
       inputDecorationTheme: const InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         elevation: 4,
       ),
