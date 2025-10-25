@@ -43,104 +43,169 @@ class AdminPage extends StatelessWidget {
     final recurringRevenue = appState.planPrice * premiumAccounts.length;
     final revenueTrend = _buildRevenueTrend(invoices, l10n.locale);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double maxWidth =
-            constraints.maxWidth == double.infinity ? 1100.0 : constraints.maxWidth;
-        final metricColumns = maxWidth >= 1100
-            ? 3
-            : maxWidth >= 720
-                ? 2
-                : 1;
-        final spacing = 16.0;
-        final double metricWidth = metricColumns == 1
-            ? maxWidth
-            : (maxWidth - spacing * (metricColumns - 1)) / metricColumns;
+    return DefaultTabController(
+      length: 4,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double maxWidth =
+              constraints.maxWidth == double.infinity ? 1100.0 : constraints.maxWidth;
+          final metricColumns = maxWidth >= 1100
+              ? 3
+              : maxWidth >= 720
+                  ? 2
+                  : 1;
+          const spacing = 16.0;
+          final double metricWidth = metricColumns == 1
+              ? maxWidth
+              : (maxWidth - spacing * (metricColumns - 1)) / metricColumns;
+          final controller = DefaultTabController.of(context)!;
 
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _AdminHeader(
-                  accountCount: accounts.length,
-                  monthlyPriceLabel: currencyFormat.format(appState.planPrice),
-                  l10n: l10n,
-                  theme: theme,
-                ),
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: spacing,
-                  runSpacing: spacing,
-                  children: [
-                    SizedBox(
-                      width: metricWidth,
-                      child: _AdminMetricCard(
-                        icon: Icons.currency_exchange_outlined,
-                        title: l10n.text('adminMetricRevenue'),
-                        value: currencyFormat.format(totalRevenue),
-                        caption: l10n.text('adminMetricRevenueCaption'),
+          return AnimatedBuilder(
+            animation: controller,
+            builder: (context, _) {
+              final selectedIndex = controller.index;
+
+              final sectionWidgets = <Widget>[];
+              switch (selectedIndex) {
+                case 0:
+                  sectionWidgets
+                    ..add(Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: [
+                        SizedBox(
+                          width: metricWidth,
+                          child: _AdminMetricCard(
+                            icon: Icons.currency_exchange_outlined,
+                            title: l10n.text('adminMetricRevenue'),
+                            value: currencyFormat.format(totalRevenue),
+                            caption: l10n.text('adminMetricRevenueCaption'),
+                          ),
+                        ),
+                        SizedBox(
+                          width: metricWidth,
+                          child: _AdminMetricCard(
+                            icon: Icons.receipt_long_outlined,
+                            title: l10n.text('adminMetricOutstanding'),
+                            value: currencyFormat.format(outstanding),
+                            caption: l10n.text('adminMetricOutstandingCaption'),
+                          ),
+                        ),
+                        SizedBox(
+                          width: metricWidth,
+                          child: _AdminMetricCard(
+                            icon: Icons.groups_outlined,
+                            title: l10n.text('adminMetricActiveSubscribers'),
+                            value: premiumAccounts.length.toString(),
+                            caption:
+                                '${l10n.text('adminMetricRecurringRevenue')}: ${currencyFormat.format(recurringRevenue)}',
+                          ),
+                        ),
+                        SizedBox(
+                          width: metricWidth,
+                          child: _AdminMetricCard(
+                            icon: Icons.analytics_outlined,
+                            title: l10n.text('adminMetricAverageInvoice'),
+                            value: currencyFormat.format(averageInvoice),
+                            caption: l10n.text('adminMetricAverageInvoiceCaption'),
+                          ),
+                        ),
+                      ],
+                    ))
+                    ..add(const SizedBox(height: 24))
+                    ..add(_AdminRevenueCard(
+                      trend: revenueTrend,
+                      currencyFormat: currencyFormat,
+                      l10n: l10n,
+                    ))
+                    ..add(const SizedBox(height: 24))
+                    ..add(_AdminActivityCard(activity: activity.take(10).toList()));
+                  break;
+                case 1:
+                  sectionWidgets
+                    ..add(_AdminAccountsCard(
+                      accounts: accounts,
+                      currentEmail: appState.user?.email,
+                      onTogglePremium: appState.toggleAccountPremium,
+                      onToggleAdmin: appState.toggleAccountAdmin,
+                      onRemove: appState.removeAccount,
+                    ))
+                    ..add(const SizedBox(height: 24))
+                    ..add(_AdminActivityCard(activity: activity.take(10).toList()));
+                  break;
+                case 2:
+                  sectionWidgets
+                    ..add(_AdminSubscriptionsCard(
+                      accounts: premiumAccounts,
+                      currencyFormat: currencyFormat,
+                      l10n: l10n,
+                      planPrice: appState.planPrice,
+                    ))
+                    ..add(const SizedBox(height: 24))
+                    ..add(_AdminRevenueCard(
+                      trend: revenueTrend,
+                      currencyFormat: currencyFormat,
+                      l10n: l10n,
+                    ));
+                  break;
+                default:
+                  sectionWidgets.add(_AdminActivityCard(activity: activity.take(25).toList()));
+                  break;
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _AdminHeader(
+                        accountCount: accounts.length,
+                        monthlyPriceLabel: currencyFormat.format(appState.planPrice),
+                        l10n: l10n,
+                        theme: theme,
                       ),
-                    ),
-                    SizedBox(
-                      width: metricWidth,
-                      child: _AdminMetricCard(
-                        icon: Icons.receipt_long_outlined,
-                        title: l10n.text('adminMetricOutstanding'),
-                        value: currencyFormat.format(outstanding),
-                        caption: l10n.text('adminMetricOutstandingCaption'),
+                      const SizedBox(height: 16),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: TabBar(
+                          labelColor: theme.colorScheme.onSurface,
+                          indicatorColor: theme.colorScheme.primary,
+                          indicatorWeight: 3,
+                          isScrollable: true,
+                          tabs: [
+                            Tab(
+                              icon: const Icon(Icons.dashboard_outlined),
+                              text: l10n.text('adminMenuDashboard'),
+                            ),
+                            Tab(
+                              icon: const Icon(Icons.group_outlined),
+                              text: l10n.text('adminMenuUsers'),
+                            ),
+                            Tab(
+                              icon: const Icon(Icons.subscriptions_outlined),
+                              text: l10n.text('adminMenuSubscriptions'),
+                            ),
+                            Tab(
+                              icon: const Icon(Icons.history_toggle_off),
+                              text: l10n.text('adminMenuActivity'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(
-                      width: metricWidth,
-                      child: _AdminMetricCard(
-                        icon: Icons.groups_outlined,
-                        title: l10n.text('adminMetricActiveSubscribers'),
-                        value: premiumAccounts.length.toString(),
-                        caption:
-                            '${l10n.text('adminMetricRecurringRevenue')}: ${currencyFormat.format(recurringRevenue)}',
-                      ),
-                    ),
-                    SizedBox(
-                      width: metricWidth,
-                      child: _AdminMetricCard(
-                        icon: Icons.analytics_outlined,
-                        title: l10n.text('adminMetricAverageInvoice'),
-                        value: currencyFormat.format(averageInvoice),
-                        caption: l10n.text('adminMetricAverageInvoiceCaption'),
-                      ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      ...sectionWidgets,
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
-                _AdminRevenueCard(
-                  trend: revenueTrend,
-                  currencyFormat: currencyFormat,
-                  l10n: l10n,
-                ),
-                const SizedBox(height: 24),
-                _AdminSubscriptionsCard(
-                  accounts: premiumAccounts,
-                  currencyFormat: currencyFormat,
-                  l10n: l10n,
-                  planPrice: appState.planPrice,
-                ),
-                const SizedBox(height: 24),
-                _AdminAccountsCard(
-                  accounts: accounts,
-                  currentEmail: appState.user?.email,
-                  onTogglePremium: appState.toggleAccountPremium,
-                  onToggleAdmin: appState.toggleAccountAdmin,
-                  onRemove: appState.removeAccount,
-                ),
-                const SizedBox(height: 24),
-                _AdminActivityCard(activity: activity.take(15).toList()),
-              ],
-            ),
-          ),
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
