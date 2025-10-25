@@ -48,4 +48,34 @@ class UserProfile {
   final String logoUrl;
   final String currencyCode;
   final String currencySymbol;
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      displayName: json['displayName'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      companyName: json['companyName'] as String? ?? '',
+      tagline: json['tagline'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      taxId: json['taxId'] as String? ?? '',
+      logoUrl: json['logoUrl'] as String? ?? '',
+      currencyCode: json['currencyCode'] as String? ?? '',
+      currencySymbol: json['currencySymbol'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'displayName': displayName,
+      'email': email,
+      'companyName': companyName,
+      'tagline': tagline,
+      'address': address,
+      'phone': phone,
+      'taxId': taxId,
+      'logoUrl': logoUrl,
+      'currencyCode': currencyCode,
+      'currencySymbol': currencySymbol,
+    };
+  }
 }

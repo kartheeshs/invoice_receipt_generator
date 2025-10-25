@@ -1,4 +1,7 @@
 import 'dart:collection';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -35,6 +38,16 @@ class ManagedAccount {
   final bool isPremium;
   final bool isAdmin;
 
+  factory ManagedAccount.fromJson(Map<String, dynamic> json) {
+    return ManagedAccount(
+      id: json['id'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      isPremium: json['isPremium'] as bool? ?? false,
+      isAdmin: json['isAdmin'] as bool? ?? false,
+    );
+  }
+
   ManagedAccount copyWith({
     String? id,
     String? displayName,
@@ -49,6 +62,16 @@ class ManagedAccount {
       isPremium: isPremium ?? this.isPremium,
       isAdmin: isAdmin ?? this.isAdmin,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'displayName': displayName,
+      'email': email,
+      'isPremium': isPremium,
+      'isAdmin': isAdmin,
+    };
   }
 }
 
@@ -78,6 +101,7 @@ class AppState extends ChangeNotifier {
     _profile = _guestProfile;
     _seedAccounts();
     _invoices.addAll(_seedInvoices());
+    _restoreSession();
   }
 
   final AppConfig _config;
@@ -88,6 +112,7 @@ class AppState extends ChangeNotifier {
   final List<ManagedAccount> _accounts = [];
   final List<String> _activityLog = [];
   final List<String> _adminEmails;
+  static const _storageKey = 'invoice_receipt_app_state';
 
   final Uuid _uuid = const Uuid();
 
@@ -151,6 +176,7 @@ class AppState extends ChangeNotifier {
     try {
       await initializeDateFormatting(locale.toLanguageTag());
       _locale = locale;
+      _persistState();
     } finally {
       _isLocaleChanging = false;
       notifyListeners();
@@ -170,6 +196,7 @@ class AppState extends ChangeNotifier {
         }
       }
       _profile = _profile.copyWith(email: _user!.email, displayName: _user!.displayName ?? _profile.displayName);
+      _persistState();
     });
   }
 
@@ -190,6 +217,7 @@ class AppState extends ChangeNotifier {
         }
       }
       _profile = _profile.copyWith(displayName: displayName, email: email);
+      _persistState();
     });
   }
 
@@ -214,6 +242,7 @@ class AppState extends ChangeNotifier {
     _isPremium = false;
     _selectedInvoice = null;
     _profile = _guestProfile;
+    _persistState();
     notifyListeners();
   }
 
@@ -229,6 +258,7 @@ class AppState extends ChangeNotifier {
       _authService.updateProfile(idToken: _user!.idToken, displayName: profile.displayName);
       _assignDisplayName(_user!.email, profile.displayName);
     }
+    _persistState();
     notifyListeners();
   }
 
@@ -274,6 +304,7 @@ class AppState extends ChangeNotifier {
       _selectedInvoice = created;
     }
     notifyListeners();
+    _persistState();
   }
 
   void deleteInvoice(String id) {
@@ -282,11 +313,13 @@ class AppState extends ChangeNotifier {
       _selectedInvoice = null;
     }
     notifyListeners();
+    _persistState();
   }
 
   void selectInvoice(Invoice? invoice) {
     _selectedInvoice = invoice;
     notifyListeners();
+    _persistState();
   }
 
   Future<void> downloadInvoicePdf(Invoice invoice) async {
@@ -308,6 +341,7 @@ class AppState extends ChangeNotifier {
       _updateAccount(account.copyWith(isPremium: value));
     }
     notifyListeners();
+    _persistState();
   }
 
   void toggleAccountPremium(String accountId, bool value) {
@@ -320,6 +354,7 @@ class AppState extends ChangeNotifier {
       _isPremium = value;
     }
     notifyListeners();
+    _persistState();
   }
 
   void toggleAccountAdmin(String accountId, bool value) {
@@ -329,6 +364,7 @@ class AppState extends ChangeNotifier {
     _accounts[index] = account;
     _log('${account.displayName} admin rights ${value ? 'granted' : 'revoked'}');
     notifyListeners();
+    _persistState();
   }
 
   void removeAccount(String accountId) {
@@ -337,9 +373,161 @@ class AppState extends ChangeNotifier {
     final account = _accounts.removeAt(index);
     _log('Removed account for ${account.displayName}');
     notifyListeners();
+    _persistState();
   }
 
   double get planPrice => _config.monthlyPlanPrice;
+
+  void _restoreSession() {
+    final storage = _storage;
+    if (storage == null) return;
+    final raw = storage[_storageKey];
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return;
+      }
+
+      final localeTag = decoded['locale'] as String?;
+      if (localeTag != null && localeTag.isNotEmpty) {
+        _locale = _localeFromTag(localeTag);
+      }
+
+      final profileData = decoded['profile'];
+      if (profileData is Map) {
+        _profile = UserProfile.fromJson(Map<String, dynamic>.from(profileData));
+      }
+
+      final accountsData = decoded['accounts'];
+      if (accountsData is List) {
+        _accounts.clear();
+        for (final item in accountsData) {
+          if (item is Map) {
+            _accounts.add(ManagedAccount.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      }
+
+      for (var i = 0; i < _accounts.length; i++) {
+        final email = _accounts[i].email.toLowerCase();
+        if (_adminEmails.contains(email) && !_accounts[i].isAdmin) {
+          _accounts[i] = _accounts[i].copyWith(isAdmin: true);
+        }
+      }
+
+      final invoicesData = decoded['invoices'];
+      if (invoicesData is List) {
+        _invoices.clear();
+        for (final item in invoicesData) {
+          if (item is Map) {
+            _invoices.add(Invoice.fromJson(Map<String, dynamic>.from(item)));
+          }
+        }
+      }
+
+      final activityData = decoded['activityLog'];
+      if (activityData is List) {
+        _activityLog.clear();
+        for (final entry in activityData) {
+          if (entry is String) {
+            _activityLog.add(entry);
+          }
+        }
+      }
+
+      final userData = decoded['user'];
+      if (userData is Map) {
+        _user = AuthUser.fromJson(Map<String, dynamic>.from(userData));
+        _ensureAccountFor(_user!);
+      }
+
+      _isPremium = decoded['isPremium'] as bool? ?? _isPremium;
+
+      if (_user != null) {
+        final account = _accountForEmail(_user!.email);
+        if (account != null) {
+          _isPremium = account.isPremium;
+          if (account.displayName.isNotEmpty) {
+            _profile = _profile.copyWith(displayName: account.displayName);
+          }
+        }
+        if (_profile.email.isEmpty) {
+          _profile = _profile.copyWith(email: _user!.email);
+        }
+      }
+
+      final selectedId = decoded['selectedInvoiceId'] as String?;
+      if (selectedId != null && selectedId.isNotEmpty) {
+        for (final invoice in _invoices) {
+          if (invoice.id == selectedId) {
+            _selectedInvoice = invoice;
+            break;
+          }
+        }
+      }
+
+      if (_profile.email.isEmpty && _user == null) {
+        _profile = _guestProfile;
+      }
+      _persistState();
+    } catch (_) {
+      storage.remove(_storageKey);
+    }
+  }
+
+  void _persistState() {
+    final storage = _storage;
+    if (storage == null) return;
+    try {
+      final data = <String, dynamic>{
+        'profile': _profile.toJson(),
+        'isPremium': _isPremium,
+        'invoices': _invoices.map((invoice) => invoice.toJson()).toList(),
+        'accounts': _accounts.map((account) => account.toJson()).toList(),
+        'activityLog': _activityLog,
+        'locale': _locale.toLanguageTag(),
+        if (_selectedInvoice != null) 'selectedInvoiceId': _selectedInvoice!.id,
+      };
+      if (_user != null) {
+        data['user'] = _user!.toJson();
+      }
+      storage[_storageKey] = jsonEncode(data);
+    } catch (_) {
+      // Ignore persistence errors to avoid disrupting the UX.
+    }
+  }
+
+  Locale _localeFromTag(String tag) {
+    final subtags = tag.split('-').where((part) => part.isNotEmpty).toList();
+    if (subtags.isEmpty) {
+      return const Locale('en');
+    }
+    final languageCode = subtags[0];
+    String? scriptCode;
+    String? countryCode;
+    if (subtags.length == 2) {
+      countryCode = subtags[1];
+    } else if (subtags.length >= 3) {
+      scriptCode = subtags[1];
+      countryCode = subtags[2];
+    }
+    return Locale.fromSubtags(
+      languageCode: languageCode,
+      scriptCode: scriptCode?.isEmpty ?? true ? null : scriptCode,
+      countryCode: countryCode?.isEmpty ?? true ? null : countryCode,
+    );
+  }
+
+  html.Storage? get _storage {
+    try {
+      return html.window.localStorage;
+    } catch (_) {
+      return null;
+    }
+  }
 
   List<Invoice> _seedInvoices() {
     final now = DateTime.now();
@@ -519,6 +707,7 @@ class AppState extends ChangeNotifier {
     if (_activityLog.length > 50) {
       _activityLog.removeLast();
     }
+    _persistState();
   }
 
   Future<void> _runAsync(Future<void> Function() action) async {

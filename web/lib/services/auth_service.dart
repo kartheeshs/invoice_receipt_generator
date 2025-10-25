@@ -11,6 +11,16 @@ class AuthUser {
     this.displayName,
   });
 
+  factory AuthUser.fromJson(Map<String, dynamic> json) {
+    return AuthUser(
+      uid: json['uid'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      idToken: json['idToken'] as String? ?? '',
+      refreshToken: json['refreshToken'] as String? ?? '',
+      displayName: json['displayName'] as String?,
+    );
+  }
+
   AuthUser copyWith({
     String? displayName,
     String? idToken,
@@ -30,6 +40,16 @@ class AuthUser {
   final String idToken;
   final String refreshToken;
   final String? displayName;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'uid': uid,
+      'email': email,
+      'idToken': idToken,
+      'refreshToken': refreshToken,
+      if (displayName != null) 'displayName': displayName,
+    };
+  }
 }
 
 class FirebaseAuthException implements Exception {
