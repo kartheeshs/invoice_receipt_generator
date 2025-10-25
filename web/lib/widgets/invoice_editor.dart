@@ -44,10 +44,12 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
   late Invoice _workingInvoice;
   late InvoiceEditorMode _mode;
   bool _saving = false;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
     _applyInvoice(widget.invoice, resetMode: true);
   }
 
@@ -66,6 +68,12 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     if (resetMode) {
       _mode = widget.isNewDraft ? InvoiceEditorMode.edit : InvoiceEditorMode.preview;
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -149,7 +157,9 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
         );
 
         return Scrollbar(
+          controller: _scrollController,
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.only(bottom: 48),
             child: content,
           ),
