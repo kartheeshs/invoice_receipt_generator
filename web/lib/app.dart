@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 
 import 'config/app_config.dart';
 import 'l10n/app_localizations.dart';
+import 'pages/admin_page.dart';
+import 'pages/home_shell.dart';
 import 'pages/landing_page.dart';
+import 'pages/sign_in_page.dart';
 import 'services/auth_service.dart';
 import 'services/crisp_service.dart';
 import 'services/pdf_service.dart';
@@ -44,7 +47,36 @@ class InvoiceApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            home: const LandingPage(),
+            initialRoute: '/',
+            onGenerateRoute: (settings) {
+              switch (settings.name) {
+                case '/':
+                  return MaterialPageRoute(
+                    builder: (_) => const LandingPage(),
+                    settings: settings,
+                  );
+                case '/app':
+                  return MaterialPageRoute(
+                    builder: (_) => const HomeShell(),
+                    settings: settings,
+                  );
+                case '/sign-in':
+                  return MaterialPageRoute(
+                    builder: (_) => const SignInPage(),
+                    settings: settings,
+                  );
+                case '/admin':
+                  return MaterialPageRoute(
+                    builder: (_) => const AdminStandalonePage(),
+                    settings: settings,
+                  );
+                default:
+                  return MaterialPageRoute(
+                    builder: (_) => const LandingPage(),
+                    settings: settings,
+                  );
+              }
+            },
           );
         },
       ),

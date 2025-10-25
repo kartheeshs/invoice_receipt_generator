@@ -8,8 +8,6 @@ import '../models/invoice.dart';
 import '../models/invoice_template_spec.dart';
 import '../state/app_state.dart';
 import '../widgets/language_menu_button.dart';
-import 'home_shell.dart';
-import 'sign_in_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -623,15 +621,11 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   void _openApp() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const HomeShell()),
-    );
+    Navigator.of(context).pushNamed('/app');
   }
 
   void _openSignIn() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SignInPage()),
-    );
+    Navigator.of(context).pushNamed('/sign-in');
   }
 
   void _scrollTo(GlobalKey key) {

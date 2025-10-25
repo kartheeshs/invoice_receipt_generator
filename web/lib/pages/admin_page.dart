@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../state/app_state.dart';
+import '../widgets/language_menu_button.dart';
 
 class AdminPage extends StatelessWidget {
   const AdminPage({super.key});
@@ -85,6 +86,61 @@ class AdminPage extends StatelessWidget {
             const SizedBox(height: 24),
             _AdminActivityCard(activity: activity.take(15).toList()),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class AdminStandalonePage extends StatelessWidget {
+  const AdminStandalonePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final l10n = context.l10n;
+
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        title: Text(l10n.text('adminTitle')),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: LanguageMenuButton(
+              currentLocale: appState.locale,
+              onSelected: (locale) => context.read<AppState>().setLocale(locale),
+              isBusy: appState.isLocaleChanging,
+              foregroundColor: theme.colorScheme.onSurface,
+              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+              borderColor: theme.colorScheme.outlineVariant,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: appState.isGuest
+                ? FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pushNamed('/sign-in'),
+                    icon: const Icon(Icons.login),
+                    label: Text(l10n.text('signInButton')),
+                  )
+                : FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pushReplacementNamed('/app'),
+                    icon: const Icon(Icons.open_in_new),
+                    label: Text(l10n.text('landingHeroPrimaryCta')),
+                  ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: const AdminPage(),
+          ),
         ),
       ),
     );
