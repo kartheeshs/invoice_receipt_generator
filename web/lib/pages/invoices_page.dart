@@ -402,61 +402,64 @@ class _GuestHistoryState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(l10n.text('guestInvoicesLockedTitle'), style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(l10n.text('guestInvoicesLockedBody')),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => onRequestSignIn(),
-                child: Text(l10n.text('signInButton')),
-              ),
-            ],
-          ),
-        ),
-        if (selectedInvoice != null) ...[
-          const SizedBox(height: 24),
-          Text(l10n.text('guestCurrentInvoiceTitle'), style: theme.textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            child: ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: Text(selectedInvoice!.clientName.isEmpty
-                  ? selectedInvoice!.number
-                  : selectedInvoice!.clientName),
-              subtitle: Text(l10n.dateFormat.format(selectedInvoice!.dueDate)),
-              trailing: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(currencyFormatter.format(selectedInvoice!.amount)),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(l10n.invoiceStatusLabel(selectedInvoice!.status)),
-                  ),
-                ],
-              ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.text('guestInvoicesLockedTitle'), style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(l10n.text('guestInvoicesLockedBody')),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => onRequestSignIn(),
+                  child: Text(l10n.text('signInButton')),
+                ),
+              ],
             ),
           ),
+          if (selectedInvoice != null) ...[
+            const SizedBox(height: 24),
+            Text(l10n.text('guestCurrentInvoiceTitle'), style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              child: ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: Text(selectedInvoice!.clientName.isEmpty
+                    ? selectedInvoice!.number
+                    : selectedInvoice!.clientName),
+                subtitle: Text(l10n.dateFormat.format(selectedInvoice!.dueDate)),
+                trailing: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(currencyFormatter.format(selectedInvoice!.amount)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(l10n.invoiceStatusLabel(selectedInvoice!.status)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

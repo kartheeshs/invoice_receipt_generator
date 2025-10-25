@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
+import '../widgets/language_menu_button.dart';
 import '../widgets/profile_form_dialog.dart';
 import 'dashboard_page.dart';
 import 'invoices_page.dart';
@@ -61,6 +62,18 @@ class _HomeShellState extends State<HomeShell> {
       appBar: AppBar(
         title: Text(l10n.text('appTitle')),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: LanguageMenuButton(
+              currentLocale: appState.locale,
+              onSelected: (locale) => context.read<AppState>().setLocale(locale),
+              isBusy: isLocaleChanging,
+              foregroundColor: theme.colorScheme.onSurface,
+              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+              borderColor: theme.colorScheme.outlineVariant,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: isGuest

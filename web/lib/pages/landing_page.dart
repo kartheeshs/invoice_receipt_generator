@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../models/invoice_template_spec.dart';
 import '../state/app_state.dart';
+import '../widgets/language_menu_button.dart';
 import 'home_shell.dart';
 import 'sign_in_page.dart';
 
@@ -97,6 +98,9 @@ class _LandingPageState extends State<LandingPage> {
                 onOpenSupport: () => _scrollTo(_supportKey),
                 onLaunchApp: () => _openApp(),
                 onSignIn: appState.isGuest ? () => _openSignIn() : null,
+                currentLocale: appState.locale,
+                onLocaleSelected: (locale) => context.read<AppState>().setLocale(locale),
+                isLocaleChanging: appState.isLocaleChanging,
               ),
               const SizedBox(height: 56),
               Builder(builder: (context) {
@@ -650,6 +654,9 @@ class _LandingNavBar extends StatelessWidget {
     required this.onOpenPricing,
     required this.onOpenSupport,
     required this.onLaunchApp,
+    required this.currentLocale,
+    required this.onLocaleSelected,
+    required this.isLocaleChanging,
     this.onSignIn,
   });
 
@@ -658,6 +665,9 @@ class _LandingNavBar extends StatelessWidget {
   final VoidCallback onOpenPricing;
   final VoidCallback onOpenSupport;
   final VoidCallback onLaunchApp;
+  final Locale currentLocale;
+  final Future<void> Function(Locale) onLocaleSelected;
+  final bool isLocaleChanging;
   final VoidCallback? onSignIn;
 
   @override
@@ -690,7 +700,17 @@ class _LandingNavBar extends StatelessWidget {
                   _NavLink(label: l10n.text('landingNavSupport'), onTap: onOpenSupport),
                 ],
               ),
-            const SizedBox(width: 24),
+            const SizedBox(width: 16),
+            LanguageMenuButton(
+              currentLocale: currentLocale,
+              onSelected: onLocaleSelected,
+              isBusy: isLocaleChanging,
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.white.withOpacity(0.12),
+              borderColor: Colors.white.withOpacity(0.3),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+            ),
+            const SizedBox(width: 16),
             if (onSignIn != null)
               TextButton(
                 onPressed: onSignIn,
@@ -713,6 +733,15 @@ class _LandingNavBar extends StatelessWidget {
             spacing: 16,
             runSpacing: 12,
             children: [
+              LanguageMenuButton(
+                currentLocale: currentLocale,
+                onSelected: onLocaleSelected,
+                isBusy: isLocaleChanging,
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.white.withOpacity(0.12),
+                borderColor: Colors.white.withOpacity(0.3),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
               _NavChip(label: l10n.text('landingNavProduct'), onTap: onOpenProduct),
               _NavChip(label: l10n.text('landingNavTemplates'), onTap: onOpenTemplates),
               _NavChip(label: l10n.text('landingNavPricing'), onTap: onOpenPricing),
