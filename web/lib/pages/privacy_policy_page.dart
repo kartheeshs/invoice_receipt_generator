@@ -15,7 +15,7 @@ class PrivacyPolicyPage extends StatelessWidget {
 
     final sections = [
       _PolicySection(
-        icon: Icons.shield_lock_outlined,
+        icon: Icons.shield_outlined,
         title: l10n.text('privacyDataProtectionTitle'),
         body: l10n.text('privacyDataProtectionBody'),
       ),

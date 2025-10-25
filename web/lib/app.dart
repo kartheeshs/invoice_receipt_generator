@@ -117,7 +117,7 @@ class InvoiceApp extends StatelessWidget {
           color: textColor,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardSurface,
         elevation: 8,
         shadowColor: shadowColor.withOpacity(0.35),
@@ -171,7 +171,7 @@ class InvoiceApp extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         labelStyle: base.textTheme.labelLarge?.copyWith(color: textColor),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: cardSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         titleTextStyle: base.textTheme.titleLarge?.copyWith(color: textColor, fontWeight: FontWeight.w700),

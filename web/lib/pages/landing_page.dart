@@ -113,20 +113,20 @@ class _LandingPageState extends State<LandingPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              _LandingNavBar(
-                onOpenProduct: () => _scrollTo(_productKey),
-                onOpenTemplates: () => _scrollTo(_templatesKey),
-                onOpenPricing: () => _scrollTo(_pricingKey),
-                onOpenSupport: () => _scrollTo(_supportKey),
-                onOpenPrivacy: _openPrivacy,
-                onLaunchApp: () => _openApp(),
-                onSignIn: appState.isGuest ? () => _openSignIn() : null,
-                currentLocale: appState.locale,
-                onLocaleSelected: (locale) => context.read<AppState>().setLocale(locale),
-                isLocaleChanging: appState.isLocaleChanging,
-              ),
-              const SizedBox(height: 56),
-              Builder(builder: (context) {
+                  _LandingNavBar(
+                    onOpenProduct: () => _scrollTo(_productKey),
+                    onOpenTemplates: () => _scrollTo(_templatesKey),
+                    onOpenPricing: () => _scrollTo(_pricingKey),
+                    onOpenSupport: () => _scrollTo(_supportKey),
+                    onOpenPrivacy: _openPrivacy,
+                    onLaunchApp: _openApp,
+                    onSignIn: appState.isGuest ? _openSignIn : null,
+                    currentLocale: appState.locale,
+                    onLocaleSelected: (locale) => context.read<AppState>().setLocale(locale),
+                    isLocaleChanging: appState.isLocaleChanging,
+                  ),
+                  const SizedBox(height: 56),
+                  Builder(builder: (context) {
                 final content = Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -227,10 +227,12 @@ class _LandingPageState extends State<LandingPage> {
                     Expanded(flex: 4, child: preview),
                   ],
                 );
-              }),
-            ],
+                  }),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
