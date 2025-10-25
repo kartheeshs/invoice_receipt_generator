@@ -394,7 +394,7 @@ class _LandingPageState extends State<LandingPage> {
             );
           }
           return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(flex: 4, child: description),
               const SizedBox(width: 32),
