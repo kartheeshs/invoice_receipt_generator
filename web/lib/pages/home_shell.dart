@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
-import '../widgets/invoice_form_dialog.dart';
 import '../widgets/profile_form_dialog.dart';
 import 'dashboard_page.dart';
 import 'invoices_page.dart';
@@ -36,9 +35,6 @@ class _HomeShellState extends State<HomeShell> {
         onRequestSignIn: () => _openAuthFlow(),
       ),
       InvoicesPage(
-        onCreateInvoice: _createInvoice,
-        onEditInvoice: _editInvoice,
-        onDeleteInvoice: _deleteInvoice,
         onDownloadInvoice: _handleDownloadInvoice,
         onRequestSignIn: () => _openAuthFlow(),
       ),
@@ -135,40 +131,11 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  void _deleteInvoice(Invoice invoice) {
-    context.read<AppState>().deleteInvoice(invoice.id);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(context.l10n.text('invoiceDeleted'))));
-  }
-
-  Future<void> _createInvoice() async {
+  void _createInvoice() {
     final appState = context.read<AppState>();
     final invoice = appState.prepareInvoice();
-    await showDialog<void>(
-      context: context,
-      builder: (context) => InvoiceFormDialog(
-        invoice: invoice,
-        onSubmit: (updated) {
-          context.read<AppState>().saveInvoice(updated);
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(context.l10n.text('invoiceSaved'))));
-        },
-      ),
-    );
-  }
-
-  Future<void> _editInvoice(Invoice invoice) async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => InvoiceFormDialog(
-        invoice: invoice,
-        onSubmit: (updated) {
-          context.read<AppState>().saveInvoice(updated);
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(context.l10n.text('invoiceSaved'))));
-        },
-      ),
-    );
+    appState.selectInvoice(invoice);
+    setState(() => _index = 1);
   }
 
   Future<void> _handleDownloadInvoice(Invoice invoice) async {
