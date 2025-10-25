@@ -52,7 +52,7 @@ class AdminPage extends StatelessWidget {
                 ? 2
                 : 1;
         final spacing = 16.0;
-        final metricWidth = metricColumns == 1
+        final double metricWidth = metricColumns == 1
             ? maxWidth
             : (maxWidth - spacing * (metricColumns - 1)) / metricColumns;
 
