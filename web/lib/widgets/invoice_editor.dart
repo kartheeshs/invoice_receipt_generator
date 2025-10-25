@@ -255,7 +255,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                               color: palette.muted,
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(height: 18),
                           Container(
                             height: 6,
                             decoration: BoxDecoration(

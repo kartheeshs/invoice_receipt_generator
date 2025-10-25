@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'config/app_config.dart';
 import 'l10n/app_localizations.dart';
-import 'pages/home_shell.dart';
+import 'pages/landing_page.dart';
 import 'services/auth_service.dart';
 import 'services/crisp_service.dart';
 import 'services/pdf_service.dart';
@@ -44,7 +44,7 @@ class InvoiceApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            home: const HomeShell(),
+            home: const LandingPage(),
           );
         },
       ),
