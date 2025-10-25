@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -5,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../models/invoice_template_spec.dart';
 import '../models/user_profile.dart';
+import '../utils/logo_picker.dart';
 
 enum InvoiceEditorMode { edit, preview, history }
 
@@ -713,6 +715,24 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
   }
 
   void _changeLogo() async {
+    if (kIsWeb) {
+      try {
+        final dataUrl = await pickLogoDataUrl();
+        if (!mounted || dataUrl == null || dataUrl.isEmpty) {
+          return;
+        }
+        setState(() {
+          _workingInvoice = _workingInvoice.copyWith(logoUrl: dataUrl);
+        });
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.text('invoiceLogoUploadFailed'))),
+        );
+      }
+      return;
+    }
+
     final controller = TextEditingController(text: _workingInvoice.logoUrl ?? widget.profile.logoUrl);
     final url = await showDialog<String>(
       context: context,
@@ -1008,7 +1028,9 @@ class _GlobalHeaderSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           _LogoPreview(
-            url: invoice.logoUrl?.isNotEmpty == true ? invoice.logoUrl! : profile.logoUrl,
+            url: invoice.logoUrl?.isNotEmpty == true
+                ? invoice.logoUrl
+                : (profile.logoUrl.isNotEmpty ? profile.logoUrl : null),
             onTap: isPreview ? null : onLogoRequested,
           ),
           const SizedBox(height: 12),
@@ -1936,14 +1958,32 @@ class _InvoiceStatusSelector extends StatelessWidget {
 }
 
 class _LogoPreview extends StatelessWidget {
-  const _LogoPreview({required this.url, this.onTap});
+  const _LogoPreview({this.url, this.onTap});
 
-  final String url;
+  final String? url;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasLogo = url != null && url!.isNotEmpty;
+
+    ImageProvider? provider;
+    if (hasLogo) {
+      try {
+        if (url!.startsWith('data:')) {
+          final data = Uri.parse(url!).data;
+          if (data != null) {
+            provider = MemoryImage(data.contentAsBytes());
+          }
+        } else {
+          provider = NetworkImage(url!);
+        }
+      } catch (_) {
+        provider = null;
+      }
+    }
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -1953,12 +1993,12 @@ class _LogoPreview extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: theme.colorScheme.primary.withOpacity(0.4)),
-          image: url.isNotEmpty
-              ? DecorationImage(image: NetworkImage(url), fit: BoxFit.cover)
+          image: provider != null
+              ? DecorationImage(image: provider, fit: BoxFit.cover)
               : null,
         ),
         alignment: Alignment.center,
-        child: url.isEmpty
+        child: !hasLogo || provider == null
             ? Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.onSurfaceVariant)
             : null,
       ),
