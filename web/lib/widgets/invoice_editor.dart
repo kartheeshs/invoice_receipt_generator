@@ -557,7 +557,9 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                   palette: palette,
                   isPreview: isPreview,
                   onChanged: _updateSection,
-                  onDueDateChanged: (date) => _setDate(binding: InvoiceFieldBinding.dueDate, date: date),
+                  onDueDateChanged: (date) =>
+                      _setDate(binding: InvoiceFieldBinding.dueDate, date: date),
+                  profile: widget.profile,
                 ),
                 const SizedBox(height: 24),
                 LineItemsEditor(
@@ -1265,6 +1267,7 @@ class _InfoColumns extends StatelessWidget {
     required this.isPreview,
     required this.onChanged,
     required this.onDueDateChanged,
+    required this.profile,
   });
 
   final Invoice invoice;
@@ -1273,6 +1276,7 @@ class _InfoColumns extends StatelessWidget {
   final bool isPreview;
   final ValueChanged<InvoiceSection> onChanged;
   final ValueChanged<DateTime> onDueDateChanged;
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
@@ -1301,6 +1305,8 @@ class _InfoColumns extends StatelessWidget {
       return existing;
     }
 
+    final fallbackCompanyName =
+        profile.companyName.isNotEmpty ? profile.companyName : profile.displayName;
     final clientElement = _element(
       binding: InvoiceFieldBinding.clientName,
       kind: InvoiceElementKind.text,
@@ -1323,11 +1329,12 @@ class _InfoColumns extends StatelessWidget {
     final companyName = _element(
       binding: InvoiceFieldBinding.companyName,
       kind: InvoiceElementKind.text,
-      value: invoice.profileName ?? '',
+      value: fallbackCompanyName,
     );
     final companyAddress = _element(
       binding: InvoiceFieldBinding.companyAddress,
       kind: InvoiceElementKind.multiline,
+      value: profile.address,
     );
     final dueDate = _element(
       binding: InvoiceFieldBinding.dueDate,

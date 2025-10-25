@@ -1974,7 +1974,7 @@ class PdfService {
               children: [
                 for (var index = 0; index < args.lineItems.length; index++)
                   pw.Container(
-                    color: showStriped && index.isOdd ? stripeColor : PdfColors.transparent,
+                    color: showStriped && index.isOdd ? stripeColor : null,
                     padding: const pw.EdgeInsets.symmetric(vertical: 10),
                     child: pw.Row(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
