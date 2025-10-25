@@ -1,6 +1,970 @@
+import 'package:uuid/uuid.dart';
+
 enum InvoiceStatus { draft, sent, paid, overdue }
 
 enum InvoiceTemplate { classic, modern, minimal, executive, japanese }
+
+const Uuid _uuid = Uuid();
+
+class InvoiceLineItem {
+  const InvoiceLineItem({
+    required this.id,
+    required this.description,
+    required this.quantity,
+    required this.unitPrice,
+    this.notes,
+  });
+
+  factory InvoiceLineItem.empty() {
+    return InvoiceLineItem(
+      id: _uuid.v4(),
+      description: 'Service description',
+      quantity: 1,
+      unitPrice: 0,
+    );
+  }
+
+  final String id;
+  final String description;
+  final double quantity;
+  final double unitPrice;
+  final String? notes;
+
+  double get total => quantity * unitPrice;
+
+  InvoiceLineItem copyWith({
+    String? id,
+    String? description,
+    double? quantity,
+    double? unitPrice,
+    String? notes,
+  }) {
+    return InvoiceLineItem(
+      id: id ?? this.id,
+      description: description ?? this.description,
+      quantity: quantity ?? this.quantity,
+      unitPrice: unitPrice ?? this.unitPrice,
+      notes: notes ?? this.notes,
+    );
+  }
+}
+
+enum InvoiceSectionType {
+  header,
+  billing,
+  project,
+  lineItems,
+  totals,
+  notes,
+  terms,
+  advertisement,
+  japaneseSummary,
+  footer,
+  custom,
+}
+
+enum InvoiceElementKind {
+  text,
+  multiline,
+  amount,
+  date,
+  status,
+  tagline,
+  badge,
+  custom,
+}
+
+enum InvoiceFieldBinding {
+  invoiceTitle,
+  invoiceNumber,
+  projectName,
+  clientName,
+  clientAddress,
+  clientCompany,
+  description,
+  notes,
+  amountDue,
+  dueDate,
+  issueDate,
+  status,
+  companyName,
+  companyAddress,
+  companyPhone,
+  companyTaxId,
+  companyTagline,
+  bankDetails,
+  advertisementHeadline,
+  advertisementBody,
+  advertisementCta,
+  footerNote,
+  logoUrl,
+  custom,
+}
+
+class InvoiceElement {
+  const InvoiceElement({
+    required this.id,
+    required this.kind,
+    required this.binding,
+    this.labelKey,
+    this.value = '',
+    this.placeholder = '',
+    this.metadata = const {},
+  });
+
+  final String id;
+  final InvoiceElementKind kind;
+  final InvoiceFieldBinding binding;
+  final String? labelKey;
+  final String value;
+  final String placeholder;
+  final Map<String, dynamic> metadata;
+
+  InvoiceElement copyWith({
+    InvoiceElementKind? kind,
+    InvoiceFieldBinding? binding,
+    String? labelKey,
+    String? value,
+    String? placeholder,
+    Map<String, dynamic>? metadata,
+  }) {
+    return InvoiceElement(
+      id: id,
+      kind: kind ?? this.kind,
+      binding: binding ?? this.binding,
+      labelKey: labelKey ?? this.labelKey,
+      value: value ?? this.value,
+      placeholder: placeholder ?? this.placeholder,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+}
+
+class InvoiceSection {
+  const InvoiceSection({
+    required this.id,
+    required this.type,
+    this.titleKey,
+    this.elements = const [],
+    this.metadata = const {},
+    this.isRemovable = false,
+    this.supportsLineItems = false,
+    this.supportsLogo = false,
+  });
+
+  final String id;
+  final InvoiceSectionType type;
+  final String? titleKey;
+  final List<InvoiceElement> elements;
+  final Map<String, dynamic> metadata;
+  final bool isRemovable;
+  final bool supportsLineItems;
+  final bool supportsLogo;
+
+  InvoiceSection copyWith({
+    String? id,
+    InvoiceSectionType? type,
+    String? titleKey,
+    List<InvoiceElement>? elements,
+    Map<String, dynamic>? metadata,
+    bool? isRemovable,
+    bool? supportsLineItems,
+    bool? supportsLogo,
+  }) {
+    return InvoiceSection(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      titleKey: titleKey ?? this.titleKey,
+      elements: elements ?? this.elements,
+      metadata: metadata ?? this.metadata,
+      isRemovable: isRemovable ?? this.isRemovable,
+      supportsLineItems: supportsLineItems ?? this.supportsLineItems,
+      supportsLogo: supportsLogo ?? this.supportsLogo,
+    );
+  }
+}
+
+class InvoiceDocument {
+  const InvoiceDocument({required this.sections});
+
+  factory InvoiceDocument.defaults(InvoiceTemplate template) {
+    switch (template) {
+      case InvoiceTemplate.japanese:
+        return InvoiceDocument(sections: _japaneseSections());
+      case InvoiceTemplate.executive:
+        return InvoiceDocument(sections: _executiveSections());
+      case InvoiceTemplate.modern:
+        return InvoiceDocument(sections: _modernSections());
+      case InvoiceTemplate.minimal:
+        return InvoiceDocument(sections: _minimalSections());
+      case InvoiceTemplate.classic:
+      default:
+        return InvoiceDocument(sections: _classicSections());
+    }
+  }
+
+  final List<InvoiceSection> sections;
+
+  InvoiceDocument copyWith({List<InvoiceSection>? sections}) {
+    return InvoiceDocument(sections: sections ?? this.sections);
+  }
+
+  InvoiceDocument updateElement(String elementId, InvoiceElement Function(InvoiceElement element) update) {
+    final updatedSections = sections
+        .map(
+          (section) => section.elements.any((element) => element.id == elementId)
+              ? section.copyWith(
+                  elements: section.elements
+                      .map((element) => element.id == elementId ? update(element) : element)
+                      .toList(),
+                )
+              : section,
+        )
+        .toList();
+    return copyWith(sections: updatedSections);
+  }
+
+  InvoiceDocument replaceSection(InvoiceSection replacement) {
+    final updated = sections
+        .map((section) => section.id == replacement.id ? replacement : section)
+        .toList();
+    return copyWith(sections: updated);
+  }
+
+  InvoiceDocument insertSection(InvoiceSection section, {int? index}) {
+    final updated = [...sections];
+    if (index != null && index >= 0 && index <= updated.length) {
+      updated.insert(index, section);
+    } else {
+      updated.add(section);
+    }
+    return copyWith(sections: updated);
+  }
+
+  InvoiceDocument removeSection(String sectionId) {
+    return copyWith(sections: sections.where((section) => section.id != sectionId).toList());
+  }
+
+  static InvoiceSection templateForAddition(InvoiceSectionType type) {
+    switch (type) {
+      case InvoiceSectionType.notes:
+        return InvoiceSection(
+          id: _uuid.v4(),
+          type: InvoiceSectionType.notes,
+          titleKey: 'sectionNotesTitle',
+          isRemovable: true,
+          elements: [
+            InvoiceElement(
+              id: _uuid.v4(),
+              kind: InvoiceElementKind.multiline,
+              binding: InvoiceFieldBinding.notes,
+              labelKey: 'notesLabel',
+              placeholder: 'Add project notes or personalized message',
+            ),
+          ],
+        );
+      case InvoiceSectionType.terms:
+        return InvoiceSection(
+          id: _uuid.v4(),
+          type: InvoiceSectionType.terms,
+          titleKey: 'sectionTermsTitle',
+          isRemovable: true,
+          elements: [
+            InvoiceElement(
+              id: _uuid.v4(),
+              kind: InvoiceElementKind.multiline,
+              binding: InvoiceFieldBinding.footerNote,
+              labelKey: 'termsLabel',
+              placeholder: 'List payment terms, late fees, or delivery notes',
+            ),
+          ],
+        );
+      case InvoiceSectionType.advertisement:
+        return InvoiceSection(
+          id: _uuid.v4(),
+          type: InvoiceSectionType.advertisement,
+          titleKey: 'sectionAdTitle',
+          isRemovable: true,
+          elements: [
+            InvoiceElement(
+              id: _uuid.v4(),
+              kind: InvoiceElementKind.text,
+              binding: InvoiceFieldBinding.advertisementHeadline,
+              labelKey: 'adHeadlineLabel',
+              placeholder: 'Promote an add-on service or seasonal offer',
+            ),
+            InvoiceElement(
+              id: _uuid.v4(),
+              kind: InvoiceElementKind.multiline,
+              binding: InvoiceFieldBinding.advertisementBody,
+              labelKey: 'adBodyLabel',
+              placeholder: 'Explain the value of your promotion in a sentence or two.',
+            ),
+            InvoiceElement(
+              id: _uuid.v4(),
+              kind: InvoiceElementKind.badge,
+              binding: InvoiceFieldBinding.advertisementCta,
+              labelKey: 'adCtaLabel',
+              placeholder: 'Add call-to-action (e.g. “Book strategy call”)',
+            ),
+          ],
+        );
+      case InvoiceSectionType.custom:
+      default:
+        return InvoiceSection(
+          id: _uuid.v4(),
+          type: InvoiceSectionType.custom,
+          titleKey: 'sectionCustomTitle',
+          isRemovable: true,
+          elements: [
+            InvoiceElement(
+              id: _uuid.v4(),
+              kind: InvoiceElementKind.multiline,
+              binding: InvoiceFieldBinding.custom,
+              placeholder: 'Add additional information or instructions for your client.',
+            ),
+          ],
+        );
+    }
+  }
+
+  static List<InvoiceSection> _classicSections() {
+    return [
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.header,
+        metadata: const {'layout': 'twoColumn'},
+        supportsLogo: true,
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.tagline,
+            binding: InvoiceFieldBinding.companyTagline,
+            labelKey: 'companyTaglineLabel',
+            placeholder: 'Creative studio tagline',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceTitle,
+            labelKey: 'invoiceTitleLabel',
+            placeholder: 'Invoice',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceNumber,
+            labelKey: 'invoiceNumberLabel',
+            placeholder: '#2024-001',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.issueDate,
+            labelKey: 'issueDateLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.status,
+            binding: InvoiceFieldBinding.status,
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.billing,
+        titleKey: 'billingDetailsTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientName,
+            labelKey: 'billToLabel',
+            placeholder: 'Client name',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.clientAddress,
+            placeholder: 'Client address and contact details',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.projectName,
+            labelKey: 'projectLabel',
+            placeholder: 'Project or engagement name',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.dueDate,
+            labelKey: 'dueDateLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.lineItems,
+        titleKey: 'lineItemsTitle',
+        supportsLineItems: true,
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.totals,
+        titleKey: 'summaryTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.amount,
+            binding: InvoiceFieldBinding.amountDue,
+            labelKey: 'amountDueLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.notes,
+        titleKey: 'sectionNotesTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.notes,
+            placeholder: 'Add project notes or special instructions for your client.',
+          ),
+        ],
+      ),
+    ];
+  }
+
+  static List<InvoiceSection> _modernSections() {
+    return [
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.header,
+        metadata: const {'layout': 'full'},
+        supportsLogo: true,
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.companyName,
+            labelKey: 'companyNameLabel',
+            placeholder: 'Modern Agency Inc.',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.tagline,
+            binding: InvoiceFieldBinding.companyTagline,
+            placeholder: 'Global design and strategy partner',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceNumber,
+            labelKey: 'invoiceNumberLabel',
+            placeholder: '#2024-102',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.status,
+            binding: InvoiceFieldBinding.status,
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.project,
+        metadata: const {'layout': 'pill'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.projectName,
+            labelKey: 'projectLabel',
+            placeholder: 'Retainer: Experience design sprint',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.issueDate,
+            labelKey: 'issueDateLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.billing,
+        titleKey: 'billingDetailsTitle',
+        metadata: const {'layout': 'columns'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientCompany,
+            labelKey: 'billToCompanyLabel',
+            placeholder: 'Client company name',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientName,
+            labelKey: 'billToContactLabel',
+            placeholder: 'Client contact name',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.clientAddress,
+            placeholder: 'Client address details',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.dueDate,
+            labelKey: 'dueDateLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.lineItems,
+        titleKey: 'lineItemsTitle',
+        supportsLineItems: true,
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.totals,
+        metadata: const {'layout': 'card'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.amount,
+            binding: InvoiceFieldBinding.amountDue,
+            labelKey: 'amountDueLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.terms,
+        titleKey: 'sectionTermsTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.footerNote,
+            placeholder: 'Outline payment methods, banking info, and thanks.',
+          ),
+        ],
+      ),
+    ];
+  }
+
+  static List<InvoiceSection> _minimalSections() {
+    return [
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.header,
+        metadata: const {'layout': 'stacked'},
+        supportsLogo: true,
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceTitle,
+            labelKey: 'invoiceTitleLabel',
+            placeholder: 'Invoice',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceNumber,
+            labelKey: 'invoiceNumberLabel',
+            placeholder: '#001',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.issueDate,
+            labelKey: 'issueDateLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.status,
+            binding: InvoiceFieldBinding.status,
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.billing,
+        titleKey: 'billingDetailsTitle',
+        metadata: const {'layout': 'split'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientName,
+            labelKey: 'billToLabel',
+            placeholder: 'Client name',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.clientAddress,
+            placeholder: 'Client address',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.dueDate,
+            labelKey: 'dueDateLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.lineItems,
+        titleKey: 'lineItemsTitle',
+        supportsLineItems: true,
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.totals,
+        metadata: const {'layout': 'minimal'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.amount,
+            binding: InvoiceFieldBinding.amountDue,
+            labelKey: 'amountDueLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.notes,
+        titleKey: 'sectionNotesTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.notes,
+            placeholder: 'Add optional notes or a thank-you message.',
+          ),
+        ],
+      ),
+    ];
+  }
+
+  static List<InvoiceSection> _executiveSections() {
+    return [
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.header,
+        metadata: const {'layout': 'executive'},
+        supportsLogo: true,
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.companyName,
+            labelKey: 'companyNameLabel',
+            placeholder: 'Executive Partners Ltd.',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.tagline,
+            binding: InvoiceFieldBinding.companyTagline,
+            placeholder: 'Consulting • Strategy • Delivery',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceNumber,
+            labelKey: 'invoiceNumberLabel',
+            placeholder: 'ENG-2045',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.issueDate,
+            labelKey: 'issueDateLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.status,
+            binding: InvoiceFieldBinding.status,
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.project,
+        metadata: const {'layout': 'badge'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.projectName,
+            labelKey: 'projectLabel',
+            placeholder: 'Strategic advisory retainer',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.dueDate,
+            labelKey: 'dueDateLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.billing,
+        metadata: const {'layout': 'executiveColumns'},
+        titleKey: 'billingDetailsTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientCompany,
+            labelKey: 'billToCompanyLabel',
+            placeholder: 'Client organisation',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientName,
+            labelKey: 'billToContactLabel',
+            placeholder: 'Key stakeholder',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.clientAddress,
+            placeholder: 'Office address and contact info',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.lineItems,
+        supportsLineItems: true,
+        titleKey: 'lineItemsTitle',
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.totals,
+        metadata: const {'layout': 'executiveTotals'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.amount,
+            binding: InvoiceFieldBinding.amountDue,
+            labelKey: 'amountDueLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.terms,
+        titleKey: 'sectionTermsTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.bankDetails,
+            placeholder: 'Wire transfer instructions, SWIFT / ABA codes, and payment window.',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.advertisement,
+        titleKey: 'sectionAdTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.advertisementHeadline,
+            placeholder: 'Extend your advisory program with quarterly workshops',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.advertisementBody,
+            placeholder: 'Offer a packaged add-on directly from your invoice.',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.badge,
+            binding: InvoiceFieldBinding.advertisementCta,
+            placeholder: 'Schedule planning call',
+          ),
+        ],
+        isRemovable: true,
+      ),
+    ];
+  }
+
+  static List<InvoiceSection> _japaneseSections() {
+    return [
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.header,
+        metadata: const {'layout': 'japanese'},
+        supportsLogo: true,
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceTitle,
+            labelKey: 'japaneseTitleLabel',
+            placeholder: '請求書 / INVOICE',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.invoiceNumber,
+            labelKey: 'invoiceNumberLabel',
+            placeholder: 'No. 0001',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.issueDate,
+            labelKey: 'issueDateLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.japaneseSummary,
+        metadata: const {'layout': 'summaryTable'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientCompany,
+            labelKey: 'japaneseBillToCompanyLabel',
+            placeholder: '御中 / Client company name',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.clientAddress,
+            placeholder: '〒 Postal code, prefecture, ward, building',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.clientName,
+            labelKey: 'japaneseBillToContactLabel',
+            placeholder: '担当者名',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.date,
+            binding: InvoiceFieldBinding.dueDate,
+            labelKey: 'dueDateLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.amount,
+            binding: InvoiceFieldBinding.amountDue,
+            labelKey: 'amountDueLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.lineItems,
+        supportsLineItems: true,
+        metadata: const {'layout': 'japanese'},
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.totals,
+        metadata: const {'layout': 'japaneseTotals'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.amount,
+            binding: InvoiceFieldBinding.amountDue,
+            labelKey: 'amountDueLabel',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.footer,
+        metadata: const {'layout': 'japaneseFooter'},
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.companyName,
+            labelKey: 'companyNameLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.companyAddress,
+            placeholder: '〒 Postal code, prefecture, ward, building',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.companyPhone,
+            labelKey: 'phoneLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.text,
+            binding: InvoiceFieldBinding.companyTaxId,
+            labelKey: 'taxIdLabel',
+          ),
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.bankDetails,
+            labelKey: 'bankDetailsLabel',
+            placeholder: '銀行名 / 支店名 / 口座種別 / 口座番号',
+          ),
+        ],
+      ),
+      InvoiceSection(
+        id: _uuid.v4(),
+        type: InvoiceSectionType.notes,
+        titleKey: 'sectionNotesTitle',
+        elements: [
+          InvoiceElement(
+            id: _uuid.v4(),
+            kind: InvoiceElementKind.multiline,
+            binding: InvoiceFieldBinding.notes,
+            placeholder: '備考欄に必要事項を入力してください。',
+          ),
+        ],
+      ),
+    ];
+  }
+}
+
+class InvoiceRevision {
+  const InvoiceRevision({
+    required this.id,
+    required this.timestamp,
+    required this.editor,
+    required this.summary,
+  });
+
+  final String id;
+  final DateTime timestamp;
+  final String editor;
+  final String summary;
+}
 
 class Invoice {
   const Invoice({
@@ -16,7 +980,11 @@ class Invoice {
     required this.dueDate,
     required this.status,
     required this.template,
+    required this.document,
+    required this.lineItems,
     this.notes = '',
+    this.logoUrl,
+    this.revisions = const [],
   });
 
   factory Invoice.create({
@@ -39,6 +1007,8 @@ class Invoice {
       dueDate: now.add(const Duration(days: 30)),
       status: InvoiceStatus.draft,
       template: template,
+      document: InvoiceDocument.defaults(template),
+      lineItems: [InvoiceLineItem.empty()],
     );
   }
 
@@ -55,7 +1025,11 @@ class Invoice {
     DateTime? dueDate,
     InvoiceStatus? status,
     InvoiceTemplate? template,
+    InvoiceDocument? document,
+    List<InvoiceLineItem>? lineItems,
     String? notes,
+    String? logoUrl,
+    List<InvoiceRevision>? revisions,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -70,7 +1044,11 @@ class Invoice {
       dueDate: dueDate ?? this.dueDate,
       status: status ?? this.status,
       template: template ?? this.template,
+      document: document ?? this.document,
+      lineItems: lineItems ?? this.lineItems,
       notes: notes ?? this.notes,
+      logoUrl: logoUrl ?? this.logoUrl,
+      revisions: revisions ?? this.revisions,
     );
   }
 
@@ -86,9 +1064,30 @@ class Invoice {
   final DateTime dueDate;
   final InvoiceStatus status;
   final InvoiceTemplate template;
+  final InvoiceDocument document;
+  final List<InvoiceLineItem> lineItems;
   final String notes;
+  final String? logoUrl;
+  final List<InvoiceRevision> revisions;
 
   bool get isOverdue => status == InvoiceStatus.overdue;
+
+  Invoice recalculateTotals() {
+    final total = lineItems.fold<double>(0, (value, item) => value + item.total);
+    return copyWith(amount: double.parse(total.toStringAsFixed(2)));
+  }
+
+  Invoice updateLineItems(List<InvoiceLineItem> items) {
+    return copyWith(lineItems: items).recalculateTotals();
+  }
+
+  Invoice updateDocument(InvoiceDocument document) {
+    return copyWith(document: document);
+  }
+
+  Invoice addRevision(InvoiceRevision revision) {
+    return copyWith(revisions: [revision, ...revisions]);
+  }
 }
 
 extension InvoiceTemplateMetadata on InvoiceTemplate {

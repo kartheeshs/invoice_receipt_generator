@@ -98,13 +98,37 @@ class PdfService {
     final client = invoice.clientName.isEmpty
         ? l10n.text('invoiceDefaultClient')
         : invoice.clientName;
-    final notes = invoice.notes.isEmpty
-        ? l10n.text('invoiceDefaultNotes')
-        : invoice.notes;
-    final amountText = format.format(invoice.amount);
+    final lineItems = invoice.lineItems.isNotEmpty
+        ? invoice.lineItems
+        : [
+            InvoiceLineItem(
+              id: '${invoice.id}-single',
+              description: description,
+              quantity: 1,
+              unitPrice: invoice.amount,
+            ),
+          ];
+    final totalAmount = lineItems.fold<double>(0, (value, item) => value + item.total);
+    final amountText = format.format(totalAmount);
     final dueMessage = _dueMessage(l10n, invoice.dueDate);
     final statusLabel = l10n.invoiceStatusLabel(invoice.status);
     final companyName = profile.companyName.isEmpty ? profile.displayName : profile.companyName;
+    final notesText = _composeSectionText(
+      invoice,
+      {InvoiceSectionType.notes, InvoiceSectionType.custom},
+      fallback: invoice.notes,
+    );
+    final termsText = _composeSectionText(invoice, {InvoiceSectionType.terms});
+    final advertisementSection = _findSection(invoice, InvoiceSectionType.advertisement);
+    final adHeadline = advertisementSection != null
+        ? _sectionBindingValue(advertisementSection, InvoiceFieldBinding.advertisementHeadline)
+        : '';
+    final adBody = advertisementSection != null
+        ? _sectionBindingValue(advertisementSection, InvoiceFieldBinding.advertisementBody)
+        : '';
+    final adCta = advertisementSection != null
+        ? _sectionBindingValue(advertisementSection, InvoiceFieldBinding.advertisementCta)
+        : '';
 
     return [
       pw.Container(
@@ -238,9 +262,8 @@ class PdfService {
       ),
       pw.SizedBox(height: 24),
       _pdfSummaryTable(
-        project: project,
-        description: description,
-        amountText: amountText,
+        items: lineItems,
+        format: format,
         accent: accent,
         border: border,
         muted: muted,
@@ -256,8 +279,25 @@ class PdfService {
         headerTextValue: headerTextValue,
         l10n: l10n,
       ),
-      pw.SizedBox(height: 20),
-      _pdfNotesSection(notes, border, surface, l10n),
+      if (notesText.isNotEmpty) ...[
+        pw.SizedBox(height: 20),
+        _pdfNotesSection(notesText, border, surface, l10n),
+      ],
+      if (termsText.isNotEmpty) ...[
+        pw.SizedBox(height: 20),
+        _pdfTermsSection(termsText, border, surface, l10n),
+      ],
+      if (adHeadline.isNotEmpty || adBody.isNotEmpty || adCta.isNotEmpty) ...[
+        pw.SizedBox(height: 20),
+        _pdfAdSection(
+          headline: adHeadline,
+          body: adBody,
+          cta: adCta,
+          accent: accent,
+          badge: badge,
+          border: border,
+        ),
+      ],
     ];
   }
 
@@ -301,10 +341,34 @@ class PdfService {
         : invoice.clientName;
     final suffix = l10n.text('invoiceJapaneseBillTo');
     final recipient = clientBase.endsWith(suffix) ? clientBase : '$clientBase$suffix';
-    final notes = invoice.notes.isEmpty
-        ? l10n.text('invoiceDefaultNotes')
-        : invoice.notes;
-    final amountText = format.format(invoice.amount);
+    final lineItems = invoice.lineItems.isNotEmpty
+        ? invoice.lineItems
+        : [
+            InvoiceLineItem(
+              id: '${invoice.id}-single',
+              description: description,
+              quantity: 1,
+              unitPrice: invoice.amount,
+            ),
+          ];
+    final subtotal = lineItems.fold<double>(0, (value, item) => value + item.total);
+    final notesText = _composeSectionText(
+      invoice,
+      {InvoiceSectionType.notes, InvoiceSectionType.custom},
+      fallback: invoice.notes,
+    );
+    final termsText = _composeSectionText(invoice, {InvoiceSectionType.terms});
+    final advertisementSection = _findSection(invoice, InvoiceSectionType.advertisement);
+    final adHeadline = advertisementSection != null
+        ? _sectionBindingValue(advertisementSection, InvoiceFieldBinding.advertisementHeadline)
+        : '';
+    final adBody = advertisementSection != null
+        ? _sectionBindingValue(advertisementSection, InvoiceFieldBinding.advertisementBody)
+        : '';
+    final adCta = advertisementSection != null
+        ? _sectionBindingValue(advertisementSection, InvoiceFieldBinding.advertisementCta)
+        : '';
+    final amountText = format.format(subtotal);
     final dueMessage = _dueMessage(l10n, invoice.dueDate);
     final statusLabel = l10n.invoiceStatusLabel(invoice.status);
     final companyName = profile.companyName.isEmpty ? profile.displayName : profile.companyName;
@@ -437,12 +501,30 @@ class PdfService {
               ],
             ),
             pw.SizedBox(height: 18),
+            _pdfJapaneseItemsTable(lineItems, format, border, muted, l10n),
+            pw.SizedBox(height: 18),
             _pdfJapaneseAmountCard(l10n, amountText, dueMessage, accent, balanceBackground, muted),
             pw.SizedBox(height: 18),
             _pdfJapaneseSection(l10n.text('invoiceJapaneseDescriptionLabel'), description, border, surface),
-            if (notes.isNotEmpty) ...[
+            if (notesText.isNotEmpty) ...[
               pw.SizedBox(height: 18),
-              _pdfJapaneseSection(l10n.text('invoiceJapaneseNotes'), notes, border, surface),
+              _pdfJapaneseSection(l10n.text('invoiceJapaneseNotes'), notesText, border, surface),
+            ],
+            if (termsText.isNotEmpty) ...[
+              pw.SizedBox(height: 18),
+              _pdfJapaneseSection(l10n.text('invoiceJapaneseTerms'), termsText, border, surface),
+            ],
+            if (adHeadline.isNotEmpty || adBody.isNotEmpty || adCta.isNotEmpty) ...[
+              pw.SizedBox(height: 18),
+              _pdfJapaneseAdSection(
+                headline: adHeadline,
+                body: adBody,
+                cta: adCta,
+                accent: accent,
+                border: border,
+                badge: badge,
+                muted: muted,
+              ),
             ],
           ],
         ),
@@ -522,16 +604,134 @@ class PdfService {
     );
   }
 
+  pw.Widget _pdfJapaneseItemsTable(
+    List<InvoiceLineItem> items,
+    NumberFormat format,
+    PdfColor border,
+    PdfColor muted,
+    AppLocalizations l10n,
+  ) {
+    return pw.Table(
+      border: pw.TableBorder.all(color: border, width: 0.8),
+      columnWidths: const {
+        0: pw.FlexColumnWidth(2.8),
+        1: pw.FlexColumnWidth(1.3),
+        2: pw.FlexColumnWidth(1.1),
+        3: pw.FlexColumnWidth(1.3),
+      },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: [
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(12),
+              child: pw.Text(l10n.text('invoiceSummaryDescription'),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(12),
+              child: pw.Text(l10n.text('invoiceSummaryPrice'),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(12),
+              child: pw.Text(l10n.text('invoiceSummaryQty'),
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ),
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(12),
+              child: pw.Text(l10n.text('invoiceSummaryAmount'),
+                  textAlign: pw.TextAlign.right,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ),
+          ],
+        ),
+        for (final item in items)
+          pw.TableRow(
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(12),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(item.description),
+                    if (item.notes?.isNotEmpty == true)
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.only(top: 4),
+                        child: pw.Text(item.notes!, style: pw.TextStyle(color: muted, fontSize: 10)),
+                      ),
+                  ],
+                ),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(12),
+                child: pw.Text(format.format(item.unitPrice), textAlign: pw.TextAlign.right),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(12),
+                child: pw.Text(_formatQuantity(item.quantity), textAlign: pw.TextAlign.center),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(12),
+                child: pw.Text(format.format(item.total),
+                    textAlign: pw.TextAlign.right, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _pdfJapaneseAdSection({
+    required String headline,
+    required String body,
+    required String cta,
+    required PdfColor accent,
+    required PdfColor border,
+    required PdfColor badge,
+    required PdfColor muted,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(18),
+      decoration: pw.BoxDecoration(
+        borderRadius: pw.BorderRadius.circular(20),
+        border: pw.Border.all(color: border, width: 0.8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(headline, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: accent, fontSize: 13)),
+          if (body.isNotEmpty) ...[
+            pw.SizedBox(height: 6),
+            pw.Text(body, style: pw.TextStyle(color: muted, fontSize: 10)),
+          ],
+          if (cta.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: pw.BoxDecoration(
+                color: badge,
+                borderRadius: pw.BorderRadius.circular(14),
+              ),
+              child: pw.Text(cta, style: pw.TextStyle(color: accent, fontWeight: pw.FontWeight.bold)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   pw.Widget _pdfSummaryTable({
-    required String project,
-    required String description,
-    required String amountText,
+    required List<InvoiceLineItem> items,
+    required NumberFormat format,
     required PdfColor accent,
     required PdfColor border,
     required PdfColor muted,
     required int badgeValue,
     required AppLocalizations l10n,
   }) {
+    final subtotal = items.fold<double>(0, (sum, item) => sum + item.total);
     return pw.Container(
       decoration: pw.BoxDecoration(
         borderRadius: pw.BorderRadius.circular(22),
@@ -576,38 +776,46 @@ class PdfService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(
-                      flex: 3,
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(project, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                          pw.SizedBox(height: 4),
-                          pw.Text(description, style: pw.TextStyle(color: muted, fontSize: 11)),
-                        ],
+                for (final item in items) ...[
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(
+                        flex: 3,
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(item.description, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                            if (item.notes?.isNotEmpty == true) ...[
+                              pw.SizedBox(height: 4),
+                              pw.Text(item.notes!, style: pw.TextStyle(color: muted, fontSize: 10)),
+                            ],
+                          ],
+                        ),
                       ),
-                    ),
-                    pw.Expanded(
-                      child: pw.Text(amountText, textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 11)),
-                    ),
-                    pw.Expanded(
-                      child: pw.Text('1', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 11)),
-                    ),
-                    pw.Expanded(
-                      child: pw.Text(amountText, textAlign: pw.TextAlign.right,
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 14),
+                      pw.Expanded(
+                        child: pw.Text(format.format(item.unitPrice),
+                            textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 11)),
+                      ),
+                      pw.Expanded(
+                        child: pw.Text(_formatQuantity(item.quantity),
+                            textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 11)),
+                      ),
+                      pw.Expanded(
+                        child: pw.Text(format.format(item.total),
+                            textAlign: pw.TextAlign.right,
+                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 12),
+                  if (item != items.last) pw.SizedBox(height: 12),
+                ],
                 pw.Divider(color: border, height: 1),
                 pw.SizedBox(height: 10),
-                _pdfSummaryTotalRow(l10n.text('invoiceSummarySubtotal'), amountText),
+                _pdfSummaryTotalRow(l10n.text('invoiceSummarySubtotal'), format.format(subtotal)),
                 pw.SizedBox(height: 6),
-                _pdfSummaryTotalRow(l10n.text('invoiceSummaryTotal'), amountText, emphasized: true),
+                _pdfSummaryTotalRow(l10n.text('invoiceSummaryTotal'), format.format(subtotal), emphasized: true),
               ],
             ),
           ),
@@ -688,6 +896,112 @@ class PdfService {
         ],
       ),
     );
+  }
+
+  pw.Widget _pdfTermsSection(String terms, PdfColor border, PdfColor surface, AppLocalizations l10n) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(20),
+      decoration: pw.BoxDecoration(
+        color: surface,
+        borderRadius: pw.BorderRadius.circular(20),
+        border: pw.Border.all(color: border, width: 1),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(l10n.text('invoiceTermsTitle'), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 6),
+          pw.Text(terms, style: const pw.TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _pdfAdSection({
+    required String headline,
+    required String body,
+    required String cta,
+    required PdfColor accent,
+    required PdfColor badge,
+    required PdfColor border,
+  }) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(20),
+      decoration: pw.BoxDecoration(
+        borderRadius: pw.BorderRadius.circular(20),
+        border: pw.Border.all(color: border, width: 1),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(headline, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: accent, fontSize: 14)),
+          if (body.isNotEmpty) ...[
+            pw.SizedBox(height: 6),
+            pw.Text(body, style: const pw.TextStyle(fontSize: 11)),
+          ],
+          if (cta.isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: pw.BoxDecoration(
+                color: badge,
+                borderRadius: pw.BorderRadius.circular(16),
+              ),
+              child: pw.Text(cta, style: pw.TextStyle(color: accent, fontWeight: pw.FontWeight.bold)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatQuantity(double quantity) {
+    if (quantity == quantity.roundToDouble()) {
+      return quantity.toInt().toString();
+    }
+    final formatted = quantity.toStringAsFixed(2);
+    return formatted
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'[.]$'), '');
+  }
+
+  String _composeSectionText(
+    Invoice invoice,
+    Set<InvoiceSectionType> types, {
+    String fallback = '',
+  }) {
+    final values = <String>[];
+    if (fallback.trim().isNotEmpty) {
+      values.add(fallback.trim());
+    }
+    for (final section in invoice.document.sections) {
+      if (!types.contains(section.type)) continue;
+      for (final element in section.elements) {
+        final value = element.value.trim();
+        if (value.isNotEmpty) {
+          values.add(value);
+        }
+      }
+    }
+    return values.join('\n\n');
+  }
+
+  InvoiceSection? _findSection(Invoice invoice, InvoiceSectionType type) {
+    for (final section in invoice.document.sections) {
+      if (section.type == type) {
+        return section;
+      }
+    }
+    return null;
+  }
+
+  String _sectionBindingValue(InvoiceSection section, InvoiceFieldBinding binding) {
+    for (final element in section.elements) {
+      if (element.binding == binding) {
+        return element.value;
+      }
+    }
+    return '';
   }
 
   pw.Widget _pdfInfoBlock({

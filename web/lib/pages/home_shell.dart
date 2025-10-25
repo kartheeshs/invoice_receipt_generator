@@ -9,6 +9,7 @@ import '../widgets/language_menu_button.dart';
 import '../widgets/profile_form_dialog.dart';
 import 'dashboard_page.dart';
 import 'invoices_page.dart';
+import 'admin_page.dart';
 import 'settings_page.dart';
 import 'sign_in_page.dart';
 
@@ -29,8 +30,9 @@ class _HomeShellState extends State<HomeShell> {
     final theme = Theme.of(context);
     final isGuest = appState.isGuest;
     final isLocaleChanging = appState.isLocaleChanging;
+    final isAdmin = appState.isAdmin;
 
-    final pages = [
+    final pages = <Widget>[
       DashboardPage(
         onCreateInvoice: _createInvoice,
         onOpenSubscription: _handleManageSubscription,
@@ -40,6 +42,7 @@ class _HomeShellState extends State<HomeShell> {
         onDownloadInvoice: _handleDownloadInvoice,
         onRequestSignIn: () => _openAuthFlow(),
       ),
+      if (isAdmin) const AdminPage(),
       SettingsPage(
         onEditProfile: _editProfile,
         onLanguageChanged: (locale) => context.read<AppState>().setLocale(locale),
@@ -53,10 +56,33 @@ class _HomeShellState extends State<HomeShell> {
     final isWide = MediaQuery.of(context).size.width >= 960;
 
     final navigationDestinations = <NavigationDestination>[
-      NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard), label: l10n.text('dashboardTab')),
-      NavigationDestination(icon: const Icon(Icons.receipt_long_outlined), selectedIcon: const Icon(Icons.receipt_long), label: l10n.text('invoicesTab')),
-      NavigationDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings), label: l10n.text('settingsTab')),
+      NavigationDestination(
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: l10n.text('dashboardTab')),
+      NavigationDestination(
+          icon: const Icon(Icons.receipt_long_outlined),
+          selectedIcon: const Icon(Icons.receipt_long),
+          label: l10n.text('invoicesTab')),
+      if (isAdmin)
+        NavigationDestination(
+          icon: const Icon(Icons.shield_outlined),
+          selectedIcon: const Icon(Icons.shield),
+          label: l10n.text('adminTab'),
+        ),
+      NavigationDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: l10n.text('settingsTab')),
     ];
+
+    if (_index >= navigationDestinations.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _index = navigationDestinations.length - 1);
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(

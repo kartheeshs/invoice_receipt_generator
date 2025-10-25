@@ -101,8 +101,8 @@ class _InvoicesPageState extends State<InvoicesPage> {
                   ),
                 );
 
-                final editor = Expanded(
-                  child: Card(
+                Widget buildEditorCard() {
+                  return Card(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                     child: Padding(
                       padding: const EdgeInsets.all(28),
@@ -122,15 +122,47 @@ class _InvoicesPageState extends State<InvoicesPage> {
                               onRequestSignIn: widget.onRequestSignIn,
                             ),
                     ),
-                  ),
-                );
+                  );
+                }
+
+                Widget editorArea;
+                if (selectedInvoice == null) {
+                  editorArea = Expanded(child: buildEditorCard());
+                } else {
+                  final historyPanel = _InvoiceHistoryPanel(
+                    invoice: selectedInvoice,
+                    isPremium: appState.isPremium,
+                  );
+                  if (showVertical) {
+                    editorArea = Expanded(
+                      child: Column(
+                        children: [
+                          Expanded(child: buildEditorCard()),
+                          const SizedBox(height: 16),
+                          SizedBox(width: double.infinity, child: historyPanel),
+                        ],
+                      ),
+                    );
+                  } else {
+                    editorArea = Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: buildEditorCard()),
+                          const SizedBox(width: 24),
+                          SizedBox(width: 320, child: historyPanel),
+                        ],
+                      ),
+                    );
+                  }
+                }
 
                 if (showVertical) {
                   return Column(
                     children: [
                       sidebar,
                       const SizedBox(height: 24),
-                      editor,
+                      editorArea,
                     ],
                   );
                 }
@@ -140,7 +172,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                   children: [
                     sidebar,
                     const SizedBox(width: 24),
-                    editor,
+                    editorArea,
                   ],
                 );
               },
@@ -460,6 +492,124 @@ class _GuestHistoryState extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _InvoiceHistoryPanel extends StatelessWidget {
+  const _InvoiceHistoryPanel({
+    required this.invoice,
+    required this.isPremium,
+  });
+
+  final Invoice invoice;
+  final bool isPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final revisions = invoice.revisions;
+    final dateFormat = DateFormat.yMMMd(l10n.locale.toLanguageTag());
+    final timeFormat = DateFormat.Hm(l10n.locale.toLanguageTag());
+
+    final subtitle = l10n
+        .text('invoiceHistorySubtitle')
+        .replaceAll('{count}', revisions.length.toString());
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.text('invoiceHistoryTitle'), style: theme.textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text(subtitle, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 16),
+            if (!isPremium)
+              _HistoryMessage(text: l10n.text('invoiceHistoryPremiumHint'))
+            else if (revisions.isEmpty)
+              _HistoryMessage(text: l10n.text('invoiceHistoryEmpty'))
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: revisions.length,
+                separatorBuilder: (_, __) => const Divider(height: 20),
+                itemBuilder: (context, index) {
+                  final revision = revisions[index];
+                  return _HistoryEntry(
+                    revision: revision,
+                    dateFormat: dateFormat,
+                    timeFormat: timeFormat,
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryEntry extends StatelessWidget {
+  const _HistoryEntry({
+    required this.revision,
+    required this.dateFormat,
+    required this.timeFormat,
+  });
+
+  final InvoiceRevision revision;
+  final DateFormat dateFormat;
+  final DateFormat timeFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final timestamp = '${dateFormat.format(revision.timestamp)} · ${timeFormat.format(revision.timestamp)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.history, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                revision.summary,
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$timestamp • ${revision.editor}',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryMessage extends StatelessWidget {
+  const _HistoryMessage({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(text, style: theme.textTheme.bodyMedium),
     );
   }
 }

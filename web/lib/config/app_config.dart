@@ -5,6 +5,7 @@ class AppConfig {
     this.monthlyPlanPrice = 600,
     this.currencyCode = 'JPY',
     this.currencySymbol = '¥',
+    this.adminEmails = const [],
   });
 
   factory AppConfig.fromEnvironment() {
@@ -17,12 +18,22 @@ class AppConfig {
             ? legacyKey
             : webKey;
 
+    final adminEmailsRaw = const String.fromEnvironment('ADMIN_EMAILS', defaultValue: '');
+    final environmentAdmins = adminEmailsRaw
+        .split(',')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList();
+
     return AppConfig(
       firebaseApiKey: resolvedFirebaseKey.isNotEmpty
           ? resolvedFirebaseKey
           : _defaultFirebaseApiKey,
       crispSubscriptionUrl:
           const String.fromEnvironment('CRISP_SUBSCRIPTION_URL', defaultValue: ''),
+      adminEmails: environmentAdmins.isNotEmpty
+          ? environmentAdmins
+          : const ['admin@example.com', 'haruto@example.com'],
     );
   }
 
@@ -31,6 +42,7 @@ class AppConfig {
   final double monthlyPlanPrice;
   final String currencyCode;
   final String currencySymbol;
+  final List<String> adminEmails;
 
   bool get hasFirebase => firebaseApiKey.isNotEmpty;
   bool get hasCrispSubscriptionLink => crispSubscriptionUrl.isNotEmpty;
