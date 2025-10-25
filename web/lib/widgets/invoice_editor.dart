@@ -40,25 +40,30 @@ class InvoiceEditor extends StatefulWidget {
 
 class _InvoiceEditorState extends State<InvoiceEditor> {
   late Invoice _workingInvoice;
-  InvoiceEditorMode _mode = InvoiceEditorMode.edit;
+  late InvoiceEditorMode _mode;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _applyInvoice(widget.invoice);
+    _applyInvoice(widget.invoice, resetMode: true);
   }
 
   @override
   void didUpdateWidget(covariant InvoiceEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.invoice.id != widget.invoice.id) {
-      _applyInvoice(widget.invoice);
+      _applyInvoice(widget.invoice, resetMode: true);
+    } else if (oldWidget.isNewDraft != widget.isNewDraft && widget.isNewDraft) {
+      _mode = InvoiceEditorMode.edit;
     }
   }
 
-  void _applyInvoice(Invoice invoice) {
+  void _applyInvoice(Invoice invoice, {required bool resetMode}) {
     _workingInvoice = invoice;
+    if (resetMode) {
+      _mode = widget.isNewDraft ? InvoiceEditorMode.edit : InvoiceEditorMode.preview;
+    }
   }
 
   @override
@@ -72,24 +77,66 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       symbol: _workingInvoice.currencySymbol,
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeading(theme, l10n, isPreview),
-        const SizedBox(height: 16),
-        _buildTemplateSelector(theme, l10n),
-        const SizedBox(height: 16),
-        _buildToolbar(theme, l10n, isPreview),
-        const SizedBox(height: 16),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 32),
-            child: _buildInvoiceCanvas(context, palette, currencyFormat, isPreview),
-          ),
-        ),
-        const SizedBox(height: 24),
-        _buildActionButtons(theme, l10n, isPreview),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 1080;
+
+        Widget templateShelf;
+        if (isWide) {
+          templateShelf = _buildTemplateSidebar(theme, l10n);
+        } else {
+          templateShelf = _buildTemplateCarousel(theme, l10n);
+        }
+
+        final canvasStack = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildToolbar(theme, l10n, isPreview),
+            const SizedBox(height: 16),
+            _buildInvoiceCanvas(context, palette, currencyFormat, isPreview),
+          ],
+        );
+
+        final bodyChildren = <Widget>[
+          _buildHeading(theme, l10n, isPreview),
+          const SizedBox(height: 16),
+        ];
+
+        if (isWide) {
+          bodyChildren.add(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 280, child: templateShelf),
+                const SizedBox(width: 32),
+                Expanded(child: canvasStack),
+              ],
+            ),
+          );
+        } else {
+          bodyChildren
+            ..add(templateShelf)
+            ..add(const SizedBox(height: 24))
+            ..add(canvasStack);
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: bodyChildren,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildActionButtons(theme, l10n, isPreview),
+          ],
+        );
+      },
     );
   }
 
@@ -123,68 +170,104 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     );
   }
 
-  Widget _buildTemplateSelector(ThemeData theme, AppLocalizations l10n) {
-    final available = widget.availableTemplates.toSet();
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      children: InvoiceTemplate.values.map((template) {
-        final spec = invoiceTemplateSpec(template);
-        final selected = template == _workingInvoice.template;
-        final enabled = available.contains(template);
-        final label = l10n.text(template.labelKey);
-        final blurb = l10n.text(template.blurbKey);
-        return Opacity(
-          opacity: enabled ? 1 : 0.35,
-          child: InkWell(
-            onTap: !enabled
-                ? null
-                : () {
-                    setState(() {
-                      _workingInvoice = _workingInvoice.copyWith(
-                        template: template,
-                        document: InvoiceDocument.defaults(template),
-                      );
-                    });
-                  },
-            borderRadius: BorderRadius.circular(18),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 220,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
-                  width: selected ? 2 : 1,
-                ),
+  Widget _buildTemplateCarousel(ThemeData theme, AppLocalizations l10n) {
+    final cards = InvoiceTemplate.values
+        .map((template) => Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: SizedBox(width: 240, child: _buildTemplateCard(template, theme, l10n)),
+            ))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.text('templateFieldLabel'), style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: cards),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTemplateSidebar(ThemeData theme, AppLocalizations l10n) {
+    final cards = InvoiceTemplate.values
+        .map((template) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _buildTemplateCard(template, theme, l10n),
+            ))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.text('templateFieldLabel'), style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        ...cards,
+      ],
+    );
+  }
+
+  Widget _buildTemplateCard(InvoiceTemplate template, ThemeData theme, AppLocalizations l10n) {
+    final available = widget.availableTemplates;
+    final spec = invoiceTemplateSpec(template);
+    final selected = template == _workingInvoice.template;
+    final enabled = available.contains(template);
+    final label = l10n.text(template.labelKey);
+    final blurb = l10n.text(template.blurbKey);
+
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: enabled ? 1 : 0.35,
+      child: InkWell(
+        onTap: !enabled
+            ? null
+            : () {
+                setState(() {
+                  _workingInvoice = _workingInvoice.copyWith(
+                    template: template,
+                    document: InvoiceDocument.defaults(template),
+                  );
+                });
+              },
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+            color: theme.colorScheme.surface,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 4 / 3,
+                child: _TemplatePreview(spec: spec),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 14),
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (selected)
-                        Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 18),
-                    ],
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    blurb,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  if (selected) Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 18),
                 ],
               ),
-            ),
+              const SizedBox(height: 6),
+              Text(blurb, style: theme.textTheme.bodySmall),
+            ],
           ),
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 
@@ -1108,6 +1191,97 @@ class _LogoPreview extends StatelessWidget {
         child: url.isEmpty
             ? Icon(Icons.add_a_photo_outlined, color: theme.colorScheme.onSurfaceVariant)
             : null,
+      ),
+    );
+  }
+}
+
+class _TemplatePreview extends StatelessWidget {
+  const _TemplatePreview({required this.spec});
+
+  final InvoiceTemplateSpec spec;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget previewLine(double widthFactor, Color color, {double height = 6}) {
+      return FractionallySizedBox(
+        widthFactor: widthFactor,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: spec.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: spec.border.withOpacity(0.8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              gradient: spec.headerGradient,
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  previewLine(0.6, spec.accent.withOpacity(0.7), height: 8),
+                  const SizedBox(height: 6),
+                  previewLine(0.35, spec.accent.withOpacity(0.35)),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List.generate(3, (index) {
+                              return Row(
+                                children: [
+                                  Expanded(
+                                    child: previewLine(
+                                      1,
+                                      spec.muted.withOpacity(0.25 + (index * 0.1)),
+                                      height: 7,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  previewLine(0.2, spec.accent.withOpacity(0.4), height: 7),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: spec.balanceBackground.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
