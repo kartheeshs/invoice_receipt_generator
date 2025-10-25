@@ -11,34 +11,50 @@ class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     final config = AppConfig.fromEnvironment();
 
-    const appId = String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '');
-    const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
-    const messagingSenderId =
-        String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID', defaultValue: '');
-    const authDomain = String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: '');
-    const storageBucket = String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: '');
-    const measurementId =
-        String.fromEnvironment('FIREBASE_MEASUREMENT_ID', defaultValue: '');
-
-    final apiKey = config.firebaseApiKey;
-
-    if (apiKey.isEmpty || appId.isEmpty || projectId.isEmpty || messagingSenderId.isEmpty) {
-      throw StateError(
-        'Missing Firebase configuration. Provide FIREBASE_API_KEY, FIREBASE_APP_ID, '
-        'FIREBASE_PROJECT_ID, and FIREBASE_MESSAGING_SENDER_ID via --dart-define.',
-      );
-    }
+    final apiKey = config.firebaseApiKey.isNotEmpty
+        ? config.firebaseApiKey
+        : _defaultWeb.apiKey;
+    final appId = _envOrDefault('FIREBASE_APP_ID', _defaultWeb.appId);
+    final projectId = _envOrDefault('FIREBASE_PROJECT_ID', _defaultWeb.projectId);
+    final messagingSenderId =
+        _envOrDefault('FIREBASE_MESSAGING_SENDER_ID', _defaultWeb.messagingSenderId);
+    final authDomain =
+        _envOptional('FIREBASE_AUTH_DOMAIN', _defaultWeb.authDomain);
+    final storageBucket =
+        _envOptional('FIREBASE_STORAGE_BUCKET', _defaultWeb.storageBucket);
+    final measurementId =
+        _envOptional('FIREBASE_MEASUREMENT_ID', _defaultWeb.measurementId);
 
     return FirebaseOptions(
       apiKey: apiKey,
       appId: appId,
       messagingSenderId: messagingSenderId,
       projectId: projectId,
-      authDomain: _nullable(authDomain),
-      storageBucket: _nullable(storageBucket),
-      measurementId: _nullable(measurementId),
+      authDomain: authDomain,
+      storageBucket: storageBucket,
+      measurementId: measurementId,
     );
   }
 
-  static String? _nullable(String value) => value.isEmpty ? null : value;
+  static const FirebaseOptions _defaultWeb = FirebaseOptions(
+    apiKey: 'AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ',
+    appId: '1:798489264335:web:b1bc7f6fe8dc5e68de37ba',
+    messagingSenderId: '798489264335',
+    projectId: 'invoice-receipt-generator-g7',
+    authDomain: 'invoice-receipt-generator-g7.firebaseapp.com',
+    storageBucket: 'invoice-receipt-generator-g7.firebasestorage.app',
+  );
+
+  static String _envOrDefault(String key, String fallback) {
+    const value = String.fromEnvironment(key, defaultValue: '');
+    return value.isNotEmpty ? value : fallback;
+  }
+
+  static String? _envOptional(String key, String? fallback) {
+    const value = String.fromEnvironment(key, defaultValue: '');
+    if (value.isNotEmpty) {
+      return value;
+    }
+    return fallback?.isEmpty ?? true ? null : fallback;
+  }
 }

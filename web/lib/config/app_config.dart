@@ -18,7 +18,9 @@ class AppConfig {
             : webKey;
 
     return AppConfig(
-      firebaseApiKey: resolvedFirebaseKey,
+      firebaseApiKey: resolvedFirebaseKey.isNotEmpty
+          ? resolvedFirebaseKey
+          : _defaultFirebaseApiKey,
       crispSubscriptionUrl:
           const String.fromEnvironment('CRISP_SUBSCRIPTION_URL', defaultValue: ''),
     );
@@ -32,4 +34,6 @@ class AppConfig {
 
   bool get hasFirebase => firebaseApiKey.isNotEmpty;
   bool get hasCrispSubscriptionLink => crispSubscriptionUrl.isNotEmpty;
+
+  static const String _defaultFirebaseApiKey = 'AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ';
 }
