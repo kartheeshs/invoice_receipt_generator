@@ -971,7 +971,9 @@ class _GlobalHeaderSection extends StatelessWidget {
     }
 
     Widget buildDateChips(Color labelColor, Color valueColor) {
-      return Row(
+      return Wrap(
+        spacing: 12,
+        runSpacing: 8,
         children: [
           _HeaderInfoChip(
             label: l10n.text('invoiceIssuedLabel'),
@@ -985,7 +987,6 @@ class _GlobalHeaderSection extends StatelessWidget {
                     }
                   },
           ),
-          const SizedBox(width: 12),
           _HeaderInfoChip(
             label: l10n.text('invoiceDueLabel'),
             value: DateFormat.yMMMMd(l10n.locale.toLanguageTag()).format(invoice.dueDate),
