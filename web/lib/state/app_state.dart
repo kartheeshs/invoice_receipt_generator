@@ -12,6 +12,7 @@ import '../models/invoice.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/crisp_service.dart';
+import '../services/firestore_service.dart';
 import '../services/pdf_service.dart';
 
 class AccessDeniedException implements Exception {
@@ -102,10 +103,13 @@ class AppState extends ChangeNotifier {
     FirebaseAuthService? authService,
     PdfService? pdfService,
     CrispService? crispService,
+    FirestoreService? firestoreService,
   })  : _config = config,
         _authService = authService ?? FirebaseAuthService(apiKey: config.firebaseApiKey),
         _pdfService = pdfService ?? PdfService(),
         _crispService = crispService ?? CrispService(config.crispSubscriptionUrl),
+        _firestoreService = firestoreService ??
+            FirestoreService(projectId: config.firebaseProjectId, apiKey: config.firebaseApiKey),
         _adminEmails = config.adminEmails.map((email) => email.toLowerCase()).toList() {
     _guestProfile = UserProfile(
       displayName: 'Guest',
@@ -129,6 +133,7 @@ class AppState extends ChangeNotifier {
   final FirebaseAuthService _authService;
   final PdfService _pdfService;
   final CrispService _crispService;
+  final FirestoreService _firestoreService;
   final List<Invoice> _invoices = [];
   final List<ManagedAccount> _accounts = [];
   final List<String> _activityLog = [];
@@ -168,10 +173,7 @@ class AppState extends ChangeNotifier {
       return false;
     }
     final account = _accountForEmail(email);
-    if (account != null) {
-      return account.hasAdminRole;
-    }
-    return _adminEmails.contains(email.toLowerCase());
+    return account?.hasAdminRole ?? false;
   }
 
   String? get errorMessage => _errorMessage;
@@ -222,9 +224,10 @@ class AppState extends ChangeNotifier {
   Future<void> signIn({required String email, required String password}) async {
     await _runAsync(() async {
       final user = await _authService.signIn(email: email, password: password);
+      final role = await _loadRoleForUser(user);
       _user = await _authService.refreshUser(user);
       if (_user != null) {
-        _ensureAccountFor(_user!);
+        _ensureAccountFor(_user!, role: role);
         final account = _accountForEmail(_user!.email);
         _isPremium = account?.isPremium ?? _isPremium;
         if (account?.displayName.isNotEmpty == true) {
@@ -245,7 +248,7 @@ class AppState extends ChangeNotifier {
       final user = await _authService.signUp(displayName: displayName, email: email, password: password);
       _user = user;
       if (_user != null) {
-        _ensureAccountFor(_user!);
+        _ensureAccountFor(_user!, role: 'user');
         _assignDisplayName(_user!.email, displayName);
         final account = _accountForEmail(_user!.email);
         if (account != null) {
@@ -285,13 +288,14 @@ class AppState extends ChangeNotifier {
   Future<void> adminSignIn({required String email, required String password}) async {
     await _runAdminAsync(() async {
       final user = await _authService.signIn(email: email, password: password);
-      final normalizedEmail = user.email.toLowerCase();
-      if (!_hasAdminRole(normalizedEmail)) {
+      final role = await _loadRoleForUser(user);
+      if ((role ?? '').toLowerCase() != 'admin') {
         throw const AccessDeniedException('adminAccessDenied');
       }
-      _adminUser = user;
-      _ensureAccountFor(user);
-      _log('Admin ${user.email} signed in');
+      final refreshed = await _authService.refreshUser(user);
+      _adminUser = refreshed;
+      _ensureAccountFor(refreshed, role: role);
+      _log('Admin ${refreshed.email} signed in');
       _persistState();
     });
   }
@@ -723,22 +727,37 @@ class AppState extends ChangeNotifier {
     ]);
   }
 
-  void _ensureAccountFor(AuthUser user) {
+  void _ensureAccountFor(AuthUser user, {String? role}) {
     final email = user.email.toLowerCase();
     final index = _accounts.indexWhere((account) => account.email.toLowerCase() == email);
-    final hasAdminRole = _hasAdminRole(email);
+    final normalizedRole = role != null && role.isNotEmpty ? role.toLowerCase() : null;
     if (index == -1) {
+      final fallbackRole = normalizedRole ?? (_adminEmails.contains(email) ? 'admin' : 'user');
       _accounts.add(ManagedAccount(
         id: user.uid.isNotEmpty ? user.uid : _uuid.v4(),
         displayName: user.displayName ?? user.email.split('@').first,
         email: user.email,
         isPremium: false,
-        role: hasAdminRole ? 'admin' : 'user',
+        role: fallbackRole,
         plan: 'Free',
         subscriptionSince: null,
       ));
-    } else if (hasAdminRole && !_accounts[index].hasAdminRole) {
-      _accounts[index] = _accounts[index].copyWith(role: 'admin');
+      return;
+    }
+
+    var updated = _accounts[index];
+    if (user.uid.isNotEmpty && updated.id != user.uid) {
+      updated = updated.copyWith(id: user.uid);
+    }
+    if (normalizedRole != null && updated.role != normalizedRole) {
+      updated = updated.copyWith(role: normalizedRole);
+    }
+    final displayName = user.displayName;
+    if (displayName != null && displayName.isNotEmpty && updated.displayName != displayName) {
+      updated = updated.copyWith(displayName: displayName);
+    }
+    if (updated != _accounts[index]) {
+      _accounts[index] = updated;
     }
   }
 
@@ -753,15 +772,6 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  bool _hasAdminRole(String email) {
-    final lower = email.toLowerCase();
-    if (_adminEmails.contains(lower)) {
-      return true;
-    }
-    final account = _accountForEmail(email);
-    return account?.hasAdminRole ?? false;
-  }
-
   void _assignDisplayName(String email, String displayName) {
     final index = _accounts.indexWhere((account) => account.email.toLowerCase() == email.toLowerCase());
     if (index == -1) return;
@@ -772,6 +782,17 @@ class AppState extends ChangeNotifier {
     final index = _accounts.indexWhere((element) => element.id == account.id);
     if (index == -1) return;
     _accounts[index] = account;
+  }
+
+  Future<String?> _loadRoleForUser(AuthUser user) async {
+    if (!_firestoreService.canQuery) {
+      return null;
+    }
+    try {
+      return await _firestoreService.fetchUserRole(uid: user.uid, idToken: user.idToken);
+    } catch (_) {
+      return null;
+    }
   }
 
   String _summarizeInvoiceChanges(Invoice previous, Invoice next) {

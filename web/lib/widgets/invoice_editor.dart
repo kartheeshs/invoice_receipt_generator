@@ -6,7 +6,7 @@ import '../models/invoice.dart';
 import '../models/invoice_template_spec.dart';
 import '../models/user_profile.dart';
 
-enum InvoiceEditorMode { edit, preview }
+enum InvoiceEditorMode { edit, preview, history }
 
 class InvoiceEditor extends StatefulWidget {
   const InvoiceEditor({
@@ -21,6 +21,7 @@ class InvoiceEditor extends StatefulWidget {
     required this.onDownload,
     required this.onClose,
     required this.onRequestSignIn,
+    required this.hasHistoryAccess,
   });
 
   final Invoice invoice;
@@ -28,6 +29,7 @@ class InvoiceEditor extends StatefulWidget {
   final List<InvoiceTemplate> availableTemplates;
   final bool isNewDraft;
   final bool isGuest;
+  final bool hasHistoryAccess;
   final Future<void> Function(Invoice invoice) onSave;
   final Future<void> Function(Invoice invoice)? onDelete;
   final Future<void> Function(Invoice invoice) onDownload;
@@ -72,6 +74,8 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     final theme = Theme.of(context);
     final palette = invoiceTemplateSpec(_workingInvoice.template);
     final isPreview = _mode == InvoiceEditorMode.preview;
+    final isHistory = _mode == InvoiceEditorMode.history;
+    final showEditor = !isHistory;
     final currencyFormat = NumberFormat.currency(
       name: _workingInvoice.currencyCode,
       symbol: _workingInvoice.currencySymbol,
@@ -80,26 +84,39 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 1080;
-
-        final templateShelf = isWide
-            ? _buildTemplateSidebar(theme, l10n)
-            : _buildTemplateCarousel(theme, l10n);
+        Widget? templateShelf;
+        if (showEditor) {
+          templateShelf = isWide
+              ? _buildTemplateSidebar(theme, l10n)
+              : _buildTemplateCarousel(theme, l10n);
+        }
 
         final canvasStack = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildToolbar(theme, l10n, isPreview),
+            _buildToolbar(theme, l10n),
             const SizedBox(height: 20),
-            _buildInvoiceCanvas(context, palette, currencyFormat, isPreview),
+            if (isHistory)
+              _buildHistoryTimeline(theme, l10n)
+            else ...[
+              _buildInvoiceCanvas(context, palette, currencyFormat, isPreview),
+              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _buildActionButtons(l10n),
+              ),
+            ],
           ],
         );
 
-        final content = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeading(theme, l10n, isPreview),
-            const SizedBox(height: 20),
-            if (isWide)
+        final contentChildren = <Widget>[
+          _buildHeading(theme, l10n, _mode),
+          const SizedBox(height: 20),
+        ];
+
+        if (isWide) {
+          if (showEditor && templateShelf != null) {
+            contentChildren.add(
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -107,14 +124,28 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                   const SizedBox(width: 32),
                   Expanded(child: canvasStack),
                 ],
-              )
-            else ...[
+              ),
+            );
+          } else {
+            contentChildren.add(canvasStack);
+          }
+        } else {
+          if (showEditor && templateShelf != null) {
+            contentChildren.addAll([
               templateShelf,
               const SizedBox(height: 24),
               canvasStack,
-            ],
-            const SizedBox(height: 48),
-          ],
+            ]);
+          } else {
+            contentChildren.add(canvasStack);
+          }
+        }
+
+        contentChildren.add(const SizedBox(height: 48));
+
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: contentChildren,
         );
 
         return Scrollbar(
@@ -127,7 +158,24 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     );
   }
 
-  Widget _buildHeading(ThemeData theme, AppLocalizations l10n, bool isPreview) {
+  Widget _buildHeading(
+    ThemeData theme,
+    AppLocalizations l10n,
+    InvoiceEditorMode mode,
+  ) {
+    String subtitle;
+    switch (mode) {
+      case InvoiceEditorMode.edit:
+        subtitle = l10n.text('invoiceEditorSubtitle');
+        break;
+      case InvoiceEditorMode.preview:
+        subtitle = l10n.text('invoicePreviewHint');
+        break;
+      case InvoiceEditorMode.history:
+        subtitle = l10n.text('invoiceHistoryTitle');
+        break;
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -137,10 +185,8 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
             children: [
               Text(l10n.text('invoiceFormTitle'), style: theme.textTheme.headlineSmall),
               const SizedBox(height: 4),
-              Text(
-                isPreview ? l10n.text('invoicePreviewHint') : l10n.text('invoiceEditorSubtitle'),
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.textTheme.bodySmall?.color),
-              ),
+              Text(subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.textTheme.bodySmall?.color)),
             ],
           ),
         ),
@@ -258,7 +304,9 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     );
   }
 
-  Widget _buildToolbar(ThemeData theme, AppLocalizations l10n, bool isPreview) {
+  Widget _buildToolbar(ThemeData theme, AppLocalizations l10n) {
+    final isPreview = _mode == InvoiceEditorMode.preview;
+    final isHistory = _mode == InvoiceEditorMode.history;
     final modePicker = SegmentedButton<InvoiceEditorMode>(
       segments: [
         ButtonSegment(
@@ -271,6 +319,11 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
           icon: const Icon(Icons.visibility_outlined),
           label: Text(l10n.text('invoiceModePreview')),
         ),
+        ButtonSegment(
+          value: InvoiceEditorMode.history,
+          icon: const Icon(Icons.history),
+          label: Text(l10n.text('invoiceHistoryTitle')),
+        ),
       ],
       selected: {_mode},
       onSelectionChanged: (value) {
@@ -280,7 +333,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       },
     );
 
-    final addSectionButton = !isPreview
+    final addSectionButton = (!isPreview && !isHistory)
         ? PopupMenuButton<InvoiceSectionType>(
             tooltip: l10n.text('invoiceAddSection'),
             onSelected: (type) => _addSection(type),
@@ -322,30 +375,17 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
           ],
         ];
 
-        final actionButtons = _buildActionButtons(l10n);
-
         if (isNarrow) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: toolbarControls,
-              ),
-              const SizedBox(height: 16),
-              actionButtons,
-            ],
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: toolbarControls,
           );
         }
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ...toolbarControls,
-            const Spacer(),
-            Flexible(child: actionButtons),
-          ],
+          children: toolbarControls,
         );
       },
     );
@@ -363,6 +403,63 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       currencyFormat,
       isPreview,
       showBilingualTitle: _workingInvoice.template.isJapanese,
+    );
+  }
+
+  Widget _buildHistoryTimeline(ThemeData theme, AppLocalizations l10n) {
+    final revisions = widget.invoice.revisions;
+    final subtitle = l10n
+        .text('invoiceHistorySubtitle')
+        .replaceAll('{count}', revisions.length.toString());
+    final dateFormat = DateFormat.yMMMd(l10n.locale.toLanguageTag());
+    final timeFormat = DateFormat.Hm(l10n.locale.toLanguageTag());
+
+    Widget body;
+    if (!widget.hasHistoryAccess) {
+      body = _HistoryTimelineMessage(text: l10n.text('invoiceHistoryPremiumHint'));
+    } else if (revisions.isEmpty) {
+      body = _HistoryTimelineMessage(text: l10n.text('invoiceHistoryEmpty'));
+    } else {
+      body = ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: revisions.length,
+        separatorBuilder: (_, __) => const Divider(height: 20),
+        itemBuilder: (context, index) {
+          final revision = revisions[index];
+          return _HistoryTimelineEntry(
+            revision: revision,
+            dateFormat: dateFormat,
+            timeFormat: timeFormat,
+          );
+        },
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.text('invoiceHistoryTitle'), style: theme.textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text(subtitle, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 20),
+          body,
+        ],
+      ),
     );
   }
 
@@ -677,6 +774,78 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       default:
         return invoice;
     }
+  }
+}
+
+class _HistoryTimelineEntry extends StatelessWidget {
+  const _HistoryTimelineEntry({
+    required this.revision,
+    required this.dateFormat,
+    required this.timeFormat,
+  });
+
+  final InvoiceRevision revision;
+  final DateFormat dateFormat;
+  final DateFormat timeFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final timestamp = '${dateFormat.format(revision.timestamp)} · ${timeFormat.format(revision.timestamp)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.history, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                revision.summary,
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$timestamp • ${revision.editor}',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+        ),
+      ],
+    );
+  }
+}
+
+class _HistoryTimelineMessage extends StatelessWidget {
+  const _HistoryTimelineMessage({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

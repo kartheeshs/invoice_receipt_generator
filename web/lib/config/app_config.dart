@@ -6,6 +6,7 @@ class AppConfig {
     this.currencyCode = 'JPY',
     this.currencySymbol = '¥',
     this.adminEmails = const [],
+    this.firebaseProjectId = '',
   });
 
   factory AppConfig.fromEnvironment() {
@@ -25,6 +26,9 @@ class AppConfig {
         .where((value) => value.isNotEmpty)
         .toList();
 
+    const projectIdEnv = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
+    final projectId = projectIdEnv.isNotEmpty ? projectIdEnv : _defaultFirebaseProjectId;
+
     return AppConfig(
       firebaseApiKey: resolvedFirebaseKey.isNotEmpty
           ? resolvedFirebaseKey
@@ -34,6 +38,7 @@ class AppConfig {
       adminEmails: environmentAdmins.isNotEmpty
           ? environmentAdmins
           : const ['admin@example.com', 'haruto@example.com'],
+      firebaseProjectId: projectId,
     );
   }
 
@@ -43,9 +48,11 @@ class AppConfig {
   final String currencyCode;
   final String currencySymbol;
   final List<String> adminEmails;
+  final String firebaseProjectId;
 
   bool get hasFirebase => firebaseApiKey.isNotEmpty;
   bool get hasCrispSubscriptionLink => crispSubscriptionUrl.isNotEmpty;
 
   static const String _defaultFirebaseApiKey = 'AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ';
+  static const String _defaultFirebaseProjectId = 'invoice-receipt-generator-g7';
 }
