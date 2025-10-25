@@ -31,6 +31,7 @@ class DashboardPage extends StatelessWidget {
           'price': currency.format(appState.planPrice),
         });
         final isGuest = appState.isGuest;
+        final isLocaleChanging = appState.isLocaleChanging;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -168,9 +169,13 @@ class DashboardPage extends StatelessWidget {
                       icon: Icons.language,
                       title: l10n.text('languageSectionLabel'),
                       subtitle: l10n.text('languageLabel'),
-                      onPressed: () => context.read<AppState>().setLocale(
-                            appState.locale.languageCode == 'en' ? const Locale('ja') : const Locale('en'),
-                          ),
+                      onPressed: isLocaleChanging
+                          ? null
+                          : () {
+                              final target =
+                                  appState.locale.languageCode == 'en' ? const Locale('ja') : const Locale('en');
+                              context.read<AppState>().setLocale(target);
+                            },
                     ),
                   ),
                 ],
@@ -251,27 +256,42 @@ class _QuickActionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDisabled = onPressed == null;
+
     return InkWell(
       onTap: onPressed,
       borderRadius: BorderRadius.circular(20),
       child: Ink(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceVariant,
+          color: isDisabled
+              ? theme.colorScheme.surfaceVariant.withOpacity(0.6)
+              : theme.colorScheme.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 32),
+            Icon(icon, size: 32, color: isDisabled ? theme.disabledColor : null),
             const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: isDisabled ? theme.disabledColor : null,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(subtitle),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isDisabled ? theme.disabledColor.withOpacity(0.8) : null,
+              ),
+            ),
           ],
         ),
       ),

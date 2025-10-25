@@ -183,74 +183,89 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
             final palette = invoiceTemplateSpec(template);
             final available = widget.availableTemplates.contains(template);
             final selected = _template == template;
-            return Opacity(
+            return AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
               opacity: available ? 1 : 0.4,
-              child: GestureDetector(
-                onTap: available
-                    ? () {
-                        setState(() {
-                          _template = template;
-                          _workingInvoice =
-                              _workingInvoice.copyWith(template: template);
-                        });
-                      }
-                    : null,
-                child: Container(
-                  width: 220,
-                  constraints: const BoxConstraints(minHeight: 140),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: palette.surface,
+              child: IgnorePointer(
+                ignoring: !available,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: selected ? palette.accent : palette.border,
-                      width: selected ? 2 : 1,
-                    ),
-                    boxShadow: selected
-                        ? [
-                            BoxShadow(
-                              color: palette.accent.withOpacity(0.25),
-                              blurRadius: 20,
-                              offset: const Offset(0, 12),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    hoverColor: palette.accent.withOpacity(0.08),
+                    splashColor: palette.accent.withOpacity(0.1),
+                    onTap: () {
+                      setState(() {
+                        _template = template;
+                        _workingInvoice =
+                            _workingInvoice.copyWith(template: template);
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      width: 220,
+                      constraints: const BoxConstraints(minHeight: 140),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: palette.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: selected ? palette.accent : palette.border,
+                          width: selected ? 2 : 1,
+                        ),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: palette.accent.withOpacity(0.25),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 12),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              l10n.text(palette.labelKey),
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.text(palette.labelKey),
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
+                              AnimatedScale(
+                                duration: const Duration(milliseconds: 200),
+                                scale: selected ? 1 : 0.0,
+                                alignment: Alignment.topRight,
+                                child: Icon(Icons.check_circle,
+                                    color: palette.accent, size: 20),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            l10n.text(palette.blurbKey),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: palette.muted,
                             ),
                           ),
-                          if (selected)
-                            Icon(Icons.check_circle,
-                                color: palette.accent, size: 20),
+                          const Spacer(),
+                          Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              gradient: palette.headerGradient,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        l10n.text(palette.blurbKey),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: palette.muted,
-                        ),
-                      ),
-                      const Spacer(),
-                      Container(
-                        height: 6,
-                        decoration: BoxDecoration(
-                          gradient: palette.headerGradient,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'dart:collection';
 
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/app_config.dart';
@@ -58,11 +59,13 @@ class AppState extends ChangeNotifier {
   late UserProfile _profile;
   Invoice? _selectedInvoice;
   Locale _locale = const Locale('en');
+  bool _isLocaleChanging = false;
   bool _isLoading = false;
   bool _isPremium = false;
   String? _errorMessage;
 
   Locale get locale => _locale;
+  bool get isLocaleChanging => _isLocaleChanging;
   AuthUser? get user => _user;
   UserProfile get profile => _profile;
   bool get isLoading => _isLoading;
@@ -94,10 +97,17 @@ class AppState extends ChangeNotifier {
     return sorted.take(5).toList();
   }
 
-  void setLocale(Locale locale) {
-    if (_locale == locale) return;
-    _locale = locale;
+  Future<void> setLocale(Locale locale) async {
+    if (_locale == locale || _isLocaleChanging) return;
+    _isLocaleChanging = true;
     notifyListeners();
+    try {
+      await initializeDateFormatting(locale.toLanguageTag());
+      _locale = locale;
+    } finally {
+      _isLocaleChanging = false;
+      notifyListeners();
+    }
   }
 
   Future<void> signIn({required String email, required String password}) async {

@@ -17,7 +17,7 @@ class SettingsPage extends StatelessWidget {
   });
 
   final VoidCallback onEditProfile;
-  final ValueChanged<Locale> onLanguageChanged;
+  final Future<void> Function(Locale locale) onLanguageChanged;
   final Future<void> Function() onSignOut;
   final Future<void> Function() onManageSubscription;
   final VoidCallback onCancelSubscription;
@@ -32,6 +32,7 @@ class SettingsPage extends StatelessWidget {
         final profile = appState.profile;
         final locale = appState.locale;
         final isGuest = appState.isGuest;
+        final isLocaleChanging = appState.isLocaleChanging;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -94,14 +95,27 @@ class SettingsPage extends StatelessWidget {
                       const SizedBox(height: 12),
                       DropdownButton<Locale>(
                         value: locale,
-                        onChanged: (value) {
-                          if (value != null) onLanguageChanged(value);
-                        },
+                        onChanged: isLocaleChanging
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  onLanguageChanged(value);
+                                }
+                              },
                         items: const [
                           DropdownMenuItem(value: Locale('en'), child: Text('English')),
                           DropdownMenuItem(value: Locale('ja'), child: Text('日本語')),
                         ],
                       ),
+                      if (isLocaleChanging) ...[
+                        const SizedBox(height: 12),
+                        LinearProgressIndicator(
+                          minHeight: 2,
+                          valueColor: AlwaysStoppedAnimation(
+                            Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

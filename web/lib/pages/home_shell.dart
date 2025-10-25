@@ -27,6 +27,7 @@ class _HomeShellState extends State<HomeShell> {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final isGuest = appState.isGuest;
+    final isLocaleChanging = appState.isLocaleChanging;
 
     final pages = [
       DashboardPage(
@@ -40,7 +41,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       SettingsPage(
         onEditProfile: _editProfile,
-        onLanguageChanged: context.read<AppState>().setLocale,
+        onLanguageChanged: (locale) => context.read<AppState>().setLocale(locale),
         onSignOut: context.read<AppState>().signOut,
         onManageSubscription: _handleManageSubscription,
         onCancelSubscription: () => context.read<AppState>().markPremium(false),
@@ -90,35 +91,40 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: Row(
+      body: Stack(
         children: [
-          if (isWide)
-            NavigationRail(
-              extended: true,
-              selectedIndex: _index,
-              onDestinationSelected: (value) => setState(() => _index = value),
-              destinations: navigationDestinations
-                  .map(
-                    (destination) => NavigationRailDestination(
-                      icon: destination.icon,
-                      selectedIcon: destination.selectedIcon,
-                      label: Text(destination.label),
-                    ),
-                  )
-                  .toList(),
-            ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              switchInCurve: Curves.easeInOut,
-              switchOutCurve: Curves.easeInOut,
-              child: IndexedStack(
-                key: ValueKey(_index),
-                index: _index,
-                children: pages,
+          Row(
+            children: [
+              if (isWide)
+                NavigationRail(
+                  extended: true,
+                  selectedIndex: _index,
+                  onDestinationSelected: (value) => setState(() => _index = value),
+                  destinations: navigationDestinations
+                      .map(
+                        (destination) => NavigationRailDestination(
+                          icon: destination.icon,
+                          selectedIcon: destination.selectedIcon,
+                          label: Text(destination.label),
+                        ),
+                      )
+                      .toList(),
+                ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  child: IndexedStack(
+                    key: ValueKey(_index),
+                    index: _index,
+                    children: pages,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          if (isLocaleChanging) const _LocaleChangeOverlay(),
         ],
       ),
       bottomNavigationBar: isWide
@@ -234,5 +240,45 @@ class _HomeShellState extends State<HomeShell> {
       return parts.first.substring(0, 1).toUpperCase();
     }
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+}
+
+class _LocaleChangeOverlay extends StatelessWidget {
+  const _LocaleChangeOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Positioned.fill(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: DecoratedBox(
+          key: const ValueKey('locale-loading'),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface.withOpacity(0.75),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  context.l10n.text('loadingMessage'),
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
