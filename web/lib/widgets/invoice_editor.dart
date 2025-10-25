@@ -369,9 +369,8 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
 
   Widget _buildActionButtons(ThemeData theme, AppLocalizations l10n, bool isPreview) {
     final canDelete = widget.onDelete != null && !widget.isNewDraft;
-    return Row(
-      children: [
-        FilledButton.icon(
+
+    FilledButton iconSaveButton() => FilledButton.icon(
           onPressed: _saving
               ? null
               : () async {
@@ -386,9 +385,9 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                 },
           icon: const Icon(Icons.save_outlined),
           label: Text(_saving ? l10n.text('savingLabel') : l10n.text('saveButton')),
-        ),
-        const SizedBox(width: 12),
-        FilledButton.icon(
+        );
+
+    FilledButton iconDownloadButton() => FilledButton.icon(
           onPressed: widget.isGuest
               ? () async {
                   await widget.onRequestSignIn();
@@ -398,42 +397,81 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                 },
           icon: const Icon(Icons.picture_as_pdf_outlined),
           label: Text(widget.isGuest ? l10n.text('downloadRequiresAccount') : l10n.text('downloadPdf')),
-        ),
-        const SizedBox(width: 12),
-        if (canDelete)
-          OutlinedButton.icon(
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text(l10n.text('deleteInvoiceTitle')),
-                      content: Text(l10n.text('deleteInvoiceBody')),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text(l10n.text('notNow')),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text(l10n.text('deleteButton')),
-                        ),
-                      ],
-                    ),
-                  ) ??
-                  false;
-              if (confirmed && widget.onDelete != null) {
-                await widget.onDelete!(_workingInvoice);
-              }
-            },
-            icon: const Icon(Icons.delete_outline),
-            label: Text(l10n.text('deleteButton')),
-          ),
-        const Spacer(),
-        TextButton(
-          onPressed: widget.onClose,
-          child: Text(l10n.text('closeButton')),
-        ),
-      ],
+        );
+
+    OutlinedButton deleteButton() => OutlinedButton.icon(
+          onPressed: () async {
+            final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l10n.text('deleteInvoiceTitle')),
+                    content: Text(l10n.text('deleteInvoiceBody')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text(l10n.text('notNow')),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text(l10n.text('deleteButton')),
+                      ),
+                    ],
+                  ),
+                ) ??
+                false;
+            if (confirmed && widget.onDelete != null) {
+              await widget.onDelete!(_workingInvoice);
+            }
+          },
+          icon: const Icon(Icons.delete_outline),
+          label: Text(l10n.text('deleteButton')),
+        );
+
+    final closeButton = TextButton(
+      onPressed: widget.onClose,
+      child: Text(l10n.text('closeButton')),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 560;
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  iconSaveButton(),
+                  iconDownloadButton(),
+                  if (canDelete) deleteButton(),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: closeButton,
+              ),
+            ],
+          );
+        }
+
+        final children = <Widget>[
+          iconSaveButton(),
+          const SizedBox(width: 12),
+          iconDownloadButton(),
+          if (canDelete) ...[
+            const SizedBox(width: 12),
+            deleteButton(),
+          ],
+          const Spacer(),
+          closeButton,
+        ];
+
+        return Row(children: children);
+      },
     );
   }
 
