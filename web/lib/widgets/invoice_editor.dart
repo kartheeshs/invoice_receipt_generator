@@ -263,9 +263,9 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     BuildContext context,
     InvoiceTemplateSpec palette,
     NumberFormat currencyFormat,
-    bool isPreview,
-    {bool showBilingualTitle = false},
-  ) {
+    bool isPreview, {
+    bool showBilingualTitle = false,
+  }) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final sections = _workingInvoice.document.sections;
