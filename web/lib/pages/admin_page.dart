@@ -45,7 +45,8 @@ class AdminPage extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth == double.infinity ? 1100 : constraints.maxWidth;
+        final double maxWidth =
+            constraints.maxWidth == double.infinity ? 1100.0 : constraints.maxWidth;
         final metricColumns = maxWidth >= 1100
             ? 3
             : maxWidth >= 720
