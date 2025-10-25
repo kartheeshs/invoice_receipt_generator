@@ -29,7 +29,7 @@ class ManagedAccount {
     required this.displayName,
     required this.email,
     this.isPremium = false,
-    this.isAdmin = false,
+    this.role = 'user',
     this.plan = 'Free',
     this.subscriptionSince,
   });
@@ -38,17 +38,23 @@ class ManagedAccount {
   final String displayName;
   final String email;
   final bool isPremium;
-  final bool isAdmin;
+  final String role;
   final String plan;
   final DateTime? subscriptionSince;
 
+  bool get hasAdminRole => role.toLowerCase() == 'admin';
+
   factory ManagedAccount.fromJson(Map<String, dynamic> json) {
+    final rawRole = json['role'];
+    final fallbackRole = (json['isAdmin'] as bool? ?? false) ? 'admin' : 'user';
+    final resolvedRole = rawRole is String && rawRole.isNotEmpty ? rawRole : fallbackRole;
+    final normalizedRole = resolvedRole.toLowerCase();
     return ManagedAccount(
       id: json['id'] as String? ?? '',
       displayName: json['displayName'] as String? ?? '',
       email: json['email'] as String? ?? '',
       isPremium: json['isPremium'] as bool? ?? false,
-      isAdmin: json['isAdmin'] as bool? ?? false,
+      role: normalizedRole == 'member' ? 'user' : normalizedRole,
       plan: json['plan'] as String? ?? 'Free',
       subscriptionSince: json['subscriptionSince'] is String && (json['subscriptionSince'] as String).isNotEmpty
           ? DateTime.tryParse(json['subscriptionSince'] as String)
@@ -61,7 +67,7 @@ class ManagedAccount {
     String? displayName,
     String? email,
     bool? isPremium,
-    bool? isAdmin,
+    String? role,
     String? plan,
     DateTime? subscriptionSince,
     bool clearSubscriptionSince = false,
@@ -71,7 +77,7 @@ class ManagedAccount {
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       isPremium: isPremium ?? this.isPremium,
-      isAdmin: isAdmin ?? this.isAdmin,
+      role: role ?? this.role,
       plan: plan ?? this.plan,
       subscriptionSince: clearSubscriptionSince ? null : (subscriptionSince ?? this.subscriptionSince),
     );
@@ -83,7 +89,7 @@ class ManagedAccount {
       'displayName': displayName,
       'email': email,
       'isPremium': isPremium,
-      'isAdmin': isAdmin,
+      'role': role,
       'plan': plan,
       if (subscriptionSince != null) 'subscriptionSince': subscriptionSince!.toIso8601String(),
     };
@@ -157,9 +163,15 @@ class AppState extends ChangeNotifier {
     if (_adminUser != null) {
       return true;
     }
-    final email = _user?.email.toLowerCase();
-    if (email == null) return false;
-    return _isAdminEmail(email);
+    final email = _user?.email;
+    if (email == null || email.isEmpty) {
+      return false;
+    }
+    final account = _accountForEmail(email);
+    if (account != null) {
+      return account.hasAdminRole;
+    }
+    return _adminEmails.contains(email.toLowerCase());
   }
 
   String? get errorMessage => _errorMessage;
@@ -274,7 +286,7 @@ class AppState extends ChangeNotifier {
     await _runAdminAsync(() async {
       final user = await _authService.signIn(email: email, password: password);
       final normalizedEmail = user.email.toLowerCase();
-      if (!_isAdminEmail(normalizedEmail)) {
+      if (!_hasAdminRole(normalizedEmail)) {
         throw const AccessDeniedException('adminAccessDenied');
       }
       _adminUser = user;
@@ -419,7 +431,7 @@ class AppState extends ChangeNotifier {
   void toggleAccountAdmin(String accountId, bool value) {
     final index = _accounts.indexWhere((account) => account.id == accountId);
     if (index == -1) return;
-    final account = _accounts[index].copyWith(isAdmin: value);
+    final account = _accounts[index].copyWith(role: value ? 'admin' : 'user');
     _accounts[index] = account;
     _log('${account.displayName} admin rights ${value ? 'granted' : 'revoked'}');
     notifyListeners();
@@ -472,8 +484,8 @@ class AppState extends ChangeNotifier {
 
       for (var i = 0; i < _accounts.length; i++) {
         final email = _accounts[i].email.toLowerCase();
-        if (_adminEmails.contains(email) && !_accounts[i].isAdmin) {
-          _accounts[i] = _accounts[i].copyWith(isAdmin: true);
+        if (_adminEmails.contains(email) && !_accounts[i].hasAdminRole) {
+          _accounts[i] = _accounts[i].copyWith(role: 'admin');
         }
       }
 
@@ -686,7 +698,7 @@ class AppState extends ChangeNotifier {
         displayName: 'Haruto Sato',
         email: 'haruto@example.com',
         isPremium: true,
-        isAdmin: _adminEmails.contains('haruto@example.com'),
+        role: _adminEmails.contains('haruto@example.com') ? 'admin' : 'user',
         plan: 'Pro',
         subscriptionSince: DateTime.now().subtract(const Duration(days: 280)),
       ),
@@ -695,7 +707,7 @@ class AppState extends ChangeNotifier {
         displayName: 'Aiko Tanaka',
         email: 'aiko@example.com',
         isPremium: false,
-        isAdmin: _adminEmails.contains('aiko@example.com'),
+        role: _adminEmails.contains('aiko@example.com') ? 'admin' : 'user',
         plan: 'Free',
         subscriptionSince: null,
       ),
@@ -704,7 +716,7 @@ class AppState extends ChangeNotifier {
         displayName: 'Liam Chen',
         email: 'liam@example.com',
         isPremium: true,
-        isAdmin: _adminEmails.contains('liam@example.com'),
+        role: _adminEmails.contains('liam@example.com') ? 'admin' : 'user',
         plan: 'Pro',
         subscriptionSince: DateTime.now().subtract(const Duration(days: 120)),
       ),
@@ -714,19 +726,19 @@ class AppState extends ChangeNotifier {
   void _ensureAccountFor(AuthUser user) {
     final email = user.email.toLowerCase();
     final index = _accounts.indexWhere((account) => account.email.toLowerCase() == email);
-    final isAdminEmail = _isAdminEmail(email);
+    final hasAdminRole = _hasAdminRole(email);
     if (index == -1) {
       _accounts.add(ManagedAccount(
         id: user.uid.isNotEmpty ? user.uid : _uuid.v4(),
         displayName: user.displayName ?? user.email.split('@').first,
         email: user.email,
         isPremium: false,
-        isAdmin: isAdminEmail,
+        role: hasAdminRole ? 'admin' : 'user',
         plan: 'Free',
         subscriptionSince: null,
       ));
-    } else if (isAdminEmail && !_accounts[index].isAdmin) {
-      _accounts[index] = _accounts[index].copyWith(isAdmin: true);
+    } else if (hasAdminRole && !_accounts[index].hasAdminRole) {
+      _accounts[index] = _accounts[index].copyWith(role: 'admin');
     }
   }
 
@@ -741,13 +753,13 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  bool _isAdminEmail(String email) {
+  bool _hasAdminRole(String email) {
     final lower = email.toLowerCase();
     if (_adminEmails.contains(lower)) {
       return true;
     }
     final account = _accountForEmail(email);
-    return account?.isAdmin ?? false;
+    return account?.hasAdminRole ?? false;
   }
 
   void _assignDisplayName(String email, String displayName) {

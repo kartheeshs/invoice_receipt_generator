@@ -796,7 +796,7 @@ class _AdminAccountTile extends StatelessWidget {
                             '${l10n.text('adminSubscriptionSinceShort')} ${DateFormat.yMMMd(localeTag).format(account.subscriptionSince!)}',
                           ),
                         ),
-                      if (account.isAdmin)
+                      if (account.hasAdminRole)
                         Chip(
                           avatar: const Icon(Icons.shield, size: 18),
                           label: Text(l10n.text('adminAdminLabel')),
@@ -844,7 +844,7 @@ class _AdminAccountTile extends StatelessWidget {
             _AdminToggle(label: l10n.text('adminPremiumLabel'), value: account.isPremium, onChanged: onTogglePremium),
             _AdminToggle(
               label: l10n.text('adminAdminLabel'),
-              value: account.isAdmin,
+              value: account.hasAdminRole,
               onChanged: isSelf ? null : onToggleAdmin,
             ),
           ],
