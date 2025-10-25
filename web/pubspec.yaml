@@ -1,4 +1,4 @@
-name: web
+name: invoice_receipt_generator_web
 description: "Responsive invoice and receipt generator for freelancers."
 publish_to: 'none'
 
