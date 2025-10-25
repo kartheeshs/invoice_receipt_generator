@@ -50,6 +50,7 @@ class _LandingPageState extends State<LandingPage> {
                 _buildJapaneseHighlight(context),
                 Container(key: _pricingKey, child: _buildWorkflowSection(context)),
                 _buildSecuritySection(context),
+                _buildPrivacySection(context),
                 Container(key: _supportKey, child: _buildCtaSection(context, appState)),
                 _buildFooter(context),
               ],
@@ -68,32 +69,56 @@ class _LandingPageState extends State<LandingPage> {
 
     final gradientColors = [
       theme.colorScheme.primary,
+      theme.colorScheme.secondary,
       theme.colorScheme.tertiary,
     ];
 
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: gradientColors,
+          colors: [
+            gradientColors[0],
+            gradientColors[1].withOpacity(0.92),
+            gradientColors[2].withOpacity(0.85),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: math.max(24.0, MediaQuery.of(context).size.width * 0.08),
-            vertical: 32,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: -160,
+            top: -120,
+            child: _HeroGlow(color: Colors.white.withOpacity(0.35), size: 360),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          Positioned(
+            left: -120,
+            bottom: -100,
+            child: _HeroGlow(color: Colors.white.withOpacity(0.25), size: 280),
+          ),
+          Positioned(
+            right: 80,
+            bottom: 40,
+            child: _HeroGlow(color: Colors.white.withOpacity(0.18), size: 180),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: math.max(24.0, MediaQuery.of(context).size.width * 0.08),
+                vertical: 32,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               _LandingNavBar(
                 onOpenProduct: () => _scrollTo(_productKey),
                 onOpenTemplates: () => _scrollTo(_templatesKey),
                 onOpenPricing: () => _scrollTo(_pricingKey),
                 onOpenSupport: () => _scrollTo(_supportKey),
+                onOpenPrivacy: _openPrivacy,
                 onLaunchApp: () => _openApp(),
                 onSignIn: appState.isGuest ? () => _openSignIn() : null,
                 currentLocale: appState.locale,
@@ -524,6 +549,89 @@ class _LandingPageState extends State<LandingPage> {
       ),
     );
   }
+  Widget _buildPrivacySection(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = context.l10n;
+    final width = MediaQuery.of(context).size.width;
+    final padding = math.max(24.0, width * 0.08);
+
+    final highlightCards = [
+      _PrivacyHighlightCard(
+        icon: Icons.lock_outline,
+        title: l10n.text('landingPrivacyHighlightSecurityTitle'),
+        description: l10n.text('landingPrivacyHighlightSecurityBody'),
+      ),
+      _PrivacyHighlightCard(
+        icon: Icons.delete_forever_outlined,
+        title: l10n.text('landingPrivacyHighlightControlTitle'),
+        description: l10n.text('landingPrivacyHighlightControlBody'),
+      ),
+      _PrivacyHighlightCard(
+        icon: Icons.verified_user_outlined,
+        title: l10n.text('landingPrivacyHighlightSupportTitle'),
+        description: l10n.text('landingPrivacyHighlightSupportBody'),
+      ),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(padding, 80, padding, 80),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.text('landingPrivacySectionTitle'),
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            l10n.text('landingPrivacySectionSubtitle'),
+            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 36),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 960;
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < highlightCards.length; i++)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: i == highlightCards.length - 1 ? 0 : 24),
+                          child: highlightCards[i],
+                        ),
+                      ),
+                  ],
+                );
+              }
+              return Wrap(
+                spacing: 20,
+                runSpacing: 20,
+                children: highlightCards
+                    .map((card) => SizedBox(
+                          width: math.min(constraints.maxWidth, 420),
+                          child: card,
+                        ))
+                    .toList(),
+              );
+            },
+          ),
+          const SizedBox(height: 32),
+          TextButton.icon(
+            onPressed: _openPrivacy,
+            icon: const Icon(Icons.arrow_forward),
+            label: Text(l10n.text('landingFooterPrivacy')),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              textStyle: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildCtaSection(BuildContext context, AppState appState) {
     final l10n = context.l10n;
@@ -615,6 +723,12 @@ class _LandingPageState extends State<LandingPage> {
             l10n.text('landingFooterCopyright').replaceFirst('{year}', DateTime.now().year.toString()),
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
+          const SizedBox(height: 20),
+          TextButton.icon(
+            onPressed: _openPrivacy,
+            icon: const Icon(Icons.privacy_tip_outlined),
+            label: Text(l10n.text('landingFooterPrivacy')),
+          ),
         ],
       ),
     );
@@ -622,6 +736,10 @@ class _LandingPageState extends State<LandingPage> {
 
   void _openApp() {
     Navigator.of(context).pushNamed('/app');
+  }
+
+  void _openPrivacy() {
+    Navigator.of(context).pushNamed('/privacy');
   }
 
   void _openSignIn() {
@@ -647,6 +765,7 @@ class _LandingNavBar extends StatelessWidget {
     required this.onOpenTemplates,
     required this.onOpenPricing,
     required this.onOpenSupport,
+    required this.onOpenPrivacy,
     required this.onLaunchApp,
     required this.currentLocale,
     required this.onLocaleSelected,
@@ -658,6 +777,7 @@ class _LandingNavBar extends StatelessWidget {
   final VoidCallback onOpenTemplates;
   final VoidCallback onOpenPricing;
   final VoidCallback onOpenSupport;
+  final VoidCallback onOpenPrivacy;
   final VoidCallback onLaunchApp;
   final Locale currentLocale;
   final Future<void> Function(Locale) onLocaleSelected;
@@ -692,6 +812,7 @@ class _LandingNavBar extends StatelessWidget {
                   _NavLink(label: l10n.text('landingNavTemplates'), onTap: onOpenTemplates),
                   _NavLink(label: l10n.text('landingNavPricing'), onTap: onOpenPricing),
                   _NavLink(label: l10n.text('landingNavSupport'), onTap: onOpenSupport),
+                  _NavLink(label: l10n.text('landingNavPrivacy'), onTap: onOpenPrivacy),
                 ],
               ),
             const SizedBox(width: 16),
@@ -740,6 +861,7 @@ class _LandingNavBar extends StatelessWidget {
               _NavChip(label: l10n.text('landingNavTemplates'), onTap: onOpenTemplates),
               _NavChip(label: l10n.text('landingNavPricing'), onTap: onOpenPricing),
               _NavChip(label: l10n.text('landingNavSupport'), onTap: onOpenSupport),
+              _NavChip(label: l10n.text('landingNavPrivacy'), onTap: onOpenPrivacy),
             ],
           ),
         ],
@@ -790,6 +912,27 @@ class _NavChip extends StatelessWidget {
   }
 }
 
+class _HeroGlow extends StatelessWidget {
+  const _HeroGlow({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, color.withOpacity(0.0)],
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroChip extends StatelessWidget {
   const _HeroChip({required this.icon, required this.label});
 
@@ -801,8 +944,9 @@ class _HeroChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.2),
+        color: Colors.white.withOpacity(0.18),
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.24)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -837,7 +981,14 @@ class _FeatureCard extends StatelessWidget {
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        color: theme.colorScheme.surface,
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.surface.withOpacity(0.98),
+            theme.colorScheme.surfaceVariant.withOpacity(0.72),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -845,25 +996,92 @@ class _FeatureCard extends StatelessWidget {
             offset: const Offset(0, 18),
           ),
         ],
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.4)),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: theme.colorScheme.primaryContainer,
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, color: theme.colorScheme.primary, size: 28),
           ),
           const SizedBox(height: 18),
           Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
-          Text(description, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            description,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.72),
+              height: 1.5,
+            ),
+          ),
         ],
       ),
     );
   }
 }
+class _PrivacyHighlightCard extends StatelessWidget {
+  const _PrivacyHighlightCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withOpacity(0.12),
+            theme.colorScheme.secondaryContainer.withOpacity(0.18),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: theme.colorScheme.primary, size: 24),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            description,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              height: 1.5,
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class _TemplateHeroCard extends StatelessWidget {
   const _TemplateHeroCard({required this.spec});

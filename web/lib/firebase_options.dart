@@ -67,5 +67,6 @@ class DefaultFirebaseOptions {
     projectId: 'invoice-receipt-generator-g7',
     authDomain: 'invoice-receipt-generator-g7.firebaseapp.com',
     storageBucket: 'invoice-receipt-generator-g7.firebasestorage.app',
+    measurementId: 'G-TKYV2VSPMZ',
   );
 }

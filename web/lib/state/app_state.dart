@@ -462,6 +462,12 @@ class AppState extends ChangeNotifier {
 
   double get planPrice => _config.monthlyPlanPrice;
 
+  bool get hasSupportLink => _config.hasCrispSubscriptionLink;
+
+  void openSupportLink() {
+    _crispService.openSubscription();
+  }
+
   void _persistState() {
     final currentUser = _user;
     if (currentUser == null || !_firestoreService.canQuery) {
