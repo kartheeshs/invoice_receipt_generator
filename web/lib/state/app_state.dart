@@ -30,6 +30,8 @@ class ManagedAccount {
     required this.email,
     this.isPremium = false,
     this.isAdmin = false,
+    this.plan = 'Free',
+    this.subscriptionSince,
   });
 
   final String id;
@@ -37,6 +39,8 @@ class ManagedAccount {
   final String email;
   final bool isPremium;
   final bool isAdmin;
+  final String plan;
+  final DateTime? subscriptionSince;
 
   factory ManagedAccount.fromJson(Map<String, dynamic> json) {
     return ManagedAccount(
@@ -45,6 +49,10 @@ class ManagedAccount {
       email: json['email'] as String? ?? '',
       isPremium: json['isPremium'] as bool? ?? false,
       isAdmin: json['isAdmin'] as bool? ?? false,
+      plan: json['plan'] as String? ?? 'Free',
+      subscriptionSince: json['subscriptionSince'] is String && (json['subscriptionSince'] as String).isNotEmpty
+          ? DateTime.tryParse(json['subscriptionSince'] as String)
+          : null,
     );
   }
 
@@ -54,6 +62,9 @@ class ManagedAccount {
     String? email,
     bool? isPremium,
     bool? isAdmin,
+    String? plan,
+    DateTime? subscriptionSince,
+    bool clearSubscriptionSince = false,
   }) {
     return ManagedAccount(
       id: id ?? this.id,
@@ -61,6 +72,8 @@ class ManagedAccount {
       email: email ?? this.email,
       isPremium: isPremium ?? this.isPremium,
       isAdmin: isAdmin ?? this.isAdmin,
+      plan: plan ?? this.plan,
+      subscriptionSince: clearSubscriptionSince ? null : (subscriptionSince ?? this.subscriptionSince),
     );
   }
 
@@ -71,6 +84,8 @@ class ManagedAccount {
       'email': email,
       'isPremium': isPremium,
       'isAdmin': isAdmin,
+      'plan': plan,
+      if (subscriptionSince != null) 'subscriptionSince': subscriptionSince!.toIso8601String(),
     };
   }
 }
@@ -118,29 +133,38 @@ class AppState extends ChangeNotifier {
 
   late final UserProfile _guestProfile;
   AuthUser? _user;
+  AuthUser? _adminUser;
   late UserProfile _profile;
   Invoice? _selectedInvoice;
   Locale _locale = const Locale('en');
   bool _isLocaleChanging = false;
   bool _isLoading = false;
+  bool _isAdminLoading = false;
   bool _isPremium = false;
   String? _errorMessage;
+  String? _adminErrorMessage;
+  String? _adminErrorKey;
 
   Locale get locale => _locale;
   bool get isLocaleChanging => _isLocaleChanging;
   AuthUser? get user => _user;
+  AuthUser? get adminUser => _adminUser;
   UserProfile get profile => _profile;
   bool get isLoading => _isLoading;
+  bool get isAdminLoading => _isAdminLoading;
   bool get isPremium => _isPremium;
   bool get isAdmin {
+    if (_adminUser != null) {
+      return true;
+    }
     final email = _user?.email.toLowerCase();
     if (email == null) return false;
-    if (_adminEmails.contains(email)) return true;
-    final match = _accounts.where((account) => account.email.toLowerCase() == email);
-    return match.isNotEmpty && match.first.isAdmin;
+    return _isAdminEmail(email);
   }
 
   String? get errorMessage => _errorMessage;
+  String? get adminErrorMessage => _adminErrorMessage;
+  String? get adminErrorKey => _adminErrorKey;
   bool get hasFirebase => _config.hasFirebase;
   bool get isAuthenticated => _user != null;
   bool get isGuest => _user == null;
@@ -246,6 +270,36 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> adminSignIn({required String email, required String password}) async {
+    await _runAdminAsync(() async {
+      final user = await _authService.signIn(email: email, password: password);
+      final normalizedEmail = user.email.toLowerCase();
+      if (!_isAdminEmail(normalizedEmail)) {
+        throw const AccessDeniedException('adminAccessDenied');
+      }
+      _adminUser = user;
+      _ensureAccountFor(user);
+      _log('Admin ${user.email} signed in');
+      _persistState();
+    });
+  }
+
+  void adminSignOut() {
+    if (_adminUser == null) return;
+    _adminUser = null;
+    _persistState();
+    notifyListeners();
+  }
+
+  void clearAdminError() {
+    if (_adminErrorMessage == null && _adminErrorKey == null) {
+      return;
+    }
+    _adminErrorMessage = null;
+    _adminErrorKey = null;
+    notifyListeners();
+  }
+
   void clearError() {
     if (_errorMessage == null) return;
     _errorMessage = null;
@@ -347,7 +401,12 @@ class AppState extends ChangeNotifier {
   void toggleAccountPremium(String accountId, bool value) {
     final index = _accounts.indexWhere((account) => account.id == accountId);
     if (index == -1) return;
-    final account = _accounts[index].copyWith(isPremium: value);
+    final account = _accounts[index].copyWith(
+      isPremium: value,
+      plan: value ? 'Pro' : 'Free',
+      subscriptionSince: value ? (_accounts[index].subscriptionSince ?? DateTime.now()) : null,
+      clearSubscriptionSince: !value,
+    );
     _accounts[index] = account;
     _log('${account.displayName} premium status set to ${value ? 'enabled' : 'disabled'}');
     if (_user != null && account.email.toLowerCase() == _user!.email.toLowerCase()) {
@@ -415,6 +474,14 @@ class AppState extends ChangeNotifier {
         final email = _accounts[i].email.toLowerCase();
         if (_adminEmails.contains(email) && !_accounts[i].isAdmin) {
           _accounts[i] = _accounts[i].copyWith(isAdmin: true);
+        }
+      }
+
+      final adminUserData = decoded['adminUser'];
+      if (adminUserData is Map) {
+        _adminUser = AuthUser.fromJson(Map<String, dynamic>.from(adminUserData));
+        if (_adminUser != null) {
+          _ensureAccountFor(_adminUser!);
         }
       }
 
@@ -493,6 +560,9 @@ class AppState extends ChangeNotifier {
       };
       if (_user != null) {
         data['user'] = _user!.toJson();
+      }
+      if (_adminUser != null) {
+        data['adminUser'] = _adminUser!.toJson();
       }
       storage[_storageKey] = jsonEncode(data);
     } catch (_) {
@@ -617,6 +687,8 @@ class AppState extends ChangeNotifier {
         email: 'haruto@example.com',
         isPremium: true,
         isAdmin: _adminEmails.contains('haruto@example.com'),
+        plan: 'Pro',
+        subscriptionSince: DateTime.now().subtract(const Duration(days: 280)),
       ),
       ManagedAccount(
         id: _uuid.v4(),
@@ -624,6 +696,8 @@ class AppState extends ChangeNotifier {
         email: 'aiko@example.com',
         isPremium: false,
         isAdmin: _adminEmails.contains('aiko@example.com'),
+        plan: 'Free',
+        subscriptionSince: null,
       ),
       ManagedAccount(
         id: _uuid.v4(),
@@ -631,6 +705,8 @@ class AppState extends ChangeNotifier {
         email: 'liam@example.com',
         isPremium: true,
         isAdmin: _adminEmails.contains('liam@example.com'),
+        plan: 'Pro',
+        subscriptionSince: DateTime.now().subtract(const Duration(days: 120)),
       ),
     ]);
   }
@@ -638,7 +714,7 @@ class AppState extends ChangeNotifier {
   void _ensureAccountFor(AuthUser user) {
     final email = user.email.toLowerCase();
     final index = _accounts.indexWhere((account) => account.email.toLowerCase() == email);
-    final isAdminEmail = _adminEmails.contains(email);
+    final isAdminEmail = _isAdminEmail(email);
     if (index == -1) {
       _accounts.add(ManagedAccount(
         id: user.uid.isNotEmpty ? user.uid : _uuid.v4(),
@@ -646,6 +722,8 @@ class AppState extends ChangeNotifier {
         email: user.email,
         isPremium: false,
         isAdmin: isAdminEmail,
+        plan: 'Free',
+        subscriptionSince: null,
       ));
     } else if (isAdminEmail && !_accounts[index].isAdmin) {
       _accounts[index] = _accounts[index].copyWith(isAdmin: true);
@@ -661,6 +739,15 @@ class AppState extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  bool _isAdminEmail(String email) {
+    final lower = email.toLowerCase();
+    if (_adminEmails.contains(lower)) {
+      return true;
+    }
+    final account = _accountForEmail(email);
+    return account?.isAdmin ?? false;
   }
 
   void _assignDisplayName(String email, String displayName) {
@@ -722,6 +809,25 @@ class AppState extends ChangeNotifier {
       _errorMessage = error.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _runAdminAsync(Future<void> Function() action) async {
+    _isAdminLoading = true;
+    _adminErrorMessage = null;
+    _adminErrorKey = null;
+    notifyListeners();
+    try {
+      await action();
+    } on AccessDeniedException catch (error) {
+      _adminErrorKey = error.reasonKey;
+    } on FirebaseAuthException catch (error) {
+      _adminErrorMessage = error.message;
+    } catch (error) {
+      _adminErrorMessage = error.toString();
+    } finally {
+      _isAdminLoading = false;
       notifyListeners();
     }
   }
