@@ -63,6 +63,7 @@ class PdfService {
   List<pw.Widget> _buildGlobalPdf({
     required Invoice invoice,
     required UserProfile profile,
+    required NumberFormat format,
     required DateFormat dateFormat,
     required InvoiceTemplateSpec spec,
     required AppLocalizations l10n,
@@ -243,7 +244,7 @@ class PdfService {
         accent: accent,
         border: border,
         muted: muted,
-        badge: badge,
+        badgeValue: badgeValue,
         l10n: l10n,
       ),
       pw.SizedBox(height: 24),
@@ -252,6 +253,7 @@ class PdfService {
         dueMessage: dueMessage,
         balanceBackground: balanceBackground,
         headerText: headerText,
+        headerTextValue: headerTextValue,
         l10n: l10n,
       ),
       pw.SizedBox(height: 20),
@@ -262,6 +264,7 @@ class PdfService {
   List<pw.Widget> _buildJapanesePdf({
     required Invoice invoice,
     required UserProfile profile,
+    required NumberFormat format,
     required DateFormat dateFormat,
     required InvoiceTemplateSpec spec,
     required AppLocalizations l10n,
@@ -407,10 +410,30 @@ class PdfService {
               defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
               border: pw.TableBorder.all(color: border, width: 0.8),
               children: [
-                _pdfJapaneseMetaRow(l10n.text('invoiceJapaneseProjectLabel'), project, badge, muted),
-                _pdfJapaneseMetaRow(l10n.text('invoiceJapaneseNumberLabel'), invoice.number, badge, muted),
-                _pdfJapaneseMetaRow(l10n.text('invoiceJapaneseIssueLabel'), dateFormat.format(invoice.issueDate), badge, muted),
-                _pdfJapaneseMetaRow(l10n.text('invoiceJapaneseDueLabel'), dateFormat.format(invoice.dueDate), badge, muted),
+            _pdfJapaneseMetaRow(
+              l10n.text('invoiceJapaneseProjectLabel'),
+              project,
+              badgeValue,
+              muted,
+            ),
+            _pdfJapaneseMetaRow(
+              l10n.text('invoiceJapaneseNumberLabel'),
+              invoice.number,
+              badgeValue,
+              muted,
+            ),
+            _pdfJapaneseMetaRow(
+              l10n.text('invoiceJapaneseIssueLabel'),
+              dateFormat.format(invoice.issueDate),
+              badgeValue,
+              muted,
+            ),
+            _pdfJapaneseMetaRow(
+              l10n.text('invoiceJapaneseDueLabel'),
+              dateFormat.format(invoice.dueDate),
+              badgeValue,
+              muted,
+            ),
               ],
             ),
             pw.SizedBox(height: 18),
@@ -427,11 +450,19 @@ class PdfService {
     ];
   }
 
-  pw.TableRow _pdfJapaneseMetaRow(String label, String value, PdfColor badge, PdfColor muted) {
+  pw.TableRow _pdfJapaneseMetaRow(
+    String label,
+    String value,
+    int badgeValue,
+    PdfColor muted,
+  ) {
+    final rowBackground = _pdfColorWithOpacity(badgeValue, 0.35);
+    final labelBackground = _pdfColorWithOpacity(badgeValue, 0.55);
     return pw.TableRow(
-      decoration: pw.BoxDecoration(color: _pdfColorWithOpacity(badgeValue, 0.5)),
+      decoration: pw.BoxDecoration(color: rowBackground),
       children: [
-        pw.Padding(
+        pw.Container(
+          color: labelBackground,
           padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
         ),
@@ -498,7 +529,7 @@ class PdfService {
     required PdfColor accent,
     required PdfColor border,
     required PdfColor muted,
-    required PdfColor badge,
+    required int badgeValue,
     required AppLocalizations l10n,
   }) {
     return pw.Container(
@@ -586,7 +617,10 @@ class PdfService {
   }
 
   pw.Widget _pdfSummaryTotalRow(String label, String value, {bool emphasized = false}) {
-    final style = pw.TextStyle(fontWeight: emphasized ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: emphasized ? 14 : 12);
+    final style = pw.TextStyle(
+      fontWeight: emphasized ? pw.FontWeight.bold : pw.FontWeight.normal,
+      fontSize: emphasized ? 14 : 12,
+    );
     return pw.Row(
       children: [
         pw.Expanded(child: pw.Text(label, style: style)),
@@ -600,6 +634,7 @@ class PdfService {
     required String dueMessage,
     required PdfColor balanceBackground,
     required PdfColor headerText,
+    required int headerTextValue,
     required AppLocalizations l10n,
   }) {
     return pw.Container(
@@ -619,8 +654,13 @@ class PdfService {
                 pw.SizedBox(height: 4),
                 pw.Text(dueMessage, style: pw.TextStyle(color: headerText, fontSize: 10)),
                 pw.SizedBox(height: 4),
-                pw.Text(l10n.text('invoiceBalanceFooter'),
-                    style: pw.TextStyle(color: _pdfColorWithOpacity(headerTextValue, 0.8), fontSize: 9)),
+                pw.Text(
+                  l10n.text('invoiceBalanceFooter'),
+                  style: pw.TextStyle(
+                    color: _pdfColorWithOpacity(headerTextValue, 0.8),
+                    fontSize: 9,
+                  ),
+                ),
               ],
             ),
           ),

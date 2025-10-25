@@ -183,15 +183,83 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
             final palette = invoiceTemplateSpec(template);
             final available = widget.availableTemplates.contains(template);
             final selected = _template == template;
-            return GestureDetector(
-              onTap: available
-                  ? () {
-                      setState(() {
-                        _template = template;
-                        _workingInvoice = _workingInvoice.copyWith(template: template);
-                      });
-                    }
-
+            return Opacity(
+              opacity: available ? 1 : 0.4,
+              child: GestureDetector(
+                onTap: available
+                    ? () {
+                        setState(() {
+                          _template = template;
+                          _workingInvoice =
+                              _workingInvoice.copyWith(template: template);
+                        });
+                      }
+                    : null,
+                child: Container(
+                  width: 220,
+                  constraints: const BoxConstraints(minHeight: 140),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: palette.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? palette.accent : palette.border,
+                      width: selected ? 2 : 1,
+                    ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: palette.accent.withOpacity(0.25),
+                              blurRadius: 20,
+                              offset: const Offset(0, 12),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.text(palette.labelKey),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (selected)
+                            Icon(Icons.check_circle,
+                                color: palette.accent, size: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.text(palette.blurbKey),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.muted,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          gradient: palette.headerGradient,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
 
   Widget _buildInvoicePreview(
     BuildContext context,
