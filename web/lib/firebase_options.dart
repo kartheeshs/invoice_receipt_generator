@@ -14,16 +14,40 @@ class DefaultFirebaseOptions {
     final apiKey = config.firebaseApiKey.isNotEmpty
         ? config.firebaseApiKey
         : _defaultWeb.apiKey;
-    final appId = _envOrDefault('FIREBASE_APP_ID', _defaultWeb.appId);
-    final projectId = _envOrDefault('FIREBASE_PROJECT_ID', _defaultWeb.projectId);
-    final messagingSenderId =
-        _envOrDefault('FIREBASE_MESSAGING_SENDER_ID', _defaultWeb.messagingSenderId);
-    final authDomain =
-        _envOptional('FIREBASE_AUTH_DOMAIN', _defaultWeb.authDomain);
-    final storageBucket =
-        _envOptional('FIREBASE_STORAGE_BUCKET', _defaultWeb.storageBucket);
-    final measurementId =
-        _envOptional('FIREBASE_MEASUREMENT_ID', _defaultWeb.measurementId);
+
+    const appIdEnv = String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '');
+    final appId = appIdEnv.isNotEmpty ? appIdEnv : _defaultWeb.appId;
+
+    const projectIdEnv =
+        String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
+    final projectId =
+        projectIdEnv.isNotEmpty ? projectIdEnv : _defaultWeb.projectId;
+
+    const messagingSenderIdEnv = String.fromEnvironment(
+      'FIREBASE_MESSAGING_SENDER_ID',
+      defaultValue: '',
+    );
+    final messagingSenderId = messagingSenderIdEnv.isNotEmpty
+        ? messagingSenderIdEnv
+        : _defaultWeb.messagingSenderId;
+
+    const authDomainEnv =
+        String.fromEnvironment('FIREBASE_AUTH_DOMAIN', defaultValue: '');
+    final authDomain = authDomainEnv.isNotEmpty
+        ? authDomainEnv
+        : _defaultWeb.authDomain;
+
+    const storageBucketEnv =
+        String.fromEnvironment('FIREBASE_STORAGE_BUCKET', defaultValue: '');
+    final storageBucket = storageBucketEnv.isNotEmpty
+        ? storageBucketEnv
+        : _defaultWeb.storageBucket;
+
+    const measurementIdEnv =
+        String.fromEnvironment('FIREBASE_MEASUREMENT_ID', defaultValue: '');
+    final measurementId = measurementIdEnv.isNotEmpty
+        ? measurementIdEnv
+        : _defaultWeb.measurementId;
 
     return FirebaseOptions(
       apiKey: apiKey,
@@ -44,17 +68,4 @@ class DefaultFirebaseOptions {
     authDomain: 'invoice-receipt-generator-g7.firebaseapp.com',
     storageBucket: 'invoice-receipt-generator-g7.firebasestorage.app',
   );
-
-  static String _envOrDefault(String key, String fallback) {
-    const value = String.fromEnvironment(key, defaultValue: '');
-    return value.isNotEmpty ? value : fallback;
-  }
-
-  static String? _envOptional(String key, String? fallback) {
-    const value = String.fromEnvironment(key, defaultValue: '');
-    if (value.isNotEmpty) {
-      return value;
-    }
-    return fallback?.isEmpty ?? true ? null : fallback;
-  }
 }
