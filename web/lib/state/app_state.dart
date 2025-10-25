@@ -1,7 +1,6 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -126,7 +125,6 @@ class AppState extends ChangeNotifier {
     _profile = _guestProfile;
     _seedAccounts();
     _invoices.addAll(_seedInvoices());
-    _restoreSession();
   }
 
   final AppConfig _config;
@@ -138,7 +136,6 @@ class AppState extends ChangeNotifier {
   final List<ManagedAccount> _accounts = [];
   final List<String> _activityLog = [];
   final List<String> _adminEmails;
-  static const _storageKey = 'invoice_receipt_app_state';
 
   final Uuid _uuid = const Uuid();
 
@@ -225,16 +222,26 @@ class AppState extends ChangeNotifier {
     await _runAsync(() async {
       final user = await _authService.signIn(email: email, password: password);
       final role = await _loadRoleForUser(user);
-      _user = await _authService.refreshUser(user);
-      if (_user != null) {
-        _ensureAccountFor(_user!, role: role);
-        final account = _accountForEmail(_user!.email);
-        _isPremium = account?.isPremium ?? _isPremium;
-        if (account?.displayName.isNotEmpty == true) {
-          _profile = _profile.copyWith(displayName: account!.displayName);
+      final refreshed = await _authService.refreshUser(user);
+      _user = refreshed;
+      if (_user == null) {
+        return;
+      }
+
+      await _loadRemoteStateForUser(_user!);
+      _ensureAccountFor(_user!, role: role);
+      final account = _accountForEmail(_user!.email);
+      if (account != null) {
+        _isPremium = account.isPremium;
+        if (account.displayName.isNotEmpty) {
+          _profile = _profile.copyWith(displayName: account.displayName);
         }
       }
-      _profile = _profile.copyWith(email: _user!.email, displayName: _user!.displayName ?? _profile.displayName);
+
+      _profile = _profile.copyWith(
+        email: _user!.email,
+        displayName: _user!.displayName ?? _profile.displayName,
+      );
       _persistState();
     });
   }
@@ -277,11 +284,13 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    if (_user != null) {
+      _persistState();
+    }
     _user = null;
     _isPremium = false;
     _selectedInvoice = null;
     _profile = _guestProfile;
-    _persistState();
     notifyListeners();
   }
 
@@ -453,137 +462,122 @@ class AppState extends ChangeNotifier {
 
   double get planPrice => _config.monthlyPlanPrice;
 
-  void _restoreSession() {
-    final storage = _storage;
-    if (storage == null) return;
-    final raw = storage[_storageKey];
-    if (raw == null || raw.isEmpty) {
+  void _persistState() {
+    final currentUser = _user;
+    if (currentUser == null || !_firestoreService.canQuery) {
       return;
     }
+
+    final payload = _buildStateSnapshot();
+
+    () async {
+      try {
+        await _firestoreService.saveUserState(
+          uid: currentUser.uid,
+          idToken: currentUser.idToken,
+          data: payload,
+        );
+      } catch (_) {
+        // Ignore persistence errors so they don't block the UI.
+      }
+    }();
+  }
+
+  Map<String, dynamic> _buildStateSnapshot() {
+    return {
+      'profile': _profile.toJson(),
+      'isPremium': _isPremium,
+      'invoices': _invoices.map((invoice) => invoice.toJson()).toList(),
+      'accounts': _accounts.map((account) => account.toJson()).toList(),
+      'activityLog': _activityLog,
+      'locale': _locale.toLanguageTag(),
+      if (_selectedInvoice != null) 'selectedInvoiceId': _selectedInvoice!.id,
+    };
+  }
+
+  Future<void> _loadRemoteStateForUser(AuthUser user) async {
+    if (!_firestoreService.canQuery) {
+      return;
+    }
+
     try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
+      final snapshot = await _firestoreService.fetchUserState(
+        uid: user.uid,
+        idToken: user.idToken,
+      );
+      if (snapshot == null || snapshot.isEmpty) {
         return;
       }
-
-      final localeTag = decoded['locale'] as String?;
-      if (localeTag != null && localeTag.isNotEmpty) {
-        _locale = _localeFromTag(localeTag);
-      }
-
-      final profileData = decoded['profile'];
-      if (profileData is Map) {
-        _profile = UserProfile.fromJson(Map<String, dynamic>.from(profileData));
-      }
-
-      final accountsData = decoded['accounts'];
-      if (accountsData is List) {
-        _accounts.clear();
-        for (final item in accountsData) {
-          if (item is Map) {
-            _accounts.add(ManagedAccount.fromJson(Map<String, dynamic>.from(item)));
-          }
-        }
-      }
-
-      for (var i = 0; i < _accounts.length; i++) {
-        final email = _accounts[i].email.toLowerCase();
-        if (_adminEmails.contains(email) && !_accounts[i].hasAdminRole) {
-          _accounts[i] = _accounts[i].copyWith(role: 'admin');
-        }
-      }
-
-      final adminUserData = decoded['adminUser'];
-      if (adminUserData is Map) {
-        _adminUser = AuthUser.fromJson(Map<String, dynamic>.from(adminUserData));
-        if (_adminUser != null) {
-          _ensureAccountFor(_adminUser!);
-        }
-      }
-
-      final invoicesData = decoded['invoices'];
-      if (invoicesData is List) {
-        _invoices.clear();
-        for (final item in invoicesData) {
-          if (item is Map) {
-            _invoices.add(Invoice.fromJson(Map<String, dynamic>.from(item)));
-          }
-        }
-      }
-
-      final activityData = decoded['activityLog'];
-      if (activityData is List) {
-        _activityLog.clear();
-        for (final entry in activityData) {
-          if (entry is String) {
-            _activityLog.add(entry);
-          }
-        }
-      }
-
-      final userData = decoded['user'];
-      if (userData is Map) {
-        _user = AuthUser.fromJson(Map<String, dynamic>.from(userData));
-        _ensureAccountFor(_user!);
-      }
-
-      _isPremium = decoded['isPremium'] as bool? ?? _isPremium;
-
-      if (_user != null) {
-        final account = _accountForEmail(_user!.email);
-        if (account != null) {
-          _isPremium = account.isPremium;
-          if (account.displayName.isNotEmpty) {
-            _profile = _profile.copyWith(displayName: account.displayName);
-          }
-        }
-        if (_profile.email.isEmpty) {
-          _profile = _profile.copyWith(email: _user!.email);
-        }
-      }
-
-      final selectedId = decoded['selectedInvoiceId'] as String?;
-      if (selectedId != null && selectedId.isNotEmpty) {
-        for (final invoice in _invoices) {
-          if (invoice.id == selectedId) {
-            _selectedInvoice = invoice;
-            break;
-          }
-        }
-      }
-
-      if (_profile.email.isEmpty && _user == null) {
-        _profile = _guestProfile;
-      }
-      _persistState();
+      _applySnapshot(snapshot);
     } catch (_) {
-      storage.remove(_storageKey);
+      // Ignore fetch errors to keep authentication responsive.
     }
   }
 
-  void _persistState() {
-    final storage = _storage;
-    if (storage == null) return;
-    try {
-      final data = <String, dynamic>{
-        'profile': _profile.toJson(),
-        'isPremium': _isPremium,
-        'invoices': _invoices.map((invoice) => invoice.toJson()).toList(),
-        'accounts': _accounts.map((account) => account.toJson()).toList(),
-        'activityLog': _activityLog,
-        'locale': _locale.toLanguageTag(),
-        if (_selectedInvoice != null) 'selectedInvoiceId': _selectedInvoice!.id,
-      };
-      if (_user != null) {
-        data['user'] = _user!.toJson();
-      }
-      if (_adminUser != null) {
-        data['adminUser'] = _adminUser!.toJson();
-      }
-      storage[_storageKey] = jsonEncode(data);
-    } catch (_) {
-      // Ignore persistence errors to avoid disrupting the UX.
+  void _applySnapshot(Map<String, dynamic> decoded) {
+    final localeTag = decoded['locale'] as String?;
+    if (localeTag != null && localeTag.isNotEmpty) {
+      _locale = _localeFromTag(localeTag);
     }
+
+    final profileData = decoded['profile'];
+    if (profileData is Map) {
+      _profile = UserProfile.fromJson(Map<String, dynamic>.from(profileData));
+    }
+
+    final accountsData = decoded['accounts'];
+    if (accountsData is List) {
+      _accounts.clear();
+      for (final item in accountsData) {
+        if (item is Map) {
+          _accounts.add(ManagedAccount.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
+    for (var i = 0; i < _accounts.length; i++) {
+      final email = _accounts[i].email.toLowerCase();
+      if (_adminEmails.contains(email) && !_accounts[i].hasAdminRole) {
+        _accounts[i] = _accounts[i].copyWith(role: 'admin');
+      }
+    }
+
+    final invoicesData = decoded['invoices'];
+    if (invoicesData is List) {
+      _invoices.clear();
+      for (final item in invoicesData) {
+        if (item is Map) {
+          _invoices.add(Invoice.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
+    final activityData = decoded['activityLog'];
+    if (activityData is List) {
+      _activityLog.clear();
+      for (final entry in activityData) {
+        if (entry is String) {
+          _activityLog.add(entry);
+        }
+      }
+    }
+
+    _isPremium = decoded['isPremium'] as bool? ?? _isPremium;
+
+    final selectedId = decoded['selectedInvoiceId'] as String?;
+    if (selectedId != null && selectedId.isNotEmpty) {
+      Invoice? match;
+      for (final invoice in _invoices) {
+        if (invoice.id == selectedId) {
+          match = invoice;
+          break;
+        }
+      }
+      _selectedInvoice = match;
+    } else {
+      _selectedInvoice = null;
+    }
+
   }
 
   Locale _localeFromTag(String tag) {
@@ -605,14 +599,6 @@ class AppState extends ChangeNotifier {
       scriptCode: scriptCode?.isEmpty ?? true ? null : scriptCode,
       countryCode: countryCode?.isEmpty ?? true ? null : countryCode,
     );
-  }
-
-  html.Storage? get _storage {
-    try {
-      return html.window.localStorage;
-    } catch (_) {
-      return null;
-    }
   }
 
   List<Invoice> _seedInvoices() {
