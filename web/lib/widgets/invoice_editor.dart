@@ -81,60 +81,47 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 1080;
 
-        Widget templateShelf;
-        if (isWide) {
-          templateShelf = _buildTemplateSidebar(theme, l10n);
-        } else {
-          templateShelf = _buildTemplateCarousel(theme, l10n);
-        }
+        final templateShelf = isWide
+            ? _buildTemplateSidebar(theme, l10n)
+            : _buildTemplateCarousel(theme, l10n);
 
         final canvasStack = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildToolbar(theme, l10n, isPreview),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _buildInvoiceCanvas(context, palette, currencyFormat, isPreview),
           ],
         );
 
-        final bodyChildren = <Widget>[
-          _buildHeading(theme, l10n, isPreview),
-          const SizedBox(height: 16),
-        ];
-
-        if (isWide) {
-          bodyChildren.add(
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: 280, child: templateShelf),
-                const SizedBox(width: 32),
-                Expanded(child: canvasStack),
-              ],
-            ),
-          );
-        } else {
-          bodyChildren
-            ..add(templateShelf)
-            ..add(const SizedBox(height: 24))
-            ..add(canvasStack);
-        }
-
-        return Column(
+        final content = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: bodyChildren,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildActionButtons(theme, l10n, isPreview),
+            _buildHeading(theme, l10n, isPreview),
+            const SizedBox(height: 20),
+            if (isWide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(width: 300, child: templateShelf),
+                  const SizedBox(width: 32),
+                  Expanded(child: canvasStack),
+                ],
+              )
+            else ...[
+              templateShelf,
+              const SizedBox(height: 24),
+              canvasStack,
+            ],
+            const SizedBox(height: 48),
           ],
+        );
+
+        return Scrollbar(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 48),
+            child: content,
+          ),
         );
       },
     );
@@ -272,31 +259,29 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
   }
 
   Widget _buildToolbar(ThemeData theme, AppLocalizations l10n, bool isPreview) {
-    return Row(
-      children: [
-        SegmentedButton<InvoiceEditorMode>(
-          segments: [
-            ButtonSegment(
-              value: InvoiceEditorMode.edit,
-              icon: const Icon(Icons.design_services_outlined),
-              label: Text(l10n.text('invoiceModeEdit')),
-            ),
-            ButtonSegment(
-              value: InvoiceEditorMode.preview,
-              icon: const Icon(Icons.visibility_outlined),
-              label: Text(l10n.text('invoiceModePreview')),
-            ),
-          ],
-          selected: {_mode},
-          onSelectionChanged: (value) {
-            setState(() {
-              _mode = value.first;
-            });
-          },
+    final modePicker = SegmentedButton<InvoiceEditorMode>(
+      segments: [
+        ButtonSegment(
+          value: InvoiceEditorMode.edit,
+          icon: const Icon(Icons.design_services_outlined),
+          label: Text(l10n.text('invoiceModeEdit')),
         ),
-        const Spacer(),
-        if (!isPreview)
-          PopupMenuButton<InvoiceSectionType>(
+        ButtonSegment(
+          value: InvoiceEditorMode.preview,
+          icon: const Icon(Icons.visibility_outlined),
+          label: Text(l10n.text('invoiceModePreview')),
+        ),
+      ],
+      selected: {_mode},
+      onSelectionChanged: (value) {
+        setState(() {
+          _mode = value.first;
+        });
+      },
+    );
+
+    final addSectionButton = !isPreview
+        ? PopupMenuButton<InvoiceSectionType>(
             tooltip: l10n.text('invoiceAddSection'),
             onSelected: (type) => _addSection(type),
             itemBuilder: (context) => [
@@ -322,8 +307,47 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
               icon: const Icon(Icons.add),
               label: Text(l10n.text('invoiceAddSection')),
             ),
-          ),
-      ],
+          )
+        : null;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 900;
+
+        final toolbarControls = <Widget>[
+          modePicker,
+          if (addSectionButton != null) ...[
+            const SizedBox(width: 12),
+            addSectionButton,
+          ],
+        ];
+
+        final actionButtons = _buildActionButtons(l10n);
+
+        if (isNarrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: toolbarControls,
+              ),
+              const SizedBox(height: 16),
+              actionButtons,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ...toolbarControls,
+            const Spacer(),
+            Flexible(child: actionButtons),
+          ],
+        );
+      },
     );
   }
 
@@ -450,7 +474,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     );
   }
 
-  Widget _buildActionButtons(ThemeData theme, AppLocalizations l10n, bool isPreview) {
+  Widget _buildActionButtons(AppLocalizations l10n) {
     final canDelete = widget.onDelete != null && !widget.isNewDraft;
 
     FilledButton iconSaveButton() => FilledButton.icon(
@@ -515,46 +539,17 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       child: Text(l10n.text('closeButton')),
     );
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 560;
-
-        if (isCompact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  iconSaveButton(),
-                  iconDownloadButton(),
-                  if (canDelete) deleteButton(),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: closeButton,
-              ),
-            ],
-          );
-        }
-
-        final children = <Widget>[
-          iconSaveButton(),
-          const SizedBox(width: 12),
-          iconDownloadButton(),
-          if (canDelete) ...[
-            const SizedBox(width: 12),
-            deleteButton(),
-          ],
-          const Spacer(),
-          closeButton,
-        ];
-
-        return Row(children: children);
-      },
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        iconSaveButton(),
+        iconDownloadButton(),
+        if (canDelete) deleteButton(),
+        closeButton,
+      ],
     );
   }
 
