@@ -186,7 +186,7 @@ class AppState extends ChangeNotifier {
   UnmodifiableListView<String> get activityLog => UnmodifiableListView(_activityLog);
 
   List<InvoiceTemplate> get availableTemplates =>
-      isGuest ? const [InvoiceTemplate.classic, InvoiceTemplate.japanese] : InvoiceTemplate.values;
+      isGuest ? const [InvoiceTemplate.waveBlue, InvoiceTemplate.japaneseBusiness] : InvoiceTemplate.values;
 
   double get outstandingTotal => _invoices
       .where((invoice) => invoice.status != InvoiceStatus.paid)
@@ -640,7 +640,7 @@ class AppState extends ChangeNotifier {
       ),
     ];
 
-    final executiveInvoice = Invoice(
+    final monochromeInvoice = Invoice(
       id: _uuid.v4(),
       number: '#INV-1001',
       clientName: 'Shibuya Design Co.',
@@ -652,8 +652,8 @@ class AppState extends ChangeNotifier {
       issueDate: now.subtract(const Duration(days: 12)),
       dueDate: now.add(const Duration(days: 18)),
       status: InvoiceStatus.sent,
-      template: InvoiceTemplate.executive,
-      document: InvoiceDocument.defaults(InvoiceTemplate.executive),
+      template: InvoiceTemplate.monochromeAccent,
+      document: InvoiceDocument.defaults(InvoiceTemplate.monochromeAccent),
       lineItems: executiveItems,
       notes: 'Payable within 30 days via bank transfer.',
       logoUrl: _guestProfile.logoUrl,
@@ -671,14 +671,14 @@ class AppState extends ChangeNotifier {
       issueDate: now.subtract(const Duration(days: 35)),
       dueDate: now.subtract(const Duration(days: 5)),
       status: InvoiceStatus.paid,
-      template: InvoiceTemplate.japanese,
-      document: InvoiceDocument.defaults(InvoiceTemplate.japanese),
+      template: InvoiceTemplate.japaneseBusiness,
+      document: InvoiceDocument.defaults(InvoiceTemplate.japaneseBusiness),
       lineItems: japaneseItems,
       notes: 'お取引ありがとうございます。',
       logoUrl: _guestProfile.logoUrl,
     ).recalculateTotals();
 
-    return [executiveInvoice, japaneseInvoice];
+    return [monochromeInvoice, japaneseInvoice];
   }
 
   void _seedAccounts() {

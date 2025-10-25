@@ -494,6 +494,28 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     final otherSections = sections.where((section) => section != headerSection).toList();
     final total = _workingInvoice.lineItems.fold<double>(0, (sum, item) => sum + item.total);
     final dueMessage = _dueMessage(l10n, _workingInvoice.dueDate);
+    final billingSection = otherSections.firstWhere(
+      (section) => section.type == InvoiceSectionType.billing,
+      orElse: () => InvoiceSection(
+        id: 'billing',
+        type: InvoiceSectionType.billing,
+        elements: const [],
+      ),
+    );
+    final totalsSection = otherSections.firstWhere(
+      (section) => section.type == InvoiceSectionType.totals,
+      orElse: () => InvoiceSection(
+        id: 'totals',
+        type: InvoiceSectionType.totals,
+        elements: const [],
+      ),
+    );
+    final filteredSections = otherSections
+        .where((section) =>
+            section.id != billingSection.id &&
+            section.id != totalsSection.id &&
+            section.type != InvoiceSectionType.lineItems)
+        .toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -531,14 +553,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
               children: [
                 _InfoColumns(
                   invoice: _workingInvoice,
-                  section: otherSections.firstWhere(
-                    (section) => section.type == InvoiceSectionType.billing,
-                    orElse: () => InvoiceSection(
-                      id: 'billing',
-                      type: InvoiceSectionType.billing,
-                      elements: const [],
-                    ),
-                  ),
+                  section: billingSection,
                   palette: palette,
                   isPreview: isPreview,
                   onChanged: _updateSection,
@@ -549,6 +564,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                   items: _workingInvoice.lineItems,
                   readOnly: isPreview,
                   currencyFormat: currencyFormat,
+                  palette: palette,
                   onChanged: _updateLineItem,
                   onAdd: _addLineItem,
                   onRemove: _removeLineItem,
@@ -558,21 +574,23 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
                   totalText: currencyFormat.format(total),
                   dueMessage: dueMessage,
                   palette: palette,
+                  metadata: totalsSection.metadata,
+                  showThankYou: palette.showThankYou,
+                  l10n: l10n,
                 ),
                 const SizedBox(height: 24),
-                for (final section in otherSections)
-                  if (section.type != InvoiceSectionType.billing)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20),
-                      child: _SectionCard(
-                        section: section,
-                        palette: palette,
-                        isPreview: isPreview,
-                        l10n: l10n,
-                        onChanged: _updateSection,
-                        onRemove: section.isRemovable ? () => _removeSection(section.id) : null,
-                      ),
+                for (final section in filteredSections)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: _SectionCard(
+                      section: section,
+                      palette: palette,
+                      isPreview: isPreview,
+                      l10n: l10n,
+                      onChanged: _updateSection,
+                      onRemove: section.isRemovable ? () => _removeSection(section.id) : null,
                     ),
+                  ),
               ],
             ),
           ),
@@ -908,103 +926,21 @@ class _GlobalHeaderSection extends StatelessWidget {
         value: invoice.number,
       ),
     );
-    return Container(
-      decoration: BoxDecoration(
-        gradient: palette.headerGradient,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
-      child: Column(
+    final layout = section.metadata['layout'] as String? ?? palette.headerLayout;
+
+    Widget buildTitleBlock(Color textColor) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.companyName.isEmpty ? profile.displayName : profile.companyName,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: palette.headerText,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (profile.tagline.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          profile.tagline,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: palette.tagline),
-                        ),
-                      ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        _HeaderInfoChip(
-                          label: l10n.text('invoiceIssuedLabel'),
-                          value: DateFormat.yMMMMd(l10n.locale.toLanguageTag()).format(invoice.issueDate),
-                          onTap: isPreview
-                              ? null
-                              : () async {
-                                  final date = await _pickDate(
-                                    context,
-                                    initial: invoice.issueDate,
-                                  );
-                                  if (date != null) {
-                                    onIssueDateChanged(date);
-                                  }
-                                },
-                        ),
-                        const SizedBox(width: 12),
-                        _HeaderInfoChip(
-                          label: l10n.text('invoiceDueLabel'),
-                          value: DateFormat.yMMMMd(l10n.locale.toLanguageTag()).format(invoice.dueDate),
-                          onTap: isPreview
-                              ? null
-                              : () async {
-                                  final date = await _pickDate(
-                                    context,
-                                    initial: invoice.dueDate,
-                                  );
-                                  if (date != null) {
-                                    onDueDateChanged(date);
-                                  }
-                                },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _LogoPreview(
-                    url: invoice.logoUrl?.isNotEmpty == true ? invoice.logoUrl! : profile.logoUrl,
-                    onTap: isPreview ? null : onLogoRequested,
-                  ),
-                  const SizedBox(height: 12),
-                  _InvoiceStatusSelector(
-                    status: invoice.status,
-                    isPreview: isPreview,
-                    onChanged: onStatusChanged,
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
           Text(
             showBilingualTitle ? l10n.text('invoiceJapaneseTitle') : l10n.text('invoicePreviewTitle'),
-            style: theme.textTheme.titleMedium?.copyWith(color: palette.headerText, letterSpacing: 1.2),
+            style: theme.textTheme.titleMedium?.copyWith(color: textColor.withOpacity(0.85), letterSpacing: 1.2),
           ),
           const SizedBox(height: 8),
           InlineEditableText(
             value: titleElement.value,
             placeholder: l10n.text('invoicePreviewTitle'),
-            style: theme.textTheme.headlineSmall?.copyWith(color: palette.headerText, fontWeight: FontWeight.bold),
+            style: theme.textTheme.headlineSmall?.copyWith(color: textColor, fontWeight: FontWeight.bold),
             enabled: !isPreview,
             onSubmitted: (value) => onChanged(
               section.copyWith(
@@ -1018,7 +954,7 @@ class _GlobalHeaderSection extends StatelessWidget {
           InlineEditableText(
             value: numberElement.value,
             placeholder: invoice.number,
-            style: theme.textTheme.titleMedium?.copyWith(color: palette.tagline),
+            style: theme.textTheme.titleMedium?.copyWith(color: textColor.withOpacity(0.7)),
             enabled: !isPreview,
             onSubmitted: (value) => onChanged(
               section.copyWith(
@@ -1029,8 +965,285 @@ class _GlobalHeaderSection extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
+      );
+    }
+
+    Widget buildDateChips(Color labelColor, Color valueColor) {
+      return Row(
+        children: [
+          _HeaderInfoChip(
+            label: l10n.text('invoiceIssuedLabel'),
+            value: DateFormat.yMMMMd(l10n.locale.toLanguageTag()).format(invoice.issueDate),
+            onTap: isPreview
+                ? null
+                : () async {
+                    final date = await _pickDate(context, initial: invoice.issueDate);
+                    if (date != null) {
+                      onIssueDateChanged(date);
+                    }
+                  },
+          ),
+          const SizedBox(width: 12),
+          _HeaderInfoChip(
+            label: l10n.text('invoiceDueLabel'),
+            value: DateFormat.yMMMMd(l10n.locale.toLanguageTag()).format(invoice.dueDate),
+            onTap: isPreview
+                ? null
+                : () async {
+                    final date = await _pickDate(context, initial: invoice.dueDate);
+                    if (date != null) {
+                      onDueDateChanged(date);
+                    }
+                  },
+          ),
+        ],
+      );
+    }
+
+    Widget buildLogoAndStatus() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _LogoPreview(
+            url: invoice.logoUrl?.isNotEmpty == true ? invoice.logoUrl! : profile.logoUrl,
+            onTap: isPreview ? null : onLogoRequested,
+          ),
+          const SizedBox(height: 12),
+          _InvoiceStatusSelector(
+            status: invoice.status,
+            isPreview: isPreview,
+            onChanged: onStatusChanged,
+          ),
+        ],
+      );
+    }
+
+    Widget buildCompanyBlock({required Color textColor, bool accentTagline = true}) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            profile.companyName.isEmpty ? profile.displayName : profile.companyName,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: textColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (profile.tagline.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                profile.tagline,
+                style: theme.textTheme.bodyMedium?.copyWith(color: accentTagline ? palette.tagline : textColor.withOpacity(0.7)),
+              ),
+            ),
+        ],
+      );
+    }
+
+    Widget waveHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: palette.headerGradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      buildCompanyBlock(textColor: palette.headerText),
+                      const SizedBox(height: 18),
+                      buildDateChips(palette.headerText, palette.headerText),
+                    ],
+                  ),
+                ),
+                buildLogoAndStatus(),
+              ],
+            ),
+            const SizedBox(height: 20),
+            buildTitleBlock(palette.headerText),
+          ],
+        ),
+      );
+    }
+
+    Widget emeraldHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: palette.headerGradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      buildCompanyBlock(textColor: palette.headerText),
+                      const SizedBox(height: 16),
+                      buildDateChips(palette.headerText, palette.headerText),
+                    ],
+                  ),
+                ),
+                buildLogoAndStatus(),
+              ],
+            ),
+            const SizedBox(height: 24),
+            buildTitleBlock(palette.headerText),
+          ],
+        ),
+      );
+    }
+
+    Widget slateHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: palette.border.withOpacity(0.6)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: buildTitleBlock(theme.colorScheme.onSurface)),
+                const SizedBox(width: 24),
+                buildLogoAndStatus(),
+              ],
+            ),
+            const SizedBox(height: 16),
+            buildDateChips(theme.colorScheme.onSurfaceVariant, theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      );
+    }
+
+    Widget outlineHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: palette.border, width: 1.4),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: buildTitleBlock(theme.colorScheme.onSurface)),
+                buildLogoAndStatus(),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget monochromeHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: palette.border.withOpacity(0.8)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                decoration: BoxDecoration(
+                  color: palette.accent,
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildCompanyBlock(textColor: palette.headerText, accentTagline: false),
+                    const SizedBox(height: 16),
+                    buildDateChips(palette.headerText, palette.headerText),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildTitleBlock(theme.colorScheme.onSurface),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 24, top: 24),
+              child: buildLogoAndStatus(),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget serviceHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: palette.headerGradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: buildCompanyBlock(textColor: palette.headerText)),
+                buildLogoAndStatus(),
+              ],
+            ),
+            const SizedBox(height: 16),
+            buildTitleBlock(palette.headerText),
+            const SizedBox(height: 12),
+            buildDateChips(palette.headerText, palette.headerText),
+          ],
+        ),
+      );
+    }
+
+    switch (layout) {
+      case 'emerald':
+        return emeraldHeader();
+      case 'slate':
+        return slateHeader();
+      case 'outline':
+        return outlineHeader();
+      case 'monochrome':
+        return monochromeHeader();
+      case 'service':
+        return serviceHeader();
+      case 'japanese':
+        return waveHeader();
+      default:
+        return waveHeader();
+    }
   }
 
   static Future<DateTime?> _pickDate(BuildContext context, {required DateTime initial}) async {
@@ -1065,61 +1278,253 @@ class _InfoColumns extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final theme = Theme.of(context);
-    final clientElement = section.elements.firstWhere(
-      (element) => element.binding == InvoiceFieldBinding.clientName,
-      orElse: () => InvoiceElement(
-        id: 'client',
-        kind: InvoiceElementKind.text,
-        binding: InvoiceFieldBinding.clientName,
-        value: invoice.clientName,
-      ),
+    final layout = section.metadata['layout'] as String? ?? palette.infoLayout;
+
+    InvoiceElement _element({
+      required InvoiceFieldBinding binding,
+      required InvoiceElementKind kind,
+      String? labelKey,
+      String? value,
+      String placeholder = '',
+    }) {
+      final existing = section.elements.firstWhere(
+        (element) => element.binding == binding,
+        orElse: () => InvoiceElement(
+          id: 'info-${binding.name}',
+          kind: kind,
+          binding: binding,
+          labelKey: labelKey,
+          value: value ?? '',
+          placeholder: placeholder,
+        ),
+      );
+      return existing;
+    }
+
+    final clientElement = _element(
+      binding: InvoiceFieldBinding.clientName,
+      kind: InvoiceElementKind.text,
+      value: invoice.clientName,
+      placeholder: l10n.text('billToLabel'),
     );
-    final addressElement = section.elements.firstWhere(
-      (element) => element.binding == InvoiceFieldBinding.clientAddress,
-      orElse: () => InvoiceElement(
-        id: 'client-address',
-        kind: InvoiceElementKind.multiline,
-        binding: InvoiceFieldBinding.clientAddress,
-        value: '',
-      ),
+    final clientAddress = _element(
+      binding: InvoiceFieldBinding.clientAddress,
+      kind: InvoiceElementKind.multiline,
     );
-    final projectElement = section.elements.firstWhere(
-      (element) => element.binding == InvoiceFieldBinding.projectName,
-      orElse: () => InvoiceElement(
-        id: 'project',
-        kind: InvoiceElementKind.text,
-        binding: InvoiceFieldBinding.projectName,
-        value: invoice.projectName,
-      ),
+    final clientCompany = _element(
+      binding: InvoiceFieldBinding.clientCompany,
+      kind: InvoiceElementKind.text,
     );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _SectionCard(
-            section: section.copyWith(
-              elements: [clientElement, addressElement],
+    final projectElement = _element(
+      binding: InvoiceFieldBinding.projectName,
+      kind: InvoiceElementKind.text,
+      value: invoice.projectName,
+    );
+    final companyName = _element(
+      binding: InvoiceFieldBinding.companyName,
+      kind: InvoiceElementKind.text,
+      value: invoice.profileName ?? '',
+    );
+    final companyAddress = _element(
+      binding: InvoiceFieldBinding.companyAddress,
+      kind: InvoiceElementKind.multiline,
+    );
+    final dueDate = _element(
+      binding: InvoiceFieldBinding.dueDate,
+      kind: InvoiceElementKind.date,
+    );
+
+    List<InvoiceElement> _updatedElements(InvoiceElement element, String value) {
+      final exists = section.elements.any((candidate) => candidate.id == element.id);
+      final updated = element.copyWith(value: value);
+      if (exists) {
+        return section.elements
+            .map((candidate) => candidate.id == element.id ? updated : candidate)
+            .toList();
+      }
+      return [...section.elements, updated];
+    }
+
+    void updateElement(InvoiceElement element, String value) {
+      onChanged(section.copyWith(elements: _updatedElements(element, value)));
+    }
+
+    InlineEditableText _editable(
+      InvoiceElement element, {
+      bool multiline = false,
+      TextStyle? style,
+    }) {
+      return InlineEditableText(
+        value: element.value,
+        placeholder: element.placeholder,
+        style: style ?? theme.textTheme.bodyMedium,
+        multiline: multiline,
+        enabled: !isPreview,
+        onSubmitted: (value) => updateElement(element, value),
+      );
+    }
+
+    Widget _buildCard(String title, List<Widget> children) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: palette.border.withOpacity(0.7)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      );
+    }
+
+    Widget buildDefault() {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _buildCard(
+              l10n.text('clientDetailsTitle'),
+              [
+                _editable(clientElement),
+                const SizedBox(height: 8),
+                _editable(clientAddress, multiline: true),
+              ],
             ),
-            palette: palette,
-            isPreview: isPreview,
-            l10n: l10n,
-            onChanged: onChanged,
-            titleOverride: l10n.text('clientDetailsTitle'),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _SectionCard(
-            section: section.copyWith(elements: [projectElement]),
-            palette: palette,
-            isPreview: isPreview,
-            l10n: l10n,
-            onChanged: onChanged,
-            titleOverride: l10n.text('projectLabel'),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildCard(
+              l10n.text('projectLabel'),
+              [
+                _editable(projectElement),
+                const SizedBox(height: 8),
+                _editable(dueDate, style: theme.textTheme.bodyMedium?.copyWith(color: palette.muted)),
+              ],
+            ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    }
+
+    switch (layout) {
+      case 'splitCompany':
+      case 'dualCard':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildCard(
+                l10n.text('clientDetailsTitle'),
+                [
+                  if (clientCompany.value.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _editable(clientCompany),
+                    ),
+                  _editable(clientElement),
+                  const SizedBox(height: 8),
+                  _editable(clientAddress, multiline: true),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildCard(
+                l10n.text('companyDetailsTitle'),
+                [
+                  _editable(companyName),
+                  const SizedBox(height: 8),
+                  _editable(companyAddress, multiline: true),
+                  const SizedBox(height: 8),
+                  _editable(dueDate, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+                ],
+              ),
+            ),
+          ],
+        );
+      case 'ledger':
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: palette.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _editable(clientElement),
+              const Divider(height: 18),
+              _editable(clientAddress, multiline: true),
+              const Divider(height: 18),
+              _editable(companyName),
+              const Divider(height: 18),
+              _editable(companyAddress, multiline: true),
+            ],
+          ),
+        );
+      case 'cardGrid':
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: [
+            SizedBox(
+              width: 280,
+              child: _buildCard(l10n.text('clientDetailsTitle'), [
+                _editable(clientElement),
+                const SizedBox(height: 8),
+                _editable(clientAddress, multiline: true),
+              ]),
+            ),
+            SizedBox(
+              width: 280,
+              child: _buildCard(l10n.text('projectLabel'), [
+                _editable(projectElement),
+                const SizedBox(height: 8),
+                _editable(dueDate, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+              ]),
+            ),
+          ],
+        );
+      case 'tallColumns':
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.text('clientDetailsTitle'), style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  _editable(clientElement),
+                  const SizedBox(height: 8),
+                  _editable(clientAddress, multiline: true),
+                ],
+              ),
+            ),
+            const SizedBox(width: 32),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.text('companyDetailsTitle'), style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  _editable(companyName),
+                  const SizedBox(height: 8),
+                  _editable(companyAddress, multiline: true),
+                ],
+              ),
+            ),
+          ],
+        );
+      default:
+        return buildDefault();
+    }
   }
 }
 
@@ -1128,46 +1533,196 @@ class _TotalsCard extends StatelessWidget {
     required this.totalText,
     required this.dueMessage,
     required this.palette,
+    required this.metadata,
+    required this.showThankYou,
+    required this.l10n,
   });
 
   final String totalText;
   final String dueMessage;
   final InvoiceTemplateSpec palette;
+  final Map<String, dynamic> metadata;
+  final bool showThankYou;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: palette.balanceBackground,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.text('invoiceBalanceDueLabel'),
-                  style: theme.textTheme.titleMedium?.copyWith(color: palette.accent, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  dueMessage,
-                  style: theme.textTheme.bodySmall?.copyWith(color: palette.muted),
-                ),
-              ],
-            ),
+    final layout = metadata['layout'] as String? ?? palette.totalsStyle;
+
+    switch (layout) {
+      case 'table':
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: palette.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: palette.border.withOpacity(0.8)),
           ),
-          Text(
-            totalText,
-            style: theme.textTheme.headlineSmall?.copyWith(color: palette.accent, fontWeight: FontWeight.w700),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.text('invoiceBalanceDueLabel'),
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(dueMessage, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+                  ],
+                ),
+              ),
+              Text(
+                totalText,
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      case 'underline':
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.border, width: 1.2)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(dueMessage, style: theme.textTheme.bodyMedium),
+              ),
+              Text(
+                totalText,
+                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        );
+      case 'sidePanel':
+        return Container(
+          decoration: BoxDecoration(
+            color: palette.accent,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.text('invoiceBalanceDueLabel'),
+                      style: theme.textTheme.titleMedium?.copyWith(color: palette.headerText),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dueMessage,
+                      style: theme.textTheme.bodySmall?.copyWith(color: palette.tagline),
+                    ),
+                    if (showThankYou)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          l10n.text('invoiceThankYou'),
+                          style: theme.textTheme.bodyMedium?.copyWith(color: palette.headerText, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                totalText,
+                style: theme.textTheme.headlineMedium?.copyWith(color: palette.headerText, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        );
+      case 'stacked':
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: palette.balanceBackground,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: palette.border.withOpacity(0.6)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.text('invoiceBalanceDueLabel'),
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: palette.accent)),
+              const SizedBox(height: 8),
+              Text(totalText, style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, color: palette.accent)),
+              const SizedBox(height: 10),
+              Text(dueMessage, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+              if (showThankYou)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Text(
+                    l10n.text('invoiceThankYou'),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: palette.muted),
+                  ),
+                ),
+            ],
+          ),
+        );
+      case 'japaneseTotals':
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: palette.balanceBackground,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: palette.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(dueMessage, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+              const SizedBox(height: 6),
+              Text(totalText, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            ],
+          ),
+        );
+      default:
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: palette.balanceBackground,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.text('invoiceBalanceDueLabel'),
+                      style: theme.textTheme.titleMedium?.copyWith(color: palette.accent, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dueMessage,
+                      style: theme.textTheme.bodySmall?.copyWith(color: palette.muted),
+                    ),
+                    if (showThankYou)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          l10n.text('invoiceThankYou'),
+                          style: theme.textTheme.bodyMedium?.copyWith(color: palette.accent, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Text(
+                totalText,
+                style: theme.textTheme.headlineSmall?.copyWith(color: palette.accent, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        );
+    }
   }
 }
 
@@ -1193,12 +1748,45 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final layout = section.metadata['layout'] as String?;
+    Color background = palette.surface;
+    BorderRadius radius = BorderRadius.circular(20);
+    Border border = Border.all(color: palette.border);
+    List<BoxShadow>? shadows;
+    String title = titleOverride ?? _sectionTitle(section.type, l10n);
+
+    switch (layout) {
+      case 'thankYou':
+        background = palette.highlight?.withOpacity(0.12) ?? palette.accent.withOpacity(0.08);
+        border = Border.all(color: palette.accent.withOpacity(0.5));
+        title = l10n.text('invoiceThankYou');
+        break;
+      case 'notesBox':
+        border = Border.all(color: palette.border.withOpacity(0.7));
+        background = palette.surface;
+        radius = BorderRadius.circular(16);
+        break;
+      case 'remarks':
+        background = palette.surface;
+        border = Border.all(color: palette.border.withOpacity(0.5));
+        break;
+      default:
+        shadows = [
+          BoxShadow(
+            color: palette.accent.withOpacity(0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 10),
+          ),
+        ];
+    }
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: palette.border),
+        color: background,
+        borderRadius: radius,
+        border: border,
+        boxShadow: shadows,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1207,7 +1795,7 @@ class _SectionCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  titleOverride ?? _sectionTitle(section.type, l10n),
+                  title,
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1553,6 +2141,7 @@ class LineItemsEditor extends StatelessWidget {
     required this.items,
     required this.currencyFormat,
     required this.readOnly,
+    required this.palette,
     required this.onChanged,
     required this.onAdd,
     required this.onRemove,
@@ -1561,6 +2150,7 @@ class LineItemsEditor extends StatelessWidget {
   final List<InvoiceLineItem> items;
   final NumberFormat currencyFormat;
   final bool readOnly;
+  final InvoiceTemplateSpec palette;
   final void Function(String id, InvoiceLineItem updated) onChanged;
   final VoidCallback onAdd;
   final void Function(String id) onRemove;
@@ -1569,6 +2159,8 @@ class LineItemsEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = context.l10n;
+    final columns = palette.lineItemColumns;
+    final style = palette.lineItemStyle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1585,86 +2177,271 @@ class LineItemsEditor extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        _LineItemHeader(columns: columns, palette: palette),
+        const SizedBox(height: 8),
         Column(
           children: [
-            for (final item in items)
+            for (var index = 0; index < items.length; index++)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: theme.colorScheme.outlineVariant),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: InlineEditableText(
-                              value: item.description,
-                              placeholder: l10n.text('invoiceLineDescriptionPlaceholder'),
-                              multiline: true,
-                              enabled: !readOnly,
-                              onSubmitted: (value) => onChanged(
-                                item.id,
-                                item.copyWith(description: value.isEmpty ? l10n.text('invoiceLineDescriptionPlaceholder') : value),
-                              ),
-                            ),
-                          ),
-                          if (!readOnly)
-                            IconButton(
-                              onPressed: () => onRemove(item.id),
-                              icon: const Icon(Icons.close),
-                              tooltip: l10n.text('removeLineItem'),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InlineEditableText(
-                              value: item.quantity.toString(),
-                              placeholder: '1',
-                              enabled: !readOnly,
-                              onSubmitted: (value) {
-                                final qty = double.tryParse(value.replaceAll(',', '.')) ?? item.quantity;
-                                onChanged(item.id, item.copyWith(quantity: qty));
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: InlineEditableText(
-                              value: item.unitPrice.toStringAsFixed(2),
-                              placeholder: currencyFormat.format(0),
-                              enabled: !readOnly,
-                              onSubmitted: (value) {
-                                final price = double.tryParse(value.replaceAll(',', '.')) ?? item.unitPrice;
-                                onChanged(item.id, item.copyWith(unitPrice: price));
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              currencyFormat.format(item.total),
-                              textAlign: TextAlign.end,
-                              style: theme.textTheme.titleMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _LineItemRow(
+                  item: items[index],
+                  palette: palette,
+                  theme: theme,
+                  l10n: l10n,
+                  currencyFormat: currencyFormat,
+                  readOnly: readOnly,
+                  style: style,
+                  index: index,
+                  onChanged: onChanged,
+                  onRemove: onRemove,
                 ),
               ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _LineItemHeader extends StatelessWidget {
+  const _LineItemHeader({required this.columns, required this.palette});
+
+  final List<String> columns;
+  final InvoiceTemplateSpec palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labels = columns.length >= 4
+        ? columns
+        : <String>['Description', 'Qty', 'Rate', 'Amount'];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        color: palette.tableHeader,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: Text(
+              labels[0],
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: palette.tableHeaderText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              labels[1],
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: palette.tableHeaderText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              labels[2],
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: palette.tableHeaderText,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                labels[3],
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: palette.tableHeaderText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LineItemRow extends StatelessWidget {
+  const _LineItemRow({
+    required this.item,
+    required this.palette,
+    required this.theme,
+    required this.l10n,
+    required this.currencyFormat,
+    required this.readOnly,
+    required this.style,
+    required this.index,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  final InvoiceLineItem item;
+  final InvoiceTemplateSpec palette;
+  final ThemeData theme;
+  final AppLocalizations l10n;
+  final NumberFormat currencyFormat;
+  final bool readOnly;
+  final String style;
+  final int index;
+  final void Function(String id, InvoiceLineItem updated) onChanged;
+  final void Function(String id) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final decoration = _decoration();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: decoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: InlineEditableText(
+                  value: item.description,
+                  placeholder: l10n.text('invoiceLineDescriptionPlaceholder'),
+                  multiline: true,
+                  enabled: !readOnly,
+                  onSubmitted: (value) => onChanged(
+                    item.id,
+                    item.copyWith(
+                      description: value.isEmpty
+                          ? l10n.text('invoiceLineDescriptionPlaceholder')
+                          : value,
+                    ),
+                  ),
+                ),
+              ),
+              if (!readOnly)
+                IconButton(
+                  onPressed: () => onRemove(item.id),
+                  icon: const Icon(Icons.close),
+                  tooltip: l10n.text('removeLineItem'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: InlineEditableText(
+                  value: item.quantity.toString(),
+                  placeholder: '1',
+                  enabled: !readOnly,
+                  onSubmitted: (value) {
+                    final qty = double.tryParse(value.replaceAll(',', '.')) ?? item.quantity;
+                    onChanged(item.id, item.copyWith(quantity: qty));
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: InlineEditableText(
+                  value: item.unitPrice.toStringAsFixed(2),
+                  placeholder: currencyFormat.format(0),
+                  enabled: !readOnly,
+                  onSubmitted: (value) {
+                    final price = double.tryParse(value.replaceAll(',', '.')) ?? item.unitPrice;
+                    onChanged(item.id, item.copyWith(unitPrice: price));
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    currencyFormat.format(item.total),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _decoration() {
+    final baseColor = palette.canvasBackground ?? palette.surface;
+    Color background;
+    BorderRadius radius = BorderRadius.circular(16);
+    Border? border;
+    List<BoxShadow>? shadows;
+
+    switch (style) {
+      case 'striped':
+        background = index.isEven
+            ? baseColor
+            : palette.tableHeader.withOpacity(0.08);
+        shadows = [
+          BoxShadow(
+            color: palette.accent.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ];
+        break;
+      case 'stripedLight':
+        background = index.isEven
+            ? baseColor
+            : palette.highlight?.withOpacity(0.08) ?? palette.accent.withOpacity(0.08);
+        border = Border.all(color: palette.border.withOpacity(0.5));
+        break;
+      case 'ledger':
+        background = baseColor;
+        border = Border.all(color: palette.border, width: 1.2);
+        radius = BorderRadius.circular(8);
+        break;
+      case 'outlined':
+        background = baseColor;
+        border = Border.all(color: palette.border.withOpacity(0.8));
+        radius = BorderRadius.circular(14);
+        break;
+      case 'separated':
+        background = baseColor;
+        border = Border(bottom: BorderSide(color: palette.border.withOpacity(0.6), width: 1));
+        radius = BorderRadius.circular(0);
+        break;
+      case 'tableHeader':
+        background = index.isEven
+            ? baseColor
+            : palette.tableHeader.withOpacity(0.06);
+        border = Border.all(color: palette.border.withOpacity(0.6));
+        break;
+      case 'japanese':
+        background = baseColor;
+        border = Border.all(color: palette.border.withOpacity(0.8));
+        radius = BorderRadius.circular(12);
+        break;
+      default:
+        background = baseColor;
+    }
+
+    return BoxDecoration(
+      color: background,
+      borderRadius: radius,
+      border: border,
+      boxShadow: shadows,
     );
   }
 }

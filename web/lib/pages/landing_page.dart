@@ -183,7 +183,7 @@ class _LandingPageState extends State<LandingPage> {
                     ),
                   ],
                 );
-                final preview = _TemplateHeroCard(spec: invoiceTemplateSpec(InvoiceTemplate.executive));
+                final preview = _TemplateHeroCard(spec: invoiceTemplateSpec(InvoiceTemplate.waveBlue));
                 if (isNarrow) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -326,7 +326,7 @@ class _LandingPageState extends State<LandingPage> {
     final width = MediaQuery.of(context).size.width;
     final horizontalPadding = math.max(24.0, width * 0.08);
     final isNarrow = width < 900;
-    final palette = invoiceTemplateSpec(InvoiceTemplate.japanese);
+    final palette = invoiceTemplateSpec(InvoiceTemplate.japaneseBusiness);
 
     return Padding(
       padding: EdgeInsets.symmetric(
@@ -529,7 +529,7 @@ class _LandingPageState extends State<LandingPage> {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final width = MediaQuery.of(context).size.width;
-    final palette = invoiceTemplateSpec(InvoiceTemplate.executive);
+    final palette = invoiceTemplateSpec(InvoiceTemplate.emeraldStripe);
 
     return Padding(
       padding: EdgeInsets.symmetric(
