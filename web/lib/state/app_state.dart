@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:uuid/uuid.dart';
 
 import '../config/app_config.dart';
+import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
@@ -123,6 +124,8 @@ class AppState extends ChangeNotifier {
       currencySymbol: config.currencySymbol,
     );
     _profile = _guestProfile;
+    _locale = _resolveInitialLocale();
+    unawaited(initializeDateFormatting(_locale.toLanguageTag()));
     _seedAccounts();
     _invoices.addAll(_seedInvoices());
   }
@@ -144,7 +147,7 @@ class AppState extends ChangeNotifier {
   AuthUser? _adminUser;
   late UserProfile _profile;
   Invoice? _selectedInvoice;
-  Locale _locale = const Locale('en');
+  late Locale _locale;
   bool _isLocaleChanging = false;
   bool _isLoading = false;
   bool _isAdminLoading = false;
@@ -524,6 +527,7 @@ class AppState extends ChangeNotifier {
     final localeTag = decoded['locale'] as String?;
     if (localeTag != null && localeTag.isNotEmpty) {
       _locale = _localeFromTag(localeTag);
+      unawaited(initializeDateFormatting(_locale.toLanguageTag()));
     }
 
     final profileData = decoded['profile'];
@@ -717,6 +721,35 @@ class AppState extends ChangeNotifier {
         subscriptionSince: DateTime.now().subtract(const Duration(days: 120)),
       ),
     ]);
+  }
+
+  Locale _resolveInitialLocale() {
+    Locale? matchLocale(Locale? candidate) {
+      if (candidate == null) return null;
+      for (final supported in AppLocalizations.supportedLocales) {
+        if (supported == candidate) {
+          return supported;
+        }
+      }
+      for (final supported in AppLocalizations.supportedLocales) {
+        if (supported.languageCode.toLowerCase() == candidate.languageCode.toLowerCase()) {
+          return supported;
+        }
+      }
+      return null;
+    }
+
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    final deviceLocales = dispatcher.locales;
+    for (final candidate in deviceLocales) {
+      final match = matchLocale(candidate);
+      if (match != null) {
+        return match;
+      }
+    }
+
+    final fallback = matchLocale(dispatcher.locale);
+    return fallback ?? AppLocalizations.supportedLocales.first;
   }
 
   void _ensureAccountFor(AuthUser user, {String? role}) {
