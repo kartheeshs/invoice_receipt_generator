@@ -491,7 +491,7 @@ class AppState extends ChangeNotifier {
       'accounts': _accounts.map((account) => account.toJson()).toList(),
       'activityLog': _activityLog,
       'locale': _locale.toLanguageTag(),
-      if (_selectedInvoice != null) 'selectedInvoiceId': _selectedInvoice!.id,
+      'selectedInvoiceId': _selectedInvoice?.id,
     };
   }
 
