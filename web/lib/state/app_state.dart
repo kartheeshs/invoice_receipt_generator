@@ -33,9 +33,11 @@ class AppState extends ChangeNotifier {
       displayName: 'Guest',
       email: '',
       companyName: 'Freelance Studio',
+      tagline: 'Global creative partner',
       address: '1-2-3 Shibuya, Tokyo, Japan',
       phone: '+81 3-1234-5678',
       taxId: 'TAX-0001',
+      logoUrl: 'https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=160&q=80',
       currencyCode: config.currencyCode,
       currencySymbol: config.currencySymbol,
     );
@@ -74,7 +76,7 @@ class AppState extends ChangeNotifier {
   Invoice? get selectedInvoice => _selectedInvoice;
 
   List<InvoiceTemplate> get availableTemplates =>
-      isGuest ? const [InvoiceTemplate.classic] : InvoiceTemplate.values;
+      isGuest ? const [InvoiceTemplate.classic, InvoiceTemplate.japanese] : InvoiceTemplate.values;
 
   double get outstandingTotal => _invoices
       .where((invoice) => invoice.status != InvoiceStatus.paid)
@@ -224,7 +226,7 @@ class AppState extends ChangeNotifier {
         issueDate: now.subtract(const Duration(days: 12)),
         dueDate: now.add(const Duration(days: 18)),
         status: InvoiceStatus.sent,
-        template: InvoiceTemplate.classic,
+        template: InvoiceTemplate.executive,
         notes: 'Payable within 30 days via bank transfer.',
       ),
       Invoice(
@@ -239,7 +241,7 @@ class AppState extends ChangeNotifier {
         issueDate: now.subtract(const Duration(days: 35)),
         dueDate: now.subtract(const Duration(days: 5)),
         status: InvoiceStatus.paid,
-        template: InvoiceTemplate.modern,
+        template: InvoiceTemplate.japanese,
         notes: 'Thank you for your business!',
       ),
     ];

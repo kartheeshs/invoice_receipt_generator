@@ -1,6 +1,6 @@
 enum InvoiceStatus { draft, sent, paid, overdue }
 
-enum InvoiceTemplate { classic, modern, minimal }
+enum InvoiceTemplate { classic, modern, minimal, executive, japanese }
 
 class Invoice {
   const Invoice({
@@ -89,4 +89,38 @@ class Invoice {
   final String notes;
 
   bool get isOverdue => status == InvoiceStatus.overdue;
+}
+
+extension InvoiceTemplateMetadata on InvoiceTemplate {
+  String get labelKey {
+    switch (this) {
+      case InvoiceTemplate.classic:
+        return 'templateClassic';
+      case InvoiceTemplate.modern:
+        return 'templateModern';
+      case InvoiceTemplate.minimal:
+        return 'templateMinimal';
+      case InvoiceTemplate.executive:
+        return 'templateExecutive';
+      case InvoiceTemplate.japanese:
+        return 'templateJapanese';
+    }
+  }
+
+  String get blurbKey {
+    switch (this) {
+      case InvoiceTemplate.classic:
+        return 'templateClassicBlurb';
+      case InvoiceTemplate.modern:
+        return 'templateModernBlurb';
+      case InvoiceTemplate.minimal:
+        return 'templateMinimalBlurb';
+      case InvoiceTemplate.executive:
+        return 'templateExecutiveBlurb';
+      case InvoiceTemplate.japanese:
+        return 'templateJapaneseBlurb';
+    }
+  }
+
+  bool get isJapanese => this == InvoiceTemplate.japanese;
 }
