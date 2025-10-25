@@ -1973,15 +1973,23 @@ class _TemplatePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget previewLine(double widthFactor, Color color, {double height = 6}) {
-      return FractionallySizedBox(
-        widthFactor: widthFactor,
-        child: Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth;
+          final width = (maxWidth.isFinite ? maxWidth : 120.0) * widthFactor;
+
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        },
       );
     }
 
