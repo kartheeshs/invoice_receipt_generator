@@ -114,7 +114,7 @@ class Receipt {
       paymentMethod: json['paymentMethod'] as String? ?? '',
       paymentReference: json['paymentReference'] as String? ?? '',
       currencyCode: json['currencyCode'] as String? ?? 'USD',
-      currencySymbol: json['currencySymbol'] as String? ?? '$',
+      currencySymbol: json['currencySymbol'] as String? ?? '\$',
       items: parsedItems.isEmpty ? [ReceiptItem.empty()] : parsedItems,
       taxRate: (json['taxRate'] as num?)?.toDouble() ?? 0,
       notes: json['notes'] as String? ?? '',
