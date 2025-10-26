@@ -1590,15 +1590,16 @@ class _GlobalHeaderSection extends StatelessWidget {
     }
   }
 
-  static Future<DateTime?> _pickDate(BuildContext context, {required DateTime initial}) async {
-    final now = DateTime.now();
-    return showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 5),
-    );
-  }
+}
+
+Future<DateTime?> _pickDate(BuildContext context, {required DateTime initial}) async {
+  final now = DateTime.now();
+  return showDatePicker(
+    context: context,
+    initialDate: initial,
+    firstDate: DateTime(now.year - 5),
+    lastDate: DateTime(now.year + 5),
+  );
 }
 
 class _InfoColumns extends StatelessWidget {
