@@ -11,6 +11,16 @@ class AuthUser {
     this.displayName,
   });
 
+  factory AuthUser.fromJson(Map<String, dynamic> json) {
+    return AuthUser(
+      uid: json['uid'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      idToken: json['idToken'] as String? ?? '',
+      refreshToken: json['refreshToken'] as String? ?? '',
+      displayName: json['displayName'] as String?,
+    );
+  }
+
   AuthUser copyWith({
     String? displayName,
     String? idToken,
@@ -30,6 +40,16 @@ class AuthUser {
   final String idToken;
   final String refreshToken;
   final String? displayName;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'uid': uid,
+      'email': email,
+      'idToken': idToken,
+      'refreshToken': refreshToken,
+      if (displayName != null) 'displayName': displayName,
+    };
+  }
 }
 
 class FirebaseAuthException implements Exception {
@@ -121,6 +141,14 @@ class FirebaseAuthService {
       return user.copyWith(displayName: details['displayName'] as String?);
     }
     return user;
+  }
+
+  Future<void> signOut() async {
+    // Firebase Identity Toolkit does not expose a dedicated sign-out endpoint
+    // for password-based web clients. The caller is responsible for discarding
+    // cached credentials, so this method simply completes to keep the
+    // interface uniform across platforms.
+    return Future<void>.value();
   }
 
   Future<Map<String, dynamic>> _post({

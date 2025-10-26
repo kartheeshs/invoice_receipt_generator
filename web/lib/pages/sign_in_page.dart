@@ -39,6 +39,7 @@ class _SignInPageState extends State<SignInPage> {
     final isLoading = appState.isLoading;
     final hasFirebase = appState.hasFirebase;
     final locale = appState.locale;
+    final isLocaleChanging = appState.isLocaleChanging;
 
     final errorMessage = appState.errorMessage;
     if (errorMessage != null && errorMessage != _lastError) {
@@ -79,20 +80,46 @@ class _SignInPageState extends State<SignInPage> {
                     elevation: 16,
                     color: theme.colorScheme.surface.withOpacity(0.9),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isWide ? 48 : 32,
-                        vertical: isWide ? 40 : 32,
-                      ),
-                      child: isWide
-                          ? Row(
-                              children: [
-                                Expanded(child: _buildHeroColumn(theme, l10n, appState)),
-                                const SizedBox(width: 48),
-                                SizedBox(width: maxCardWidth, child: _buildForm(context, theme, l10n, appState, hasFirebase, locale, isLoading)),
-                              ],
-                            )
-                          : _buildForm(context, theme, l10n, appState, hasFirebase, locale, isLoading),
+                    child: Stack(
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isWide ? 48 : 32,
+                            vertical: isWide ? 40 : 32,
+                          ),
+                          child: isWide
+                              ? Row(
+                                  children: [
+                                    Expanded(child: _buildHeroColumn(theme, l10n, appState)),
+                                    const SizedBox(width: 48),
+                                    SizedBox(
+                                      width: maxCardWidth,
+                                      child: _buildForm(
+                                        context,
+                                        theme,
+                                        l10n,
+                                        appState,
+                                        hasFirebase,
+                                        locale,
+                                        isLoading,
+                                        isLocaleChanging,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : _buildForm(
+                                  context,
+                                  theme,
+                                  l10n,
+                                  appState,
+                                  hasFirebase,
+                                  locale,
+                                  isLoading,
+                                  isLocaleChanging,
+                                ),
+                        ),
+                        if (isLocaleChanging) const _LocaleLoadingShield(),
+                      ],
                     ),
                   ),
                 ),
@@ -157,6 +184,7 @@ class _SignInPageState extends State<SignInPage> {
     bool hasFirebase,
     Locale locale,
     bool isLoading,
+    bool isLocaleChanging,
   ) {
     return SingleChildScrollView(
       child: Column(
@@ -175,9 +203,13 @@ class _SignInPageState extends State<SignInPage> {
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<Locale>(
                     value: locale,
-                    onChanged: (value) {
-                      if (value != null) context.read<AppState>().setLocale(value);
-                    },
+                    onChanged: isLocaleChanging
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              context.read<AppState>().setLocale(value);
+                            }
+                          },
                     items: const [
                       DropdownMenuItem(value: Locale('en'), child: Text('English')),
                       DropdownMenuItem(value: Locale('ja'), child: Text('日本語')),
@@ -188,6 +220,10 @@ class _SignInPageState extends State<SignInPage> {
             ),
           ),
           const SizedBox(height: 24),
+          if (isLocaleChanging) ...[
+            const LinearProgressIndicator(minHeight: 2),
+            const SizedBox(height: 24),
+          ],
           Text(
             l10n.text(_isSignUp ? 'signUpTitle' : 'signInTitle'),
             style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
@@ -395,6 +431,50 @@ class _SignInPageState extends State<SignInPage> {
     if (appState.isAuthenticated) {
       Navigator.of(context).pop();
     }
+  }
+}
+
+class _LocaleLoadingShield extends StatelessWidget {
+  const _LocaleLoadingShield();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Positioned.fill(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          opacity: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withOpacity(0.82),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 4,
+                      valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    context.l10n.text('loadingMessage'),
+                    style: theme.textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

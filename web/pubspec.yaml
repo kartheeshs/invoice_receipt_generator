@@ -1,4 +1,4 @@
-name: web
+name: invoice_receipt_generator_web
 description: "Responsive invoice and receipt generator for freelancers."
 publish_to: 'none'
 
@@ -14,10 +14,12 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   firebase_core: ^2.32.0
+  web: ^0.5.1
   intl: ^0.20.2
   provider: ^6.1.2
   uuid: ^4.4.0
   pdf: ^3.11.0
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:

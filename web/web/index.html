@@ -33,6 +33,25 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-app.js';
+    import { getAnalytics, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.1/firebase-analytics.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ',
+      authDomain: 'invoice-receipt-generator-g7.firebaseapp.com',
+      projectId: 'invoice-receipt-generator-g7',
+      storageBucket: 'invoice-receipt-generator-g7.firebasestorage.app',
+      messagingSenderId: '798489264335',
+      appId: '1:798489264335:web:b1bc7f6fe8dc5e68de37ba',
+      measurementId: 'G-TKYV2VSPMZ'
+    };
+
+    const app = initializeApp(firebaseConfig);
+    if (await isSupported()) {
+      getAnalytics(app);
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

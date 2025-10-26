@@ -5,9 +5,11 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../state/app_state.dart';
+import '../widgets/language_menu_button.dart';
 import '../widgets/profile_form_dialog.dart';
 import 'dashboard_page.dart';
 import 'invoices_page.dart';
+import 'admin_page.dart';
 import 'settings_page.dart';
 import 'sign_in_page.dart';
 
@@ -27,8 +29,10 @@ class _HomeShellState extends State<HomeShell> {
     final l10n = context.l10n;
     final theme = Theme.of(context);
     final isGuest = appState.isGuest;
+    final isLocaleChanging = appState.isLocaleChanging;
+    final isAdmin = appState.isAdmin;
 
-    final pages = [
+    final pages = <Widget>[
       DashboardPage(
         onCreateInvoice: _createInvoice,
         onOpenSubscription: _handleManageSubscription,
@@ -38,9 +42,10 @@ class _HomeShellState extends State<HomeShell> {
         onDownloadInvoice: _handleDownloadInvoice,
         onRequestSignIn: () => _openAuthFlow(),
       ),
+      if (isAdmin) const AdminPage(),
       SettingsPage(
         onEditProfile: _editProfile,
-        onLanguageChanged: context.read<AppState>().setLocale,
+        onLanguageChanged: (locale) => context.read<AppState>().setLocale(locale),
         onSignOut: context.read<AppState>().signOut,
         onManageSubscription: _handleManageSubscription,
         onCancelSubscription: () => context.read<AppState>().markPremium(false),
@@ -51,15 +56,50 @@ class _HomeShellState extends State<HomeShell> {
     final isWide = MediaQuery.of(context).size.width >= 960;
 
     final navigationDestinations = <NavigationDestination>[
-      NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard), label: l10n.text('dashboardTab')),
-      NavigationDestination(icon: const Icon(Icons.receipt_long_outlined), selectedIcon: const Icon(Icons.receipt_long), label: l10n.text('invoicesTab')),
-      NavigationDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings), label: l10n.text('settingsTab')),
+      NavigationDestination(
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: l10n.text('dashboardTab')),
+      NavigationDestination(
+          icon: const Icon(Icons.receipt_long_outlined),
+          selectedIcon: const Icon(Icons.receipt_long),
+          label: l10n.text('invoicesTab')),
+      if (isAdmin)
+        NavigationDestination(
+          icon: const Icon(Icons.shield_outlined),
+          selectedIcon: const Icon(Icons.shield),
+          label: l10n.text('adminTab'),
+        ),
+      NavigationDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: l10n.text('settingsTab')),
     ];
+
+    if (_index >= navigationDestinations.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _index = navigationDestinations.length - 1);
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.text('appTitle')),
         actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: LanguageMenuButton(
+              currentLocale: appState.locale,
+              onSelected: (locale) => context.read<AppState>().setLocale(locale),
+              isBusy: isLocaleChanging,
+              foregroundColor: theme.colorScheme.onSurface,
+              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+              borderColor: theme.colorScheme.outlineVariant,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: isGuest
@@ -90,35 +130,40 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: Row(
+      body: Stack(
         children: [
-          if (isWide)
-            NavigationRail(
-              extended: true,
-              selectedIndex: _index,
-              onDestinationSelected: (value) => setState(() => _index = value),
-              destinations: navigationDestinations
-                  .map(
-                    (destination) => NavigationRailDestination(
-                      icon: destination.icon,
-                      selectedIcon: destination.selectedIcon,
-                      label: Text(destination.label),
-                    ),
-                  )
-                  .toList(),
-            ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              switchInCurve: Curves.easeInOut,
-              switchOutCurve: Curves.easeInOut,
-              child: IndexedStack(
-                key: ValueKey(_index),
-                index: _index,
-                children: pages,
+          Row(
+            children: [
+              if (isWide)
+                NavigationRail(
+                  extended: true,
+                  selectedIndex: _index,
+                  onDestinationSelected: (value) => setState(() => _index = value),
+                  destinations: navigationDestinations
+                      .map(
+                        (destination) => NavigationRailDestination(
+                          icon: destination.icon,
+                          selectedIcon: destination.selectedIcon,
+                          label: Text(destination.label),
+                        ),
+                      )
+                      .toList(),
+                ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  child: IndexedStack(
+                    key: ValueKey(_index),
+                    index: _index,
+                    children: pages,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          if (isLocaleChanging) const _LocaleChangeOverlay(),
         ],
       ),
       bottomNavigationBar: isWide
@@ -234,5 +279,45 @@ class _HomeShellState extends State<HomeShell> {
       return parts.first.substring(0, 1).toUpperCase();
     }
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+}
+
+class _LocaleChangeOverlay extends StatelessWidget {
+  const _LocaleChangeOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Positioned.fill(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: DecoratedBox(
+          key: const ValueKey('locale-loading'),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface.withOpacity(0.75),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  context.l10n.text('loadingMessage'),
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
