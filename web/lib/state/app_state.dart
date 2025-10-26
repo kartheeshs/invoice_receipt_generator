@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../config/app_config.dart';
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
+import '../models/receipt.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/crisp_service.dart';
@@ -128,6 +129,7 @@ class AppState extends ChangeNotifier {
     unawaited(initializeDateFormatting(_locale.toLanguageTag()));
     _seedAccounts();
     _invoices.addAll(_seedInvoices());
+    _receipts.addAll(_seedReceipts());
   }
 
   final AppConfig _config;
@@ -136,6 +138,7 @@ class AppState extends ChangeNotifier {
   final CrispService _crispService;
   final FirestoreService _firestoreService;
   final List<Invoice> _invoices = [];
+  final List<Receipt> _receipts = [];
   final List<ManagedAccount> _accounts = [];
   final List<String> _activityLog = [];
   final List<String> _adminEmails;
@@ -147,6 +150,7 @@ class AppState extends ChangeNotifier {
   AuthUser? _adminUser;
   late UserProfile _profile;
   Invoice? _selectedInvoice;
+  Receipt? _selectedReceipt;
   late Locale _locale;
   bool _isLocaleChanging = false;
   bool _isLoading = false;
@@ -184,7 +188,9 @@ class AppState extends ChangeNotifier {
   bool get isGuest => _user == null;
 
   UnmodifiableListView<Invoice> get invoices => UnmodifiableListView(_invoices);
+  UnmodifiableListView<Receipt> get receipts => UnmodifiableListView(_receipts);
   Invoice? get selectedInvoice => _selectedInvoice;
+  Receipt? get selectedReceipt => _selectedReceipt;
   UnmodifiableListView<ManagedAccount> get accounts => UnmodifiableListView(_accounts);
   UnmodifiableListView<String> get activityLog => UnmodifiableListView(_activityLog);
 
@@ -197,6 +203,8 @@ class AppState extends ChangeNotifier {
 
   double get paidTotal =>
       _invoices.where((invoice) => invoice.status == InvoiceStatus.paid).fold(0, (total, invoice) => total + invoice.amount);
+
+  double get receiptVolume => _receipts.fold(0, (total, receipt) => total + receipt.total);
 
   double get averageInvoice =>
       _invoices.isEmpty ? 0 : _invoices.map((invoice) => invoice.amount).reduce((a, b) => a + b) / _invoices.length;
@@ -300,6 +308,7 @@ class AppState extends ChangeNotifier {
     _user = null;
     _isPremium = false;
     _selectedInvoice = null;
+    _selectedReceipt = null;
     _profile = _guestProfile;
     notifyListeners();
   }
@@ -362,6 +371,24 @@ class AppState extends ChangeNotifier {
     return invoice;
   }
 
+  Receipt prepareReceipt([Receipt? existing]) {
+    if (existing != null) {
+      return existing;
+    }
+    final counter = (_receipts.length + 1).toString().padLeft(3, '0');
+    final number = '#RCT-$counter';
+    final receipt = Receipt.create(
+      id: _uuid.v4(),
+      number: number,
+      currencyCode: _profile.currencyCode,
+      currencySymbol: _profile.currencySymbol,
+    ).copyWith(
+      logoUrl: _profile.logoUrl.isEmpty ? null : _profile.logoUrl,
+      paymentMethod: 'Bank transfer',
+    );
+    return receipt;
+  }
+
   void saveInvoice(Invoice invoice) {
     final index = _invoices.indexWhere((element) => element.id == invoice.id);
     final now = DateTime.now();
@@ -411,11 +438,45 @@ class AppState extends ChangeNotifier {
     _persistState();
   }
 
+  void saveReceipt(Receipt receipt) {
+    final index = _receipts.indexWhere((element) => element.id == receipt.id);
+    if (index >= 0) {
+      _receipts[index] = receipt;
+    } else {
+      _receipts.add(receipt);
+    }
+    _selectedReceipt = receipt;
+    notifyListeners();
+    _persistState();
+  }
+
+  void deleteReceipt(String id) {
+    _receipts.removeWhere((receipt) => receipt.id == id);
+    if (_selectedReceipt?.id == id) {
+      _selectedReceipt = null;
+    }
+    notifyListeners();
+    _persistState();
+  }
+
+  void selectReceipt(Receipt? receipt) {
+    _selectedReceipt = receipt;
+    notifyListeners();
+    _persistState();
+  }
+
   Future<void> downloadInvoicePdf(Invoice invoice) async {
     if (isGuest) {
       throw const AccessDeniedException('downloadRequiresAccount');
     }
     await _pdfService.downloadInvoice(invoice: invoice, profile: _profile, locale: _locale);
+  }
+
+  Future<void> downloadReceiptPdf(Receipt receipt) async {
+    if (isGuest) {
+      throw const AccessDeniedException('downloadRequiresAccount');
+    }
+    await _pdfService.downloadReceipt(receipt: receipt, profile: _profile, locale: _locale);
   }
 
   void openSubscription() {
@@ -504,10 +565,12 @@ class AppState extends ChangeNotifier {
       'profile': _profile.toJson(),
       'isPremium': _isPremium,
       'invoices': _invoices.map((invoice) => invoice.toJson()).toList(),
+      'receipts': _receipts.map((receipt) => receipt.toJson()).toList(),
       'accounts': _accounts.map((account) => account.toJson()).toList(),
       'activityLog': _activityLog,
       'locale': _locale.toLanguageTag(),
       'selectedInvoiceId': _selectedInvoice?.id,
+      'selectedReceiptId': _selectedReceipt?.id,
     };
   }
 
@@ -569,6 +632,16 @@ class AppState extends ChangeNotifier {
       }
     }
 
+    final receiptsData = decoded['receipts'];
+    if (receiptsData is List) {
+      _receipts.clear();
+      for (final item in receiptsData) {
+        if (item is Map) {
+          _receipts.add(Receipt.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+
     final activityData = decoded['activityLog'];
     if (activityData is List) {
       _activityLog.clear();
@@ -593,6 +666,20 @@ class AppState extends ChangeNotifier {
       _selectedInvoice = match;
     } else {
       _selectedInvoice = null;
+    }
+
+    final selectedReceiptId = decoded['selectedReceiptId'] as String?;
+    if (selectedReceiptId != null && selectedReceiptId.isNotEmpty) {
+      Receipt? receiptMatch;
+      for (final receipt in _receipts) {
+        if (receipt.id == selectedReceiptId) {
+          receiptMatch = receipt;
+          break;
+        }
+      }
+      _selectedReceipt = receiptMatch;
+    } else {
+      _selectedReceipt = null;
     }
 
   }
@@ -696,6 +783,52 @@ class AppState extends ChangeNotifier {
     ).recalculateTotals();
 
     return [monochromeInvoice, japaneseInvoice];
+  }
+
+  List<Receipt> _seedReceipts() {
+    final now = DateTime.now();
+
+    final kyotoReceipt = Receipt(
+      id: _uuid.v4(),
+      number: '#RCT-201',
+      clientName: 'Kyoto Craft Market',
+      clientEmail: 'billing@kyotocraft.jp',
+      clientAddress: 'Nakagyo Ward, Kyoto, Japan',
+      issueDate: now.subtract(const Duration(days: 3)),
+      paymentMethod: 'Credit card',
+      paymentReference: 'AUTH-483920',
+      currencyCode: _profile.currencyCode,
+      currencySymbol: _profile.currencySymbol,
+      items: [
+        ReceiptItem(id: _uuid.v4(), description: 'Design consultation session', amount: 18000),
+        ReceiptItem(id: _uuid.v4(), description: 'Prototype review workshop', amount: 12000),
+      ],
+      taxRate: 0.1,
+      notes: 'Payment received in full. Thank you for partnering with us.',
+      logoUrl: _guestProfile.logoUrl,
+    );
+
+    final globalReceipt = Receipt(
+      id: _uuid.v4(),
+      number: '#RCT-202',
+      clientName: 'Atlas Mobility Ltd.',
+      clientEmail: 'finance@atlasmobility.co',
+      clientAddress: '44 Market Street, Singapore',
+      issueDate: now.subtract(const Duration(days: 18)),
+      paymentMethod: 'Bank transfer',
+      paymentReference: 'TRX-982174',
+      currencyCode: _profile.currencyCode,
+      currencySymbol: _profile.currencySymbol,
+      items: [
+        ReceiptItem(id: _uuid.v4(), description: 'Product design sprint', amount: 42000),
+        ReceiptItem(id: _uuid.v4(), description: 'Usability testing (4 sessions)', amount: 16000),
+      ],
+      taxRate: 0.08,
+      notes: 'Remittance confirmed. We appreciate your continued collaboration.',
+      logoUrl: _guestProfile.logoUrl,
+    );
+
+    return [kyotoReceipt, globalReceipt];
   }
 
   void _seedAccounts() {

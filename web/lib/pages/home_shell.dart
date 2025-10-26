@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
+import '../models/receipt.dart';
 import '../state/app_state.dart';
 import '../widgets/language_menu_button.dart';
 import '../widgets/profile_form_dialog.dart';
@@ -12,6 +13,7 @@ import 'invoices_page.dart';
 import 'admin_page.dart';
 import 'settings_page.dart';
 import 'sign_in_page.dart';
+import 'receipts_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -35,11 +37,16 @@ class _HomeShellState extends State<HomeShell> {
     final pages = <Widget>[
       DashboardPage(
         onCreateInvoice: _createInvoice,
+        onCreateReceipt: _createReceipt,
         onOpenSubscription: _handleManageSubscription,
         onRequestSignIn: () => _openAuthFlow(),
       ),
       InvoicesPage(
         onDownloadInvoice: _handleDownloadInvoice,
+        onRequestSignIn: () => _openAuthFlow(),
+      ),
+      ReceiptsPage(
+        onDownloadReceipt: _handleDownloadReceipt,
         onRequestSignIn: () => _openAuthFlow(),
       ),
       if (isAdmin) const AdminPage(),
@@ -64,6 +71,10 @@ class _HomeShellState extends State<HomeShell> {
           icon: const Icon(Icons.receipt_long_outlined),
           selectedIcon: const Icon(Icons.receipt_long),
           label: l10n.text('invoicesTab')),
+      NavigationDestination(
+          icon: const Icon(Icons.fact_check_outlined),
+          selectedIcon: const Icon(Icons.fact_check),
+          label: l10n.text('receiptsTab')),
       if (isAdmin)
         NavigationDestination(
           icon: const Icon(Icons.shield_outlined),
@@ -183,6 +194,13 @@ class _HomeShellState extends State<HomeShell> {
     setState(() => _index = 1);
   }
 
+  void _createReceipt() {
+    final appState = context.read<AppState>();
+    final receipt = appState.prepareReceipt();
+    appState.selectReceipt(receipt);
+    setState(() => _index = 2);
+  }
+
   Future<void> _handleDownloadInvoice(Invoice invoice) async {
     final authenticated = await _ensureAuthenticated(messageKey: 'downloadRequiresAccount');
     if (!authenticated) {
@@ -202,6 +220,27 @@ class _HomeShellState extends State<HomeShell> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(context.l10n.text('pdfReady'))));
+  }
+
+  Future<void> _handleDownloadReceipt(Receipt receipt) async {
+    final authenticated = await _ensureAuthenticated(messageKey: 'downloadRequiresAccount');
+    if (!authenticated) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.text('downloadRequiresAccount'))));
+      return;
+    }
+    try {
+      await context.read<AppState>().downloadReceiptPdf(receipt);
+    } on AccessDeniedException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.text(error.reasonKey))));
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.text('receiptDownloadStarted'))));
   }
 
   Future<void> _editProfile() async {
