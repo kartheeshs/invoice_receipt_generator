@@ -7,12 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/widgets.dart' show PdfGoogleFonts;
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../models/invoice_template_spec.dart';
 import '../models/user_profile.dart';
+import 'pdf_google_fonts.dart';
 
 class PdfService {
   _PdfFontBundle? _fontBundle;
