@@ -1,8 +1,10 @@
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
+import '../models/invoice.dart';
 import '../state/app_state.dart';
 import '../widgets/metric_card.dart';
 
@@ -73,22 +75,13 @@ class DashboardPage extends StatelessWidget {
               const SizedBox(height: 32),
               Text(l10n.text('recentInvoices'), style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 12),
-              if (isGuest) ...[
-                _GuestInvoicesNotice(l10n: l10n, onRequestSignIn: onRequestSignIn),
-                const SizedBox(height: 16),
-              ],
-              ...appState.recentInvoices.map((invoice) => Card(
-                    elevation: 0,
-                    child: ListTile(
-                      leading: const Icon(Icons.picture_as_pdf),
-                      title: Text(invoice.number),
-                      subtitle: Text(l10n.invoiceTemplateLabel(invoice.template)),
-                      trailing: Text(
-                        currency.format(invoice.amount),
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                  )),
+              _RecentInvoicesSection(
+                invoices: appState.recentInvoices,
+                l10n: l10n,
+                currency: currency,
+                isGuest: isGuest,
+                onRequestSignIn: onRequestSignIn,
+              ),
             ],
           ),
         );
@@ -204,6 +197,319 @@ class _MetricGrid extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _RecentInvoicesSection extends StatelessWidget {
+  const _RecentInvoicesSection({
+    required this.invoices,
+    required this.l10n,
+    required this.currency,
+    required this.isGuest,
+    required this.onRequestSignIn,
+  });
+
+  final List<Invoice> invoices;
+  final AppLocalizations l10n;
+  final NumberFormat currency;
+  final bool isGuest;
+  final Future<void> Function() onRequestSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    final children = <Widget>[];
+    if (isGuest) {
+      children
+        ..add(_GuestInvoicesNotice(l10n: l10n, onRequestSignIn: onRequestSignIn))
+        ..add(const SizedBox(height: 16));
+    }
+
+    children.add(_RecentInvoicesTable(
+      invoices: invoices,
+      l10n: l10n,
+      currency: currency,
+      locked: isGuest,
+    ));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+  }
+}
+
+class _RecentInvoicesTable extends StatelessWidget {
+  const _RecentInvoicesTable({
+    required this.invoices,
+    required this.l10n,
+    required this.currency,
+    this.locked = false,
+  });
+
+  final List<Invoice> invoices;
+  final AppLocalizations l10n;
+  final NumberFormat currency;
+  final bool locked;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasInvoices = invoices.isNotEmpty;
+
+    Widget content = Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _RecentInvoiceHeader(l10n: l10n),
+            const SizedBox(height: 12),
+            if (hasInvoices)
+              ...[for (var i = 0; i < invoices.length; i++) ...[
+                if (i > 0) const Divider(height: 28),
+                _RecentInvoiceRow(
+                  invoice: invoices[i],
+                  l10n: l10n,
+                  currency: currency,
+                ),
+              ]]
+            else
+              _RecentInvoicesEmptyState(l10n: l10n, locked: locked),
+          ],
+        ),
+      ),
+    );
+
+    if (!locked) {
+      return content;
+    }
+
+    return AnimatedOpacity(
+      opacity: 0.85,
+      duration: const Duration(milliseconds: 200),
+      child: content,
+    );
+  }
+}
+
+class _RecentInvoiceHeader extends StatelessWidget {
+  const _RecentInvoiceHeader({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.35,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 640;
+        if (isCompact) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(l10n.text('invoiceNumberLabel'), style: labelStyle),
+              Text(l10n.text('amountLabel'), style: labelStyle),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(flex: 3, child: Text(l10n.text('invoiceNumberLabel'), style: labelStyle)),
+            Expanded(flex: 2, child: Text(l10n.text('issueDateLabel'), style: labelStyle)),
+            Expanded(flex: 2, child: Text(l10n.text('invoiceStatusLabel'), style: labelStyle)),
+            Text(l10n.text('amountLabel'), style: labelStyle),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RecentInvoiceRow extends StatelessWidget {
+  const _RecentInvoiceRow({
+    required this.invoice,
+    required this.l10n,
+    required this.currency,
+  });
+
+  final Invoice invoice;
+  final AppLocalizations l10n;
+  final NumberFormat currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final issuedOn = l10n.dateFormat.format(invoice.issueDate);
+    final amountText = currency.format(invoice.amount);
+    final statusLabel = l10n.invoiceStatusLabel(invoice.status);
+    final statusColor = _statusColor(theme, invoice.status);
+    final statusBackground = statusColor.withOpacity(0.12);
+    final clientName = invoice.clientName.isNotEmpty
+        ? invoice.clientName
+        : l10n.text('invoiceDefaultClient');
+
+    final statusChip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: statusBackground,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        statusLabel,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: statusColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 640;
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      invoice.number,
+                      style: theme.textTheme.titleMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(amountText, style: theme.textTheme.titleMedium),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                clientName,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  statusChip,
+                  const SizedBox(width: 12),
+                  Text(
+                    issuedOn,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    invoice.number,
+                    style: theme.textTheme.titleMedium,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    clientName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                issuedOn,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: statusChip)),
+            Text(
+              amountText,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Color _statusColor(ThemeData theme, InvoiceStatus status) {
+    switch (status) {
+      case InvoiceStatus.draft:
+        return theme.colorScheme.outline;
+      case InvoiceStatus.sent:
+        return theme.colorScheme.primary;
+      case InvoiceStatus.paid:
+        return theme.colorScheme.secondary;
+      case InvoiceStatus.overdue:
+        return theme.colorScheme.error;
+    }
+  }
+}
+
+class _RecentInvoicesEmptyState extends StatelessWidget {
+  const _RecentInvoicesEmptyState({required this.l10n, required this.locked});
+
+  final AppLocalizations l10n;
+  final bool locked;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = locked ? l10n.text('guestInvoicesLockedTitle') : l10n.text('invoicesEmptyTitle');
+    final body = locked ? l10n.text('guestInvoicesLockedBody') : l10n.text('invoicesEmptyBody');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.inbox_outlined, size: 36, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(height: 12),
+          Text(title, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
+          const SizedBox(height: 6),
+          Text(
+            body,
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

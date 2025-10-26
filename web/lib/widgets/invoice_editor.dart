@@ -2725,10 +2725,43 @@ class _TemplatePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color onHeader = spec.headerText;
-    final Color tableHeader = spec.tableHeader;
-    final Color tableHeaderText = spec.tableHeaderText;
-    final Color canvas = spec.canvasBackground ?? spec.surface;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : 320.0;
+        final targetHeight = maxWidth * 0.75;
+        final preview = SizedBox(
+          width: maxWidth,
+          height: targetHeight,
+          child: _TemplatePreviewArtboard(spec: spec),
+        );
+
+        final hasTightHeight = constraints.hasBoundedHeight && constraints.maxHeight < targetHeight;
+        if (hasTightHeight) {
+          return FittedBox(
+            fit: BoxFit.contain,
+            alignment: Alignment.topCenter,
+            child: preview,
+          );
+        }
+
+        return preview;
+      },
+    );
+  }
+}
+
+class _TemplatePreviewArtboard extends StatelessWidget {
+  const _TemplatePreviewArtboard({required this.spec});
+
+  final InvoiceTemplateSpec spec;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = spec;
+    final Color onHeader = palette.headerText;
+    final Color tableHeader = palette.tableHeader;
+    final Color tableHeaderText = palette.tableHeaderText;
+    final Color canvas = palette.canvasBackground ?? palette.surface;
 
     Widget pill(Color color, {double height = 8, double widthFactor = 1}) {
       return LayoutBuilder(
