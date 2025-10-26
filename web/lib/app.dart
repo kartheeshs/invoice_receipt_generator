@@ -137,14 +137,14 @@ class InvoiceApp extends StatelessWidget {
         toolbarTextStyle: textTheme.bodyMedium,
         iconTheme: IconThemeData(color: headingColor),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColor,
         elevation: isDark ? 4 : 8,
         shadowColor: isDark ? Colors.black38 : const Color(0xFFB8C5FF).withOpacity(0.35),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         margin: EdgeInsets.zero,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         titleTextStyle: textTheme.titleLarge,

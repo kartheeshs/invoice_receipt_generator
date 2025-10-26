@@ -301,7 +301,7 @@ class _HeroPreviewCard extends StatelessWidget {
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: 20),
-          _TemplatePreviewCard(spec: invoiceTemplateSpec(const InvoiceTemplate.waveBlue())),
+          _TemplatePreviewCard(spec: invoiceTemplateSpec(InvoiceTemplate.waveBlue)),
         ],
       ),
     );
@@ -429,6 +429,7 @@ class _TemplateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final spec = invoiceTemplateSpec(template);
+    final l10n = context.l10n;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
@@ -452,9 +453,9 @@ class _TemplateCard extends StatelessWidget {
             children: [
               _TemplatePreviewCard(spec: spec),
               const SizedBox(height: 16),
-              Text(spec.displayName, style: theme.textTheme.titleMedium),
+              Text(l10n.text(spec.labelKey), style: theme.textTheme.titleMedium),
               const SizedBox(height: 6),
-              Text(spec.description, style: theme.textTheme.bodySmall),
+              Text(l10n.text(spec.blurbKey), style: theme.textTheme.bodySmall),
               const SizedBox(height: 16),
               Text('Use template', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
             ],

@@ -57,12 +57,20 @@ class PdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         theme: fonts.theme,
-        build: (context) => [
-          pw.DefaultTextStyle.merge(
-            style: pw.TextStyle(fontFallback: fonts.fallback),
-            child: pw.Column(children: content),
-          ),
-        ],
+        build: (context) {
+          final pageWidth = context.page.pageFormat.availableWidth;
+          return content
+              .map(
+                (widget) => pw.Container(
+                  width: pageWidth,
+                  child: pw.DefaultTextStyle.merge(
+                    style: pw.TextStyle(fontFallback: fonts.fallback),
+                    child: widget,
+                  ),
+                ),
+              )
+              .toList();
+        },
       ),
     );
 

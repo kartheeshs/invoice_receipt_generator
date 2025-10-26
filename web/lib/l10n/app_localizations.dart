@@ -460,8 +460,6 @@ class AppLocalizations {
       'landingAdminButton': '管理コンソールを見る',
       'landingFooterCopy': 'Next.jsのマーケティング体験とFlutterエディターを組み合わせた最新の請求プラットフォームです。',
       'privacyLink': 'プライバシーとポリシー',
-      'landingCtaTitle': '世界標準の請求書を今すぐ作成',
-      'landingCtaSubtitle': 'ゲストで無料体験、ログインすればプレミアムテンプレートとチーム機能を解放。',
       'landingCtaButton': '最初の請求書を作成',
       'landingCtaButtonAuthed': 'ダッシュボードへ移動',
       'landingNavProduct': '製品',
