@@ -469,7 +469,7 @@ class InvoiceDocument {
       InvoiceSection(
         id: _uuid.v4(),
         type: InvoiceSectionType.header,
-        metadata: const {'layout': 'wave'},
+        metadata: const {'layout': 'spotlight'},
         supportsLogo: true,
         elements: [
           InvoiceElement(
@@ -510,7 +510,7 @@ class InvoiceDocument {
         id: _uuid.v4(),
         type: InvoiceSectionType.billing,
         titleKey: 'billingDetailsTitle',
-        metadata: const {'layout': 'splitCompany'},
+        metadata: const {'layout': 'spotlightGrid'},
         elements: [
           InvoiceElement(
             id: _uuid.v4(),
@@ -562,7 +562,7 @@ class InvoiceDocument {
       InvoiceSection(
         id: _uuid.v4(),
         type: InvoiceSectionType.totals,
-        metadata: const {'layout': 'badge'},
+        metadata: const {'layout': 'summaryPill'},
         elements: [
           InvoiceElement(
             id: _uuid.v4(),
@@ -756,7 +756,7 @@ class InvoiceDocument {
       InvoiceSection(
         id: _uuid.v4(),
         type: InvoiceSectionType.header,
-        metadata: const {'layout': 'slate'},
+        metadata: const {'layout': 'pillar'},
         supportsLogo: true,
         elements: [
           InvoiceElement(
@@ -791,7 +791,7 @@ class InvoiceDocument {
         id: _uuid.v4(),
         type: InvoiceSectionType.billing,
         titleKey: 'billingDetailsTitle',
-        metadata: const {'layout': 'twoColumn'},
+        metadata: const {'layout': 'sidebarLedger'},
         elements: [
           InvoiceElement(
             id: _uuid.v4(),
@@ -1018,7 +1018,7 @@ class InvoiceDocument {
       InvoiceSection(
         id: _uuid.v4(),
         type: InvoiceSectionType.header,
-        metadata: const {'layout': 'outline'},
+        metadata: const {'layout': 'banner'},
         supportsLogo: true,
         elements: [
           InvoiceElement(

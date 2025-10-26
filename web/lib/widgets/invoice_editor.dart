@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -1227,6 +1229,207 @@ class _GlobalHeaderSection extends StatelessWidget {
       );
     }
 
+    Widget spotlightHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: palette.headerGradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 720;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildCompanyBlock(textColor: palette.headerText),
+                          const SizedBox(height: 18),
+                          buildTitleBlock(palette.headerText),
+                        ],
+                      ),
+                    ),
+                    if (!isCompact) ...[
+                      const SizedBox(width: 28),
+                      buildLogoAndStatus(),
+                    ],
+                  ],
+                ),
+                if (isCompact) ...[
+                  const SizedBox(height: 16),
+                  Align(alignment: Alignment.centerLeft, child: buildLogoAndStatus()),
+                ],
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: palette.headerText.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  child: buildDateChips(palette.headerText, palette.headerText),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+
+    Widget pillarHeader() {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 760;
+          if (isCompact) {
+            return Container(
+              decoration: BoxDecoration(
+                color: palette.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(color: palette.border.withOpacity(0.6)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: palette.headerGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    padding: const EdgeInsets.all(22),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildCompanyBlock(textColor: palette.headerText),
+                        const SizedBox(height: 16),
+                        buildDateChips(palette.headerText, palette.headerText),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  buildTitleBlock(theme.colorScheme.onSurface),
+                  const SizedBox(height: 16),
+                  Align(alignment: Alignment.centerRight, child: buildLogoAndStatus()),
+                ],
+              ),
+            );
+          }
+          return Container(
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(color: palette.border.withOpacity(0.6)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 240,
+                  decoration: BoxDecoration(
+                    gradient: palette.headerGradient,
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      buildCompanyBlock(textColor: palette.headerText),
+                      const SizedBox(height: 20),
+                      buildDateChips(palette.headerText, palette.headerText),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        buildTitleBlock(theme.colorScheme.onSurface),
+                        const SizedBox(height: 20),
+                        Align(alignment: Alignment.topRight, child: buildLogoAndStatus()),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
+    Widget bannerHeader() {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 720;
+          Widget companyAndDates() {
+            final company = buildCompanyBlock(textColor: theme.colorScheme.onSurface);
+            final dates = buildDateChips(
+              theme.colorScheme.onSurfaceVariant,
+              theme.colorScheme.onSurfaceVariant,
+            );
+            if (isCompact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  company,
+                  const SizedBox(height: 16),
+                  Align(alignment: Alignment.centerLeft, child: dates),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: company),
+                const SizedBox(width: 24),
+                Flexible(child: Align(alignment: Alignment.topRight, child: dates)),
+              ],
+            );
+          }
+
+          return Container(
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(color: palette.border.withOpacity(0.8)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                  decoration: BoxDecoration(
+                    color: palette.accent.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: buildTitleBlock(theme.colorScheme.onSurface)),
+                      const SizedBox(width: 24),
+                      buildLogoAndStatus(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                companyAndDates(),
+              ],
+            ),
+          );
+        },
+      );
+    }
+
     Widget serviceHeader() {
       return Container(
         decoration: BoxDecoration(
@@ -1254,6 +1457,12 @@ class _GlobalHeaderSection extends StatelessWidget {
     }
 
     switch (layout) {
+      case 'spotlight':
+        return spotlightHeader();
+      case 'pillar':
+        return pillarHeader();
+      case 'banner':
+        return bannerHeader();
       case 'emerald':
         return emeraldHeader();
       case 'slate':
@@ -1498,6 +1707,57 @@ class _InfoColumns extends StatelessWidget {
             ],
           ),
         );
+      case 'spotlightGrid':
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final availableWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 960.0;
+            final columns = availableWidth >= 1080
+                ? 3
+                : availableWidth >= 720
+                    ? 2
+                    : 1;
+            const spacing = 20.0;
+            final rawWidth = columns == 1
+                ? availableWidth
+                : (availableWidth - spacing * (columns - 1)) / columns;
+            final cardWidth = columns == 1
+                ? math.min(rawWidth, 420.0)
+                : math.max(260.0, rawWidth);
+
+            Widget clientCard() => _buildCard(l10n.text('clientDetailsTitle'), [
+                  if (clientCompany.value.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _editable(clientCompany),
+                    ),
+                  _editable(clientElement),
+                  const SizedBox(height: 8),
+                  _editable(clientAddress, multiline: true),
+                ]);
+
+            Widget companyCard() => _buildCard(l10n.text('companyDetailsTitle'), [
+                  _editable(companyName),
+                  const SizedBox(height: 8),
+                  _editable(companyAddress, multiline: true),
+                ]);
+
+            Widget projectCard() => _buildCard(l10n.text('projectLabel'), [
+                  _editable(projectElement),
+                  const SizedBox(height: 8),
+                  _editable(dueDate, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+                ]);
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                SizedBox(width: cardWidth, child: clientCard()),
+                SizedBox(width: cardWidth, child: companyCard()),
+                SizedBox(width: cardWidth, child: projectCard()),
+              ],
+            );
+          },
+        );
       case 'cardGrid':
         return Wrap(
           spacing: 16,
@@ -1520,6 +1780,67 @@ class _InfoColumns extends StatelessWidget {
               ]),
             ),
           ],
+        );
+      case 'sidebarLedger':
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = !constraints.hasBoundedWidth || constraints.maxWidth < 760;
+
+            Widget clientCard() => _buildCard(l10n.text('clientDetailsTitle'), [
+                  if (clientCompany.value.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _editable(clientCompany),
+                    ),
+                  _editable(clientElement),
+                  const SizedBox(height: 8),
+                  _editable(clientAddress, multiline: true),
+                ]);
+
+            Widget companyCard() => _buildCard(l10n.text('companyDetailsTitle'), [
+                  _editable(companyName),
+                  const SizedBox(height: 8),
+                  _editable(companyAddress, multiline: true),
+                ]);
+
+            Widget projectCard() => _buildCard(l10n.text('projectLabel'), [
+                  _editable(projectElement),
+                  const SizedBox(height: 8),
+                  _editable(dueDate, style: theme.textTheme.bodySmall?.copyWith(color: palette.muted)),
+                ]);
+
+            if (isCompact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  clientCard(),
+                  const SizedBox(height: 16),
+                  companyCard(),
+                  const SizedBox(height: 16),
+                  projectCard(),
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: clientCard()),
+                const SizedBox(width: 20),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      companyCard(),
+                      const SizedBox(height: 16),
+                      projectCard(),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         );
       case 'tallColumns':
         return Row(
@@ -1581,6 +1902,65 @@ class _TotalsCard extends StatelessWidget {
     final layout = metadata['layout'] as String? ?? palette.totalsStyle;
 
     switch (layout) {
+      case 'summaryPill':
+        return Container(
+          decoration: BoxDecoration(
+            gradient: palette.headerGradient,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.text('invoiceBalanceDueLabel'),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: palette.headerText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dueMessage,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.headerText.withOpacity(0.85),
+                      ),
+                    ),
+                    if (showThankYou)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          l10n.text('invoiceThankYou'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: palette.headerText.withOpacity(0.9),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Text(
+                  totalText,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
       case 'table':
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
