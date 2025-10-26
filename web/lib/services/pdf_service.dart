@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/widgets.dart' show PdfGoogleFonts;
+import 'package:pdf_google_fonts/pdf_google_fonts.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
