@@ -61,7 +61,7 @@ export default function RootLayout({
               <div>
                 <h3>Invoice Atlas</h3>
                 <p>
-                  Create invoice and receipt PDFs that feel bespoke without fighting a designer. The marketing site and the Flutter workspace share a single design system.
+                  Create invoice and receipt PDFs that feel bespoke without fighting a designer. The marketing site and the web workspace share a single design system.
                 </p>
               </div>
               <div>
