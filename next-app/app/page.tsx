@@ -1,34 +1,81 @@
 import Link from 'next/link';
 
+const stats = [
+  { label: 'teams ship proposals with our editor each week', value: '1.8k+' },
+  { label: 'avg. time to export a PDF once line items are ready', value: '3 min' },
+  { label: 'languages supported with automatic currency formatting', value: '28' },
+];
+
 const features = [
   {
-    title: 'Design on the canvas',
-    body: 'Drag-friendly sections, instant totals, and inline edits keep the invoice exactly as clients will see it.'
+    title: 'Live collaboration with guardrails',
+    body: 'Editors watch changes in real time while approvals are locked behind granular roles so finance stays in control.',
   },
   {
-    title: 'Global-ready PDF exports',
-    body: 'Localized currencies, bilingual labels, and crisp typography ensure every export feels premium.'
+    title: 'Brand-perfect PDF output',
+    body: 'Global fonts, edge-to-edge layout options, and vector logos render as crisply as they do in your design tool.',
   },
   {
-    title: 'Admin insight when you need it',
-    body: 'Role-based access, subscription tracking, and audit notes keep leadership informed without extra effort.'
-  }
+    title: 'Automations that feel personal',
+    body: 'Set invoice cadences, graceful reminders, and localized salutations once—then let Invoice Atlas deliver them for you.',
+  },
+  {
+    title: 'Admin analytics at a glance',
+    body: 'Subscription revenue, payment velocity, and outstanding balances stay visible without pulling raw exports.',
+  },
+];
+
+const roadmap = [
+  {
+    step: '01',
+    title: 'Tailor the canvas',
+    body: 'Choose a template, lock in your palette, and drag branded modules into place. No hex codes or CSS required.',
+  },
+  {
+    step: '02',
+    title: 'Collect payment details',
+    body: 'Sync contacts, drop in terms, and insert payment rails once. We remember them for future invoices automatically.',
+  },
+  {
+    step: '03',
+    title: 'Share or export instantly',
+    body: 'Export an audit-ready PDF, share a live link, or send with your connected email provider without leaving the browser.',
+  },
 ];
 
 const plans = [
   {
-    tier: 'Free',
+    tier: 'Starter',
     price: '$0',
-    description: 'Create and send polished invoices with unlimited PDF downloads.',
-    points: ['Modern invoice template', 'Inline editing experience', 'Google Analytics-ready landing site']
+    description: 'Perfect for freelancers and boutiques who want beautiful PDFs with zero setup fees.',
+    points: [
+      'Unlimited invoices & receipt exports',
+      'Two premium layout families',
+      'Smart reminders + scheduled sends',
+    ],
   },
   {
-    tier: 'Pro',
+    tier: 'Growth',
     price: '$24/mo',
-    description: 'For teams that need history, admin controls, and premium layouts.',
+    description: 'Unlock revision history, admin tools, and client dashboards built for scaling agencies.',
     featured: true,
-    points: ['All Free features', 'Revision history & template switching', 'Admin workspace with user & subscription management']
-  }
+    points: [
+      'Everything in Starter',
+      'Advanced templates & rich sections',
+      'Team seats with roles & approvals',
+      'Analytics workspace & exports',
+    ],
+  },
+  {
+    tier: 'Enterprise',
+    price: 'Let’s chat',
+    description: 'SOC2-ready deployment, custom templates, and dedicated onboarding for finance teams.',
+    points: [
+      'Dedicated CSM and migration support',
+      'Custom domains & SSO (SAML/OIDC)',
+      'Your brand’s typography baked in',
+    ],
+  },
 ];
 
 export default function LandingPage() {
@@ -37,36 +84,34 @@ export default function LandingPage() {
       <section className="hero">
         <div className="section hero-grid">
           <div className="hero-copy">
-            <span className="eyebrow">Modern invoicing for growing teams</span>
-            <h1>Build invoices that feel bespoke in minutes.</h1>
+            <span className="eyebrow">Invoice design without the spreadsheet stress</span>
+            <h1>Build polished, on-brand invoices in minutes.</h1>
             <p>
-              Invoice Atlas pairs a live WYSIWYG editor with template structures inspired by global finance teams. Drop in a
-              logo, adjust line items, and export a pristine PDF without leaving the browser.
+              Invoice Atlas combines a Next.js marketing site with a Flutter workspace so prospects can learn and launch in one
+              flow. Craft invoices, receipts, and statements that respect local standards while still feeling uniquely yours.
             </p>
             <div className="hero-actions">
-              <Link href="/app" className="primary-button">
+              <Link href="/app" className="primary-button" prefetch={false}>
                 Launch the app
               </Link>
-              <Link href="#pricing" className="secondary-button">
-                Compare plans
+              <Link href="#features" className="secondary-button">
+                Explore features
               </Link>
             </div>
             <div className="hero-metric-row">
-              <div>
-                <strong>97%</strong>
-                <span>of beta customers shipped invoices in under 5 minutes.</span>
-              </div>
-              <div>
-                <strong>2</strong>
-                <span>simple plans — stay free or upgrade when you need admin tools.</span>
-              </div>
+              {stats.map((stat) => (
+                <div key={stat.label}>
+                  <strong>{stat.value}</strong>
+                  <p>{stat.label}</p>
+                </div>
+              ))}
             </div>
           </div>
           <div className="hero-preview">
             <div className="preview-card">
               <div className="preview-header">
                 <span className="preview-badge">Canvas preview</span>
-                <span className="preview-status">Draft • Wave template</span>
+                <span>Wave template · Draft</span>
               </div>
               <div className="preview-body">
                 <div className="preview-line" />
@@ -74,8 +119,14 @@ export default function LandingPage() {
                 <div className="preview-line short" />
               </div>
               <div className="preview-footer">
-                <span>Total due</span>
-                <strong>$3,240.00</strong>
+                <div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Balance due</div>
+                  <strong>$3,240.00</strong>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Due</div>
+                  <strong>Jul 30</strong>
+                </div>
               </div>
             </div>
           </div>
@@ -84,11 +135,11 @@ export default function LandingPage() {
 
       <section id="features" className="section features">
         <div className="section-heading">
-          <span className="eyebrow">Why teams switch</span>
-          <h2>Professional structure without the busy work</h2>
+          <span className="eyebrow">Workflow</span>
+          <h2>Purpose-built for operators who obsess over detail</h2>
           <p>
-            Choose layouts inspired by finance best practices, edit inline, and send PDFs that mirror the exact design your
-            client approved.
+            Drag to compose, localize every label, and export a PDF that mirrors your brand guidelines. No plugins or design handoff
+            required.
           </p>
         </div>
         <div className="feature-grid">
@@ -99,13 +150,24 @@ export default function LandingPage() {
             </article>
           ))}
         </div>
+        <div className="roadmap-grid" style={{ marginTop: '3rem' }}>
+          {roadmap.map((item) => (
+            <article key={item.step} className="roadmap-step">
+              <span className="eyebrow" style={{ justifyContent: 'flex-start' }}>
+                Step {item.step}
+              </span>
+              <strong>{item.title}</strong>
+              <p>{item.body}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section id="pricing" className="section pricing">
         <div className="section-heading">
           <span className="eyebrow">Pricing</span>
-          <h2>Only two plans. Start free, grow when you are ready.</h2>
-          <p>Unlock the pro workspace for history, advanced templates, and admin controls.</p>
+          <h2>Choose the plan that matches your momentum</h2>
+          <p>Stay free as long as you need, then graduate to growth when finance is ready for deeper controls.</p>
         </div>
         <div className="pricing-grid">
           {plans.map((plan) => (
@@ -120,8 +182,8 @@ export default function LandingPage() {
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-              <Link href="/app" className={`plan-button${plan.featured ? ' primary' : ''}`}>
-                {plan.featured ? 'Upgrade to Pro' : 'Start for free'}
+              <Link href="/app" className={`plan-button${plan.featured ? ' primary' : ''}`} prefetch={false}>
+                {plan.featured ? 'Upgrade to Growth' : 'Start building'}
               </Link>
             </article>
           ))}
@@ -131,11 +193,11 @@ export default function LandingPage() {
       <section className="section cta">
         <div className="cta-banner">
           <div>
-            <h2>Ready to impress your next client?</h2>
-            <p>Launch the editor, customize the template, and send a polished invoice today.</p>
+            <h2>Your next invoice can feel like a brand moment.</h2>
+            <p>Spin up the Flutter workspace, drop in your assets, and export a client-ready PDF before the coffee cools.</p>
           </div>
-          <Link href="/app" className="primary-button">
-            Open Invoice Atlas
+          <Link href="/app" className="primary-button" prefetch={false}>
+            Open the workspace
           </Link>
         </div>
       </section>

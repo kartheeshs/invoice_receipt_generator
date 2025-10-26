@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' show PdfGoogleFonts;
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
@@ -56,12 +57,20 @@ class PdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         theme: fonts.theme,
-        build: (context) => [
-          pw.DefaultTextStyle.merge(
-            style: pw.TextStyle(fontFallback: fonts.fallback),
-            child: pw.Column(children: content),
-          ),
-        ],
+        build: (context) {
+          final maxWidth = context.page.pageFormat.availableWidth;
+          return [
+            pw.DefaultTextStyle.merge(
+              style: pw.TextStyle(fontFallback: fonts.fallback),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: content
+                    .map((widget) => pw.SizedBox(width: maxWidth, child: widget))
+                    .toList(),
+              ),
+            ),
+          ];
+        },
       ),
     );
 
@@ -2098,11 +2107,14 @@ class PdfService {
     }
 
     final bundle = _PdfFontBundle(
-      base: pw.Font.helvetica(),
-      bold: pw.Font.helveticaBold(),
-      italic: pw.Font.helveticaOblique(),
-      boldItalic: pw.Font.helveticaBoldOblique(),
-      fallback: <pw.Font>[pw.Font.courier()],
+      base: await PdfGoogleFonts.robotoRegular(),
+      bold: await PdfGoogleFonts.robotoBold(),
+      italic: await PdfGoogleFonts.robotoItalic(),
+      boldItalic: await PdfGoogleFonts.robotoBoldItalic(),
+      fallback: <pw.Font>[
+        await PdfGoogleFonts.notoSansRegular(),
+        await PdfGoogleFonts.notoSansJPRegular(),
+      ],
     );
     _fontBundle = bundle;
     return bundle;

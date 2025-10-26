@@ -33,8 +33,8 @@ export default function RootLayout({
           <div className="navbar-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div className="badge">Invoice Atlas</div>
-              <span style={{ color: '#475569', fontWeight: 500 }}>
-                Professional invoices without the heavy lift
+              <span style={{ color: 'rgba(226, 232, 240, 0.75)', fontWeight: 500 }}>
+                Design-led invoices, powered by Flutter
               </span>
             </div>
             <nav className="nav-links">
@@ -53,7 +53,8 @@ export default function RootLayout({
             <div>
               <h3>Invoice Atlas</h3>
               <p>
-                A refined invoicing workspace with inline editing, premium templates, and admin oversight when you need it.
+                A refined invoicing workspace that blends a Next.js marketing story with a Flutter-powered editor so teams can
+                learn, launch, and collaborate without switching tabs.
               </p>
             </div>
             <div>
