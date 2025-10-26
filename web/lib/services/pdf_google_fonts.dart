@@ -20,25 +20,45 @@ class PdfGoogleFonts {
   static final Map<String, Future<pw.Font>> _requiredCache = {};
   static final Map<String, Future<pw.Font?>> _optionalCache = {};
 
-  static Future<pw.Font> robotoRegular() =>
-      _loadRequired('robotoRegular', const ['packages/flutter/fonts/Roboto-Regular.ttf']);
+  static Future<pw.Font> robotoRegular() => _loadRequired(
+        'robotoRegular',
+        const [
+          'packages/flutter/fonts/Roboto-Regular.ttf',
+          'packages/flutter/assets/fonts/Roboto-Regular.ttf',
+        ],
+      );
 
-  static Future<pw.Font> robotoBold() =>
-      _loadRequired('robotoBold', const ['packages/flutter/fonts/Roboto-Bold.ttf']);
+  static Future<pw.Font> robotoBold() => _loadRequired(
+        'robotoBold',
+        const [
+          'packages/flutter/fonts/Roboto-Bold.ttf',
+          'packages/flutter/assets/fonts/Roboto-Bold.ttf',
+        ],
+      );
 
-  static Future<pw.Font> robotoItalic() =>
-      _loadRequired('robotoItalic', const ['packages/flutter/fonts/Roboto-Italic.ttf']);
+  static Future<pw.Font> robotoItalic() => _loadRequired(
+        'robotoItalic',
+        const [
+          'packages/flutter/fonts/Roboto-Italic.ttf',
+          'packages/flutter/assets/fonts/Roboto-Italic.ttf',
+        ],
+      );
 
   static Future<pw.Font> robotoBoldItalic() => _loadRequired(
         'robotoBoldItalic',
-        const ['packages/flutter/fonts/Roboto-BoldItalic.ttf'],
+        const [
+          'packages/flutter/fonts/Roboto-BoldItalic.ttf',
+          'packages/flutter/assets/fonts/Roboto-BoldItalic.ttf',
+        ],
       );
 
   static Future<pw.Font?> notoSansRegular() => _loadOptional(
         'notoSansRegular',
         const [
           'packages/flutter/fonts/NotoSans-Regular.ttf',
+          'packages/flutter/assets/fonts/NotoSans-Regular.ttf',
           'packages/flutter/fonts/NotoSans-Regular.otf',
+          'packages/flutter/assets/fonts/NotoSans-Regular.otf',
         ],
       );
 
@@ -46,7 +66,9 @@ class PdfGoogleFonts {
         'notoSansJPRegular',
         const [
           'packages/flutter/fonts/NotoSansJP-Regular.otf',
+          'packages/flutter/assets/fonts/NotoSansJP-Regular.otf',
           'packages/flutter/fonts/NotoSansJP-Regular.ttf',
+          'packages/flutter/assets/fonts/NotoSansJP-Regular.ttf',
         ],
       );
 
