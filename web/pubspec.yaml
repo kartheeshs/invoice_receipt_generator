@@ -28,30 +28,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  fonts:
-    - family: Roboto
-      fonts:
-        - asset: fonts/Roboto-Regular.ttf
-          package: flutter
-        - asset: fonts/Roboto-Italic.ttf
-          package: flutter
-          style: italic
-        - asset: fonts/Roboto-Bold.ttf
-          package: flutter
-          weight: 700
-        - asset: fonts/Roboto-BoldItalic.ttf
-          package: flutter
-          weight: 700
-          style: italic
-    - family: NotoSans
-      fonts:
-        - asset: fonts/NotoSans-Regular.ttf
-          package: flutter
-        - asset: fonts/NotoSans-Regular.otf
-          package: flutter
-    - family: NotoSansJP
-      fonts:
-        - asset: fonts/NotoSansJP-Regular.otf
-          package: flutter
-        - asset: fonts/NotoSansJP-Regular.ttf
-          package: flutter
