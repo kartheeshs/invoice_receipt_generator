@@ -173,6 +173,15 @@ class _MetricGrid extends StatelessWidget {
             : constraints.maxWidth > 720
                 ? 2
                 : 1;
+        final bool isWide = constraints.maxWidth > 1024;
+        final bool isMedium = !isWide && constraints.maxWidth > 720;
+        final double tileWidth =
+            (constraints.maxWidth - ((columns - 1) * 20)) / columns;
+        final double? tileHeight = isWide
+            ? 180
+            : isMedium
+                ? 200
+                : null;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -180,7 +189,9 @@ class _MetricGrid extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: 20,
             mainAxisSpacing: 20,
-            childAspectRatio: constraints.maxWidth > 1024 ? 2.4 : 1.8,
+            mainAxisExtent: tileHeight,
+            childAspectRatio:
+                tileHeight == null ? 1.2 : tileWidth / tileHeight,
           ),
           itemCount: metrics.length,
           itemBuilder: (context, index) {
