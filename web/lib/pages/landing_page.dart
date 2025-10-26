@@ -35,10 +35,44 @@ class _LandingPageState extends State<LandingPage> {
     final theme = Theme.of(context);
     final l10n = context.l10n;
 
+    final isDark = theme.brightness == Brightness.dark;
+    final backgroundGradient = LinearGradient(
+      colors: isDark
+          ? [const Color(0xFF050A19), const Color(0xFF0F172A)]
+          : [const Color(0xFFF8FAFF), const Color(0xFFF0F4FF)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(gradient: backgroundGradient),
+            ),
+          ),
+          Positioned(
+            top: -140,
+            left: -120,
+            child: _HeroGlow(
+              color: isDark
+                  ? const Color(0xFF1F2937).withOpacity(0.55)
+                  : theme.colorScheme.primary.withOpacity(0.22),
+              size: 320,
+            ),
+          ),
+          Positioned(
+            bottom: -160,
+            right: -80,
+            child: _HeroGlow(
+              color: isDark
+                  ? theme.colorScheme.secondary.withOpacity(0.24)
+                  : theme.colorScheme.secondary.withOpacity(0.28),
+              size: 280,
+            ),
+          ),
           SingleChildScrollView(
             controller: _scrollController,
             child: Column(
