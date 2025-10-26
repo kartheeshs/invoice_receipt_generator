@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf_google_fonts/pdf_google_fonts.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
@@ -14,6 +15,8 @@ import '../models/invoice_template_spec.dart';
 import '../models/user_profile.dart';
 
 class PdfService {
+  _PdfFontBundle? _fontBundle;
+
   Future<void> downloadInvoice({
     required Invoice invoice,
     required UserProfile profile,
@@ -27,6 +30,7 @@ class PdfService {
     );
     final dateFormat = DateFormat.yMMMMd(locale.toLanguageTag());
     final spec = invoiceTemplateSpec(invoice.template);
+    final fonts = await _ensureFonts();
 
     final pdf = pw.Document();
 
@@ -52,7 +56,13 @@ class PdfService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        build: (context) => content,
+        theme: fonts.theme,
+        build: (context) => [
+          pw.DefaultTextStyle.merge(
+            fontFallback: fonts.fallback,
+            child: pw.Column(children: content),
+          ),
+        ],
       ),
     );
 
@@ -1927,12 +1937,19 @@ class PdfService {
           args.spec.highlightColor ?? args.spec.badgeBackgroundColor,
           0.08,
         );
+    const columnWidths = <int, pw.TableColumnWidth>{
+      0: pw.FlexColumnWidth(4),
+      1: pw.FlexColumnWidth(2),
+      2: pw.FlexColumnWidth(2),
+      3: pw.FlexColumnWidth(2),
+    };
     return pw.Container(
       decoration: pw.BoxDecoration(
         borderRadius: pw.BorderRadius.circular(20),
         border: pw.Border.all(color: palette.border, width: 1),
       ),
       child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
           pw.Container(
             decoration: pw.BoxDecoration(
@@ -1940,92 +1957,105 @@ class PdfService {
               borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(20)),
             ),
             padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            child: pw.Row(
+            child: pw.Table(
+              columnWidths: columnWidths,
+              defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
               children: [
-                pw.Expanded(
-                  flex: 4,
-                  child: pw.Text(headers[0],
-                      style: pw.TextStyle(color: headerText, fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Text(headers[1],
-                      textAlign: pw.TextAlign.center,
-                      style: pw.TextStyle(color: headerText, fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Text(headers[2],
-                      textAlign: pw.TextAlign.center,
-                      style: pw.TextStyle(color: headerText, fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                ),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Text(headers[3],
-                      textAlign: pw.TextAlign.right,
-                      style: pw.TextStyle(color: headerText, fontWeight: pw.FontWeight.bold, fontSize: 11)),
+                pw.TableRow(
+                  children: [
+                    _pdfLedgerHeaderCell(headers[0], headerText, pw.TextAlign.left),
+                    _pdfLedgerHeaderCell(headers[1], headerText, pw.TextAlign.center),
+                    _pdfLedgerHeaderCell(headers[2], headerText, pw.TextAlign.center),
+                    _pdfLedgerHeaderCell(headers[3], headerText, pw.TextAlign.right),
+                  ],
                 ),
               ],
             ),
           ),
           pw.Padding(
             padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            child: pw.Column(
+            child: pw.Table(
+              columnWidths: columnWidths,
+              defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
               children: [
                 for (var index = 0; index < args.lineItems.length; index++)
-                  pw.Container(
-                    color: showStriped && index.isOdd ? stripeColor : null,
-                    padding: const pw.EdgeInsets.symmetric(vertical: 10),
-                    child: pw.Row(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Expanded(
-                          flex: 4,
-                          child: pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text(args.lineItems[index].description,
-                                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
-                              if (args.lineItems[index].notes?.isNotEmpty == true)
-                                pw.Padding(
-                                  padding: const pw.EdgeInsets.only(top: 4),
-                                  child: pw.Text(args.lineItems[index].notes!,
-                                      style: pw.TextStyle(color: palette.muted, fontSize: 9)),
-                                ),
-                            ],
-                          ),
-                        ),
-                        pw.Expanded(
-                          flex: 2,
-                          child: pw.Text(
-                            args.format.format(args.lineItems[index].unitPrice),
-                            textAlign: pw.TextAlign.center,
-                            style: const pw.TextStyle(fontSize: 10),
-                          ),
-                        ),
-                        pw.Expanded(
-                          flex: 2,
-                          child: pw.Text(
-                            _formatQuantity(args.lineItems[index].quantity),
-                            textAlign: pw.TextAlign.center,
-                            style: const pw.TextStyle(fontSize: 10),
-                          ),
-                        ),
-                        pw.Expanded(
-                          flex: 2,
-                          child: pw.Text(
-                            args.format.format(args.lineItems[index].total),
-                            textAlign: pw.TextAlign.right,
-                            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11),
-                          ),
-                        ),
-                      ],
-                    ),
+                  pw.TableRow(
+                    decoration:
+                        showStriped && index.isOdd ? pw.BoxDecoration(color: stripeColor) : null,
+                    children: [
+                      _pdfLedgerDescriptionCell(args, index, palette.muted),
+                      _pdfLedgerValueCell(
+                        args.format.format(args.lineItems[index].unitPrice),
+                        pw.TextAlign.center,
+                      ),
+                      _pdfLedgerValueCell(
+                        _formatQuantity(args.lineItems[index].quantity),
+                        pw.TextAlign.center,
+                      ),
+                      _pdfLedgerValueCell(
+                        args.format.format(args.lineItems[index].total),
+                        pw.TextAlign.right,
+                        emphasized: true,
+                      ),
+                    ],
                   ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  pw.Widget _pdfLedgerHeaderCell(String text, PdfColor color, pw.TextAlign align) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4),
+      child: pw.Text(
+        text,
+        textAlign: align,
+        style: pw.TextStyle(color: color, fontWeight: pw.FontWeight.bold, fontSize: 11),
+      ),
+    );
+  }
+
+  pw.Widget _pdfLedgerDescriptionCell(_PdfBuildArgs args, int index, PdfColor muted) {
+    final item = args.lineItems[index];
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            item.description,
+            style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+          ),
+          if (item.notes?.isNotEmpty == true)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 4),
+              child: pw.Text(
+                item.notes!,
+                style: pw.TextStyle(color: muted, fontSize: 9),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _pdfLedgerValueCell(
+    String value,
+    pw.TextAlign align, {
+    bool emphasized = false,
+  }) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      child: pw.Text(
+        value,
+        textAlign: align,
+        style: pw.TextStyle(
+          fontSize: 10,
+          fontWeight: emphasized ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
       ),
     );
   }
@@ -2062,9 +2092,58 @@ class PdfService {
     html.Url.revokeObjectUrl(url);
   }
 
+  Future<_PdfFontBundle> _ensureFonts() async {
+    final cached = _fontBundle;
+    if (cached != null) {
+      return cached;
+    }
+
+    final fonts = await Future.wait<pw.Font>([
+      PdfGoogleFonts.plusJakartaSansRegular(),
+      PdfGoogleFonts.plusJakartaSansBold(),
+      PdfGoogleFonts.plusJakartaSansItalic(),
+      PdfGoogleFonts.plusJakartaSansBoldItalic(),
+      PdfGoogleFonts.notoSansJPRegular(),
+      PdfGoogleFonts.notoSansJPBold(),
+    ]);
+
+    final bundle = _PdfFontBundle(
+      base: fonts[0],
+      bold: fonts[1],
+      italic: fonts[2],
+      boldItalic: fonts[3],
+      fallback: [fonts[4], fonts[5]],
+    );
+    _fontBundle = bundle;
+    return bundle;
+  }
+
   PdfColor _pdfColor(int value) => PdfColor.fromInt(value);
 
   pw.Alignment _pdfAlignment(Alignment alignment) => pw.Alignment(alignment.x, alignment.y);
+}
+
+class _PdfFontBundle {
+  _PdfFontBundle({
+    required this.base,
+    required this.bold,
+    required this.italic,
+    required this.boldItalic,
+    required this.fallback,
+  });
+
+  final pw.Font base;
+  final pw.Font bold;
+  final pw.Font italic;
+  final pw.Font boldItalic;
+  final List<pw.Font> fallback;
+
+  pw.ThemeData get theme => pw.ThemeData.withFont(
+        base: base,
+        bold: bold,
+        italic: italic,
+        boldItalic: boldItalic,
+      );
 }
 
 class _PdfPalette {

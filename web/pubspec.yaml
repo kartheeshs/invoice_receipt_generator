@@ -19,6 +19,7 @@ dependencies:
   provider: ^6.1.2
   uuid: ^4.4.0
   pdf: ^3.11.0
+  pdf_google_fonts: ^3.11.0
   google_fonts: ^6.1.0
 
 dev_dependencies:

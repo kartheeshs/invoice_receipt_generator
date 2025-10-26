@@ -225,6 +225,13 @@ class AppState extends ChangeNotifier {
     await _runAsync(() async {
       final user = await _authService.signIn(email: email, password: password);
       final role = await _loadRoleForUser(user);
+      if ((role ?? '').toLowerCase() == 'admin') {
+        await _authService.signOut();
+        _user = null;
+        _errorMessage = AppLocalizations(_locale).text('signInAdminPortalOnly');
+        notifyListeners();
+        return;
+      }
       final refreshed = await _authService.refreshUser(user);
       _user = refreshed;
       if (_user == null) {
