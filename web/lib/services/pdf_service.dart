@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/widgets.dart' show PdfGoogleFonts;
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
@@ -59,7 +58,7 @@ class PdfService {
         theme: fonts.theme,
         build: (context) => [
           pw.DefaultTextStyle.merge(
-            fontFallback: fonts.fallback,
+            style: pw.TextStyle(fontFallback: fonts.fallback),
             child: pw.Column(children: content),
           ),
         ],
@@ -2098,21 +2097,12 @@ class PdfService {
       return cached;
     }
 
-    final fonts = await Future.wait<pw.Font>([
-      PdfGoogleFonts.plusJakartaSansRegular(),
-      PdfGoogleFonts.plusJakartaSansBold(),
-      PdfGoogleFonts.plusJakartaSansItalic(),
-      PdfGoogleFonts.plusJakartaSansBoldItalic(),
-      PdfGoogleFonts.notoSansJPRegular(),
-      PdfGoogleFonts.notoSansJPBold(),
-    ]);
-
     final bundle = _PdfFontBundle(
-      base: fonts[0],
-      bold: fonts[1],
-      italic: fonts[2],
-      boldItalic: fonts[3],
-      fallback: [fonts[4], fonts[5]],
+      base: pw.Font.helvetica(),
+      bold: pw.Font.helveticaBold(),
+      italic: pw.Font.helveticaOblique(),
+      boldItalic: pw.Font.helveticaBoldOblique(),
+      fallback: <pw.Font>[pw.Font.courier()],
     );
     _fontBundle = bundle;
     return bundle;

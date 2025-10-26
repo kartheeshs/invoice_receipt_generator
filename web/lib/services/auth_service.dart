@@ -143,6 +143,14 @@ class FirebaseAuthService {
     return user;
   }
 
+  Future<void> signOut() async {
+    // Firebase Identity Toolkit does not expose a dedicated sign-out endpoint
+    // for password-based web clients. The caller is responsible for discarding
+    // cached credentials, so this method simply completes to keep the
+    // interface uniform across platforms.
+    return Future<void>.value();
+  }
+
   Future<Map<String, dynamic>> _post({
     required String path,
     required Map<String, dynamic> body,
