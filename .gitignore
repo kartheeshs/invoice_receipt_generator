@@ -1,4 +1,8 @@
 node_modules/
+next-app/node_modules/
+.next/
+next-app/.next/
+next-app/out/
 .env
 web/.env
 server/.env
