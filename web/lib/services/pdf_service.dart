@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf_fonts/pdf_fonts.dart';
+import 'package:pdf/widgets.dart' show PdfGoogleFonts;
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
@@ -2145,6 +2145,7 @@ class _PdfFontBundle {
         bold: bold,
         italic: italic,
         boldItalic: boldItalic,
+        fallback: fallback,
       );
 }
 

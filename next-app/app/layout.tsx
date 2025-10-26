@@ -33,7 +33,7 @@ export default function RootLayout({
           <div className="navbar-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div className="badge">Invoice Atlas</div>
-              <span style={{ color: '#475569', fontWeight: 500 }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
                 Design-led invoices, powered by Flutter
               </span>
             </div>
@@ -74,7 +74,7 @@ export default function RootLayout({
               </ul>
             </div>
           </div>
-          <div style={{ marginTop: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+          <div style={{ marginTop: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             © {new Date().getFullYear()} Invoice Atlas. All rights reserved.
           </div>
         </footer>
