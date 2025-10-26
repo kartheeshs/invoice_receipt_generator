@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' show PdfGoogleFonts;
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
@@ -2098,13 +2099,13 @@ class PdfService {
     }
 
     final bundle = _PdfFontBundle(
-      base: await pw.PdfGoogleFonts.robotoRegular(),
-      bold: await pw.PdfGoogleFonts.robotoBold(),
-      italic: await pw.PdfGoogleFonts.robotoItalic(),
-      boldItalic: await pw.PdfGoogleFonts.robotoBoldItalic(),
+      base: await PdfGoogleFonts.robotoRegular(),
+      bold: await PdfGoogleFonts.robotoBold(),
+      italic: await PdfGoogleFonts.robotoItalic(),
+      boldItalic: await PdfGoogleFonts.robotoBoldItalic(),
       fallback: <pw.Font>[
-        await pw.PdfGoogleFonts.notoSansRegular(),
-        await pw.PdfGoogleFonts.notoSansJPRegular(),
+        await PdfGoogleFonts.notoSansRegular(),
+        await PdfGoogleFonts.notoSansJPRegular(),
       ],
     );
     _fontBundle = bundle;

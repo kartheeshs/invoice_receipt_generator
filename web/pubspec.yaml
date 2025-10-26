@@ -28,3 +28,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - packages/google_fonts/google_fonts/Roboto-Regular.ttf
+    - packages/google_fonts/google_fonts/Roboto-Bold.ttf
+    - packages/google_fonts/google_fonts/Roboto-Italic.ttf
+    - packages/google_fonts/google_fonts/Roboto-BoldItalic.ttf
+    - packages/google_fonts/google_fonts/NotoSans-Regular.ttf
+    - packages/google_fonts/google_fonts/NotoSansJP-Regular.ttf
