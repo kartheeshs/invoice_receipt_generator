@@ -1366,6 +1366,114 @@ class _GlobalHeaderSection extends StatelessWidget {
       );
     }
 
+    Widget minimalFormHeader() {
+      return Container(
+        decoration: BoxDecoration(
+          color: palette.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: palette.border.withOpacity(0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: palette.accent.withOpacity(0.07),
+              blurRadius: 18,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _LogoPreview(
+                      url: invoice.logoUrl?.isNotEmpty == true
+                          ? invoice.logoUrl
+                          : (profile.logoUrl.isNotEmpty ? profile.logoUrl : null),
+                      onTap: isPreview ? null : onLogoRequested,
+                    ),
+                    const SizedBox(height: 12),
+                    _InvoiceStatusSelector(
+                      status: invoice.status,
+                      isPreview: isPreview,
+                      onChanged: onStatusChanged,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 28),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        l10n.text('invoiceTitleLabel'),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: palette.muted,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: InlineEditableText(
+                          value: titleElement.value,
+                          placeholder: l10n.text('invoicePreviewTitle'),
+                          enabled: !isPreview,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          onSubmitted: (value) => onChanged(
+                            section.copyWith(
+                              elements: section.elements
+                                  .map((element) =>
+                                      element.id == titleElement.id ? element.copyWith(value: value) : element)
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: InlineEditableText(
+                          value: numberElement.value,
+                          placeholder: invoice.number,
+                          enabled: !isPreview,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: palette.muted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSubmitted: (value) => onChanged(
+                            section.copyWith(
+                              elements: section.elements
+                                  .map((element) =>
+                                      element.id == numberElement.id ? element.copyWith(value: value) : element)
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            buildDateChips(
+              theme.colorScheme.onSurfaceVariant,
+              theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      );
+    }
+
     Widget bannerHeader() {
       return LayoutBuilder(
         builder: (context, constraints) {
@@ -1457,6 +1565,8 @@ class _GlobalHeaderSection extends StatelessWidget {
     }
 
     switch (layout) {
+      case 'minimalForm':
+        return minimalFormHeader();
       case 'spotlight':
         return spotlightHeader();
       case 'pillar':
@@ -1555,7 +1665,7 @@ class _InfoColumns extends StatelessWidget {
     );
     final projectElement = _element(
       binding: InvoiceFieldBinding.projectName,
-      kind: InvoiceElementKind.text,
+      kind: InvoiceElementKind.multiline,
       value: invoice.projectName,
     );
     final companyName = _element(
@@ -1572,6 +1682,24 @@ class _InfoColumns extends StatelessWidget {
       binding: InvoiceFieldBinding.dueDate,
       kind: InvoiceElementKind.date,
     );
+
+    InvoiceElement _customElement({
+      required String field,
+      InvoiceElementKind kind = InvoiceElementKind.text,
+      String placeholder = '',
+    }) {
+      final existing = section.elements.firstWhere(
+        (element) => element.metadata['field'] == field,
+        orElse: () => InvoiceElement(
+          id: 'info-$field',
+          kind: kind,
+          binding: InvoiceFieldBinding.custom,
+          placeholder: placeholder,
+          metadata: {'field': field},
+        ),
+      );
+      return existing;
+    }
 
     List<InvoiceElement> _updatedElements(InvoiceElement element, String value) {
       final exists = section.elements.any((candidate) => candidate.id == element.id);
@@ -1652,6 +1780,191 @@ class _InfoColumns extends StatelessWidget {
     }
 
     switch (layout) {
+      case 'formStack':
+        final paymentTerms = _customElement(
+          field: 'paymentTerms',
+          placeholder: l10n.text('paymentTermsPlaceholder'),
+        );
+        final poNumber = _customElement(
+          field: 'poNumber',
+          placeholder: l10n.text('poNumberPlaceholder'),
+        );
+        final invoiceNumber = _element(
+          binding: InvoiceFieldBinding.invoiceNumber,
+          kind: InvoiceElementKind.text,
+          value: invoice.number,
+        );
+        final dateFormat = DateFormat.yMMMd(l10n.locale.toLanguageTag());
+
+        Widget tile(String label, List<Widget> children) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: palette.border.withOpacity(0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: palette.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...children,
+              ],
+            ),
+          );
+        }
+
+        Widget metaField(String label, Widget child) {
+          return Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: palette.border.withOpacity(0.45)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: palette.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                child,
+              ],
+            ),
+          );
+        }
+
+        Widget dateField(String label, DateTime value, ValueChanged<DateTime> onChange) {
+          return metaField(
+            label,
+            GestureDetector(
+              onTap: isPreview
+                  ? null
+                  : () async {
+                      final picked = await _pickDate(context, initial: value);
+                      if (picked != null) {
+                        onChange(picked);
+                      }
+                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  dateFormat.format(value),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          );
+        }
+
+        Widget metaEditable(String label, InvoiceElement element, {bool multiline = false}) {
+          return metaField(
+            label,
+            InlineEditableText(
+              value: element.value,
+              placeholder: element.placeholder,
+              enabled: !isPreview,
+              multiline: multiline,
+              style: theme.textTheme.bodyMedium,
+              onSubmitted: (value) => updateElement(element, value),
+            ),
+          );
+        }
+
+        Widget fromCard() => tile(l10n.text('whoFromLabel'), [
+              _editable(companyName),
+              const SizedBox(height: 8),
+              _editable(companyAddress, multiline: true),
+            ]);
+
+        Widget billToCard() => tile(l10n.text('billToLabel'), [
+              _editable(clientElement),
+              const SizedBox(height: 8),
+              _editable(clientAddress, multiline: true),
+            ]);
+
+        Widget shipToCard() => tile(l10n.text('shipToLabel'), [
+              _editable(projectElement, multiline: true),
+            ]);
+
+        Widget metadataColumn(bool expand) {
+          final children = [
+            metaEditable(l10n.text('invoiceNumberLabel'), invoiceNumber),
+            metaField(
+              l10n.text('issueDateLabel'),
+              Text(
+                dateFormat.format(invoice.issueDate),
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            metaEditable(l10n.text('paymentTermsLabel'), paymentTerms),
+            dateField(l10n.text('dueDateLabel'), invoice.dueDate, onDueDateChanged),
+            metaEditable(l10n.text('poNumberLabel'), poNumber),
+          ];
+
+          return SizedBox(
+            width: expand ? double.infinity : 240,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < children.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: i == children.length - 1 ? 0 : 12),
+                    child: children[i],
+                  ),
+              ],
+            ),
+          );
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 960;
+            final columnSpacing = 24.0;
+            final leftColumn = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                fromCard(),
+                const SizedBox(height: 16),
+                billToCard(),
+                const SizedBox(height: 16),
+                shipToCard(),
+              ],
+            );
+
+            if (isCompact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  leftColumn,
+                  const SizedBox(height: 20),
+                  metadataColumn(true),
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: leftColumn),
+                SizedBox(width: columnSpacing),
+                metadataColumn(false),
+              ],
+            );
+          },
+        );
       case 'splitCompany':
       case 'dualCard':
         return Row(

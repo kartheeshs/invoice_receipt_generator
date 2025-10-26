@@ -20,7 +20,7 @@ export default function AdminLandingPage() {
           <Link className="button-primary" href="/app?view=admin">
             Open admin console
           </Link>
-          <Link className="button-secondary" href="/">
+          <Link className="secondary-button" href="/">
             Return to marketing site
           </Link>
         </div>

@@ -33,17 +33,16 @@ export default function RootLayout({
           <div className="navbar-inner">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div className="badge">Invoice Atlas</div>
-              <span style={{ color: 'rgba(226,232,240,0.65)' }}>
-                Intelligent invoicing for modern finance teams
+              <span style={{ color: '#475569', fontWeight: 500 }}>
+                Professional invoices without the heavy lift
               </span>
             </div>
             <nav className="nav-links">
-              <a href="#templates">Templates</a>
-              <a href="#workflow">Workflow</a>
+              <a href="#features">Features</a>
               <a href="#pricing">Pricing</a>
               <a href="/privacy-policy">Privacy</a>
-              <a className="button-secondary" href="/app" style={{ padding: '0.6rem 1.2rem' }}>
-                Launch Web App
+              <a className="primary-button" href="/app">
+                Launch app
               </a>
             </nav>
           </div>
@@ -54,28 +53,27 @@ export default function RootLayout({
             <div>
               <h3>Invoice Atlas</h3>
               <p>
-                Crafted for globally-minded finance teams who need to ship bilingual invoices, automate
-                approvals, and maintain crystal-clear records.
+                A refined invoicing workspace with inline editing, premium templates, and admin oversight when you need it.
               </p>
             </div>
             <div>
-              <h3>Platform</h3>
+              <h3>Explore</h3>
               <ul className="list-reset" style={{ display: 'grid', gap: '0.5rem' }}>
-                <li><a href="/app">Launch App</a></li>
-                <li><a href="/app?view=create">Create Invoice</a></li>
-                <li><a href="/app?view=templates">Template Gallery</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="/privacy-policy">Privacy &amp; Policy</a></li>
               </ul>
             </div>
             <div>
-              <h3>Company</h3>
+              <h3>Get help</h3>
               <ul className="list-reset" style={{ display: 'grid', gap: '0.5rem' }}>
-                <li><a href="#pricing">Pricing</a></li>
-                <li><a href="/privacy-policy">Privacy &amp; Policy</a></li>
-                <li><a href="mailto:support@invoice-atlas.example.com">Support</a></li>
+                <li><a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a></li>
+                <li><a href="/admin">Admin console</a></li>
+                <li><a href="/app">Launch the app</a></li>
               </ul>
             </div>
           </div>
-          <div style={{ marginTop: '2.5rem', textAlign: 'center', color: 'rgba(148,163,184,0.6)' }}>
+          <div style={{ marginTop: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
             © {new Date().getFullYear()} Invoice Atlas. All rights reserved.
           </div>
         </footer>
