@@ -18,7 +18,7 @@ export default function FlutterShellPage() {
 
   return (
     <div className="app-shell">
-      <div className="section app-shell__inner">
+      <div className="app-shell__inner">
         <header className="app-shell__header">
           <div>
             <p className="app-shell__eyebrow">Embedded preview</p>
@@ -29,10 +29,10 @@ export default function FlutterShellPage() {
             </p>
           </div>
           <div className="app-shell__actions">
-            <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="button button-primary">
+            <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="button button--primary">
               Open full app
             </Link>
-            <Link prefetch={false} href="/" className="button button-secondary">
+            <Link prefetch={false} href="/" className="button button--ghost">
               Back to marketing site
             </Link>
           </div>
@@ -45,7 +45,7 @@ export default function FlutterShellPage() {
                 Double-check the deployed web build URL or run <code>flutter build web --base-href /flutter/</code> to refresh the static
                 files inside <code>public/flutter</code>.
               </p>
-              <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="button button-primary">
+              <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="button button--primary">
                 Try opening in a new tab
               </Link>
             </div>

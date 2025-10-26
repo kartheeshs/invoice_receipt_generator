@@ -150,7 +150,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                               children: [
                                 FilledButton(
                                   onPressed: () => Navigator.of(context).pushReplacementNamed('/app'),
-                                  child: Text(l10n.text('landingHeroPrimaryCta')),
+                                  child: Text(l10n.text('launchAppButton')),
                                 ),
                                 OutlinedButton.icon(
                                   onPressed: () {

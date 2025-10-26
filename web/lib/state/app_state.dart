@@ -351,13 +351,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Invoice prepareInvoice([Invoice? existing]) {
+  Invoice prepareInvoice({Invoice? existing, InvoiceTemplate? template}) {
+    final selectedTemplate = template ?? availableTemplates.first;
     final invoice = existing ??
         Invoice.create(
           id: _uuid.v4(),
           currencyCode: _profile.currencyCode,
           currencySymbol: _profile.currencySymbol,
-          template: availableTemplates.first,
+          template: selectedTemplate,
         ).copyWith(logoUrl: _profile.logoUrl.isEmpty ? null : _profile.logoUrl);
     return invoice;
   }

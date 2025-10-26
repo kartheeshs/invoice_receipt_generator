@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,512 +8,552 @@ import '../models/invoice_template_spec.dart';
 import '../state/app_state.dart';
 import '../widgets/language_menu_button.dart';
 
-class LandingPage extends StatefulWidget {
+class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
   @override
-  State<LandingPage> createState() => _LandingPageState();
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final appState = context.watch<AppState>();
+    final l10n = context.l10n;
+
+    return Scaffold(
+      backgroundColor: theme.colorScheme.background,
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _LandingNav(appState: appState, l10n: l10n)),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: _HeroSection(
+                  onLaunch: () => Navigator.of(context).pushNamed('/app'),
+                  stats: const [
+                    _Metric(value: '1.8k+', label: 'Teams billing with Atlas each month'),
+                    _Metric(value: '3 min', label: 'Average draft-to-download time'),
+                    _Metric(value: '28', label: 'Currencies formatted automatically'),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: _FeatureSection(features: _features),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: _TemplateSection(
+                  templates: appState.availableTemplates,
+                  onSelect: (template) {
+                    final invoice = appState.prepareInvoice(template: template);
+                    appState.selectInvoice(invoice);
+                    Navigator.of(context).pushNamed('/app');
+                  },
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: _WorkflowSection(steps: _workflowSteps),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: _PricingSection(plans: _plans, onLaunch: () => Navigator.of(context).pushNamed('/app')),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                child: _CallToAction(onLaunch: () => Navigator.of(context).pushNamed('/app')),
+              ),
+            ),
+            SliverToBoxAdapter(child: _Footer(appState: appState, l10n: l10n)),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _LandingPageState extends State<LandingPage> {
-  final ScrollController _scrollController = ScrollController();
-  final _productKey = GlobalKey();
-  final _templatesKey = GlobalKey();
-  final _pricingKey = GlobalKey();
-  final _supportKey = GlobalKey();
+class _LandingNav extends StatelessWidget {
+  const _LandingNav({required this.appState, required this.l10n});
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
+  final AppState appState;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
     final theme = Theme.of(context);
-    final l10n = context.l10n;
-
-    final isDark = theme.brightness == Brightness.dark;
-    final backgroundGradient = LinearGradient(
-      colors: isDark
-          ? [const Color(0xFF050A19), const Color(0xFF0F172A)]
-          : [const Color(0xFFF8FAFF), const Color(0xFFF0F4FF)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Row(
         children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(gradient: backgroundGradient),
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Invoice Atlas', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Polished invoices in minutes',
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary, letterSpacing: 1.1),
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            top: -140,
-            left: -120,
-            child: _HeroGlow(
-              color: isDark
-                  ? const Color(0xFF1F2937).withOpacity(0.55)
-                  : theme.colorScheme.primary.withOpacity(0.22),
-              size: 320,
-            ),
+          const Spacer(),
+          LanguageMenuButton(
+            currentLocale: appState.locale,
+            onSelected: (locale) => context.read<AppState>().setLocale(locale),
+            isBusy: appState.isLocaleChanging,
+            foregroundColor: theme.colorScheme.onSurface,
+            backgroundColor: theme.colorScheme.surface,
+            borderColor: theme.colorScheme.outlineVariant,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           ),
-          Positioned(
-            bottom: -160,
-            right: -80,
-            child: _HeroGlow(
-              color: isDark
-                  ? theme.colorScheme.secondary.withOpacity(0.24)
-                  : theme.colorScheme.secondary.withOpacity(0.28),
-              size: 280,
-            ),
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pushNamed('/app'),
+            child: Text(l10n.text('launchAppButton')),
           ),
-          SingleChildScrollView(
-            controller: _scrollController,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeroSection(context, appState),
-                Container(key: _productKey, child: _buildFeatureSection(context)),
-                Container(key: _templatesKey, child: _buildTemplateShowcase(context)),
-                _buildJapaneseHighlight(context),
-                Container(key: _pricingKey, child: _buildWorkflowSection(context)),
-                _buildSecuritySection(context),
-                _buildPrivacySection(context),
-                Container(key: _supportKey, child: _buildCtaSection(context, appState)),
-                _buildFooter(context),
-              ],
-            ),
-          ),
-          if (appState.isLocaleChanging) const _LandingLocaleOverlay(),
         ],
       ),
     );
   }
+}
 
-  Widget _buildHeroSection(BuildContext context, AppState appState) {
-    final l10n = context.l10n;
+class _HeroSection extends StatelessWidget {
+  const _HeroSection({required this.onLaunch, required this.stats});
+
+  final VoidCallback onLaunch;
+  final List<_Metric> stats;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isNarrow = MediaQuery.of(context).size.width < 980;
+    final colorScheme = theme.colorScheme;
 
-    final gradientColors = [
-      theme.colorScheme.primary,
-      theme.colorScheme.secondary,
-      theme.colorScheme.tertiary,
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            gradientColors[0],
-            gradientColors[1].withOpacity(0.92),
-            gradientColors[2].withOpacity(0.85),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -160,
-            top: -120,
-            child: _HeroGlow(color: Colors.white.withOpacity(0.35), size: 360),
-          ),
-          Positioned(
-            left: -120,
-            bottom: -100,
-            child: _HeroGlow(color: Colors.white.withOpacity(0.25), size: 280),
-          ),
-          Positioned(
-            right: 80,
-            bottom: 40,
-            child: _HeroGlow(color: Colors.white.withOpacity(0.18), size: 180),
-          ),
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: math.max(24.0, MediaQuery.of(context).size.width * 0.08),
-                vertical: 32,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 960;
+        return Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(colorScheme.brightness == Brightness.dark ? 0.4 : 0.08),
+                blurRadius: 40,
+                offset: const Offset(0, 26),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _LandingNavBar(
-                    onOpenProduct: () => _scrollTo(_productKey),
-                    onOpenTemplates: () => _scrollTo(_templatesKey),
-                    onOpenPricing: () => _scrollTo(_pricingKey),
-                    onOpenSupport: () => _scrollTo(_supportKey),
-                    onOpenPrivacy: _openPrivacy,
-                    onLaunchApp: _openApp,
-                    onSignIn: appState.isGuest ? _openSignIn : null,
-                    currentLocale: appState.locale,
-                    onLocaleSelected: (locale) => context.read<AppState>().setLocale(locale),
-                    isLocaleChanging: appState.isLocaleChanging,
-                  ),
-                  const SizedBox(height: 56),
-                  Builder(builder: (context) {
-                final content = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+          child: Flex(
+            direction: isWide ? Axis.horizontal : Axis.vertical,
+            crossAxisAlignment: isWide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                flex: isWide ? 11 : 0,
+                child: Column(
+                  crossAxisAlignment: isWide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
+                        color: colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        l10n.text('landingHeroBadge').toUpperCase(),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: Colors.white,
-                          letterSpacing: 1.1,
+                        'Invoice & receipt workspace',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.primary,
+                          letterSpacing: 1.2,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     Text(
-                      l10n.text('landingHeroTitle'),
-                      style: theme.textTheme.displayMedium?.copyWith(
-                        color: Colors.white,
+                      'Send polished invoices in minutes, not hours.',
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        color: theme.colorScheme.onSurface,
                         fontWeight: FontWeight.w700,
-                        height: 1.05,
+                        letterSpacing: -1.2,
                       ),
+                      textAlign: isWide ? TextAlign.start : TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Build branded invoices and receipts with finance-approved templates, collaborate with teammates, and export vector-perfect PDFs from one workspace.',
+                      style: theme.textTheme.bodyLarge,
+                      textAlign: isWide ? TextAlign.start : TextAlign.center,
                     ),
                     const SizedBox(height: 20),
-                    Text(
-                      l10n.text('landingHeroSubtitle'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
+                      alignment: isWide ? WrapAlignment.start : WrapAlignment.center,
                       children: [
-                        FilledButton.icon(
-                          onPressed: _openApp,
-                          icon: const Icon(Icons.open_in_new),
-                          label: Text(l10n.text('landingHeroPrimaryCta')),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: theme.colorScheme.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          ),
+                        FilledButton(
+                          onPressed: onLaunch,
+                          child: const Text('Launch the app'),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () => _scrollTo(_templatesKey),
-                          icon: const Icon(Icons.view_carousel_outlined),
-                          label: Text(l10n.text('landingHeroSecondaryCta')),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            foregroundColor: Colors.white,
-                            side: BorderSide(color: Colors.white.withOpacity(0.6)),
-                          ),
+                        OutlinedButton(
+                          onPressed: () => Navigator.of(context).pushNamed('/app'),
+                          child: const Text('View dashboard'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     Wrap(
-                      spacing: 16,
+                      spacing: 12,
                       runSpacing: 12,
-                      children: [
-                        _HeroChip(
-                          icon: Icons.cloud_done_outlined,
-                          label: l10n.text('landingHeroPointSync'),
-                        ),
-                        _HeroChip(
-                          icon: Icons.language_outlined,
-                          label: l10n.text('landingHeroPointGlobal'),
-                        ),
-                        _HeroChip(
-                          icon: Icons.picture_as_pdf_outlined,
-                          label: l10n.text('landingHeroPointPdf'),
-                        ),
-                      ],
+                      alignment: isWide ? WrapAlignment.start : WrapAlignment.center,
+                      children: stats
+                          .map(
+                            (metric) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment:
+                                    isWide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    metric.value,
+                                    style: theme.textTheme.headlineSmall?.copyWith(color: colorScheme.primary),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    metric.label,
+                                    style: theme.textTheme.bodySmall,
+                                    textAlign: isWide ? TextAlign.start : TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ],
-                );
-                final preview = _TemplateHeroCard(spec: invoiceTemplateSpec(InvoiceTemplate.waveBlue));
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      content,
-                      const SizedBox(height: 48),
-                      preview,
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(flex: 5, child: content),
-                    const SizedBox(width: 48),
-                    Expanded(flex: 4, child: preview),
-                  ],
-                );
-                  }),
-                ],
+                ),
               ),
+              const SizedBox(height: 28, width: 28),
+              Expanded(
+                flex: isWide ? 9 : 0,
+                child: _HeroPreviewCard(colorScheme: colorScheme),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HeroPreviewCard extends StatelessWidget {
+  const _HeroPreviewCard({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              'Live PDF preview',
+              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.primary, letterSpacing: 1.1),
             ),
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Every change you make — colours, copy, totals — updates the PDF instantly so you always know what clients will see.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 20),
+          _TemplatePreviewCard(spec: invoiceTemplateSpec(const InvoiceTemplate.waveBlue())),
         ],
       ),
     );
   }
+}
 
-  Widget _buildFeatureSection(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = math.max(24.0, width * 0.08);
-    final contentWidth = width - horizontalPadding * 2;
-    final isNarrow = width < 900;
 
-    final cards = [
-      _FeatureCard(
-        icon: Icons.auto_awesome_mosaic_outlined,
-        title: l10n.text('landingFeatureAutomationTitle'),
-        description: l10n.text('landingFeatureAutomationBody'),
-      ),
-      _FeatureCard(
-        icon: Icons.branding_watermark_outlined,
-        title: l10n.text('landingFeatureBrandingTitle'),
-        description: l10n.text('landingFeatureBrandingBody'),
-      ),
-      _FeatureCard(
-        icon: Icons.gavel_outlined,
-        title: l10n.text('landingFeatureComplianceTitle'),
-        description: l10n.text('landingFeatureComplianceBody'),
-      ),
-      _FeatureCard(
-        icon: Icons.groups_outlined,
-        title: l10n.text('landingFeatureCollaborationTitle'),
-        description: l10n.text('landingFeatureCollaborationBody'),
-      ),
-    ];
 
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: 96,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.text('landingFeatureSectionTitle'),
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.text('landingFeatureSectionSubtitle'),
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 36),
-          Wrap(
-            spacing: 20,
-            runSpacing: 20,
-            children: cards
-                .map((card) => SizedBox(
-                      width: isNarrow
-                          ? double.infinity
-                          : math.max(320.0, contentWidth / 2 - 10),
-                      child: card,
-                    ))
-                .toList(),
-          ),
-        ],
-      ),
+class _FeatureSection extends StatelessWidget {
+  const _FeatureSection({required this.features});
+
+  final List<_Feature> features;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeading(
+          title: 'Everything you need to move from draft to paid',
+          body: 'Start with a finance-reviewed template, adjust the details, and export with confidence. No design tools required.',
+        ),
+        const SizedBox(height: 24),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = constraints.maxWidth;
+            final columns = maxWidth > 960
+                ? 3
+                : maxWidth > 640
+                    ? 2
+                    : 1;
+            final itemWidth = maxWidth / columns - (16 * (columns - 1) / columns);
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: features
+                  .map(
+                    (feature) => SizedBox(
+                      width: itemWidth,
+                      child: _FeatureCard(feature: feature),
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildTemplateShowcase(BuildContext context) {
-    final l10n = context.l10n;
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({required this.feature});
+
+  final _Feature feature;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = math.max(24.0, width * 0.08);
-    final contentWidth = width - horizontalPadding * 2;
-    final isNarrow = width < 1000;
-
     return Container(
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: 96,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(theme.colorScheme.brightness == Brightness.dark ? 0.35 : 0.08),
+            blurRadius: 26,
+            offset: const Offset(0, 18),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l10n.text('landingTemplateSectionTitle'),
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.text('landingTemplateSectionSubtitle'),
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 32),
-          Wrap(
-            spacing: 20,
-            runSpacing: 20,
-            children: InvoiceTemplate.values
-                .map((template) => _TemplatePreviewCard(
-                      template: template,
-                      width: isNarrow
-                          ? double.infinity
-                          : math.max(320.0, contentWidth / 2 - 10),
-                    ))
-                .toList(),
-          ),
+          Text(feature.title, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(feature.body, style: theme.textTheme.bodyMedium),
         ],
       ),
     );
   }
+}
 
-  Widget _buildJapaneseHighlight(BuildContext context) {
-    final l10n = context.l10n;
+class _TemplateSection extends StatelessWidget {
+  const _TemplateSection({required this.templates, required this.onSelect});
+
+  final List<InvoiceTemplate> templates;
+  final ValueChanged<InvoiceTemplate> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeading(
+          title: 'Template gallery',
+          body: 'Swap layouts with a click. Every template adjusts typography, colour, and summary blocks without breaking your data.',
+        ),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: templates
+              .map(
+                (template) => _TemplateCard(
+                  template: template,
+                  onTap: () => onSelect(template),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _TemplateCard extends StatelessWidget {
+  const _TemplateCard({required this.template, required this.onTap});
+
+  final InvoiceTemplate template;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = math.max(24.0, width * 0.08);
-    final isNarrow = width < 900;
-    final palette = invoiceTemplateSpec(InvoiceTemplate.japaneseBusiness);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: 96,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(32),
+    final spec = invoiceTemplateSpec(template);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Ink(
+        width: 280,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: palette.border.withOpacity(0.7)),
-          color: palette.surface,
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: palette.accent.withOpacity(0.08),
-              blurRadius: 40,
+              color: Colors.black.withOpacity(theme.colorScheme.brightness == Brightness.dark ? 0.35 : 0.08),
+              blurRadius: 28,
               offset: const Offset(0, 18),
             ),
           ],
         ),
-        child: Builder(builder: (context) {
-          final description = Column(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                l10n.text('landingTemplateJapaneseTitle'),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: palette.accent,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                l10n.text('landingTemplateJapaneseBody'),
-                style: theme.textTheme.titleMedium?.copyWith(color: palette.muted),
-              ),
-              const SizedBox(height: 24),
-              Wrap(
-                spacing: 16,
-                runSpacing: 12,
-                children: [
-                  _HeroChip(
-                    icon: Icons.translate_outlined,
-                    label: l10n.text('landingTemplateJapaneseFeatureBilingual'),
-                  ),
-                  _HeroChip(
-                    icon: Icons.balance_outlined,
-                    label: l10n.text('landingTemplateJapaneseFeatureTax'),
-                  ),
-                  _HeroChip(
-                    icon: Icons.storefront_outlined,
-                    label: l10n.text('landingTemplateJapaneseFeatureRetail'),
-                  ),
-                ],
-              ),
+              _TemplatePreviewCard(spec: spec),
+              const SizedBox(height: 16),
+              Text(spec.displayName, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(spec.description, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 16),
+              Text('Use template', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
             ],
-          );
-          final preview = _JapanesePreviewCard(palette: palette);
-          if (isNarrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                description,
-                const SizedBox(height: 32),
-                preview,
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 4, child: description),
-              const SizedBox(width: 32),
-              Expanded(flex: 5, child: preview),
-            ],
-          );
-        }),
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildWorkflowSection(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = math.max(24.0, width * 0.08);
-    final contentWidth = width - horizontalPadding * 2;
-    final isNarrow = width < 900;
+class _TemplatePreviewCard extends StatelessWidget {
+  const _TemplatePreviewCard({required this.spec});
 
-    final steps = [
-      (Icons.dashboard_customize_outlined, l10n.text('landingWorkflowStepCapture')),
-      (Icons.style_outlined, l10n.text('landingWorkflowStepDesign')),
-      (Icons.send_outlined, l10n.text('landingWorkflowStepSend')),
-      (Icons.autorenew_outlined, l10n.text('landingWorkflowStepAutomate')),
-    ];
+  final InvoiceTemplateSpec spec;
 
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: 96,
+  @override
+  Widget build(BuildContext context) {
+    final gradient = spec.headerGradientColors.map((color) => Color(color)).toList();
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(18),
       ),
+      padding: const EdgeInsets.all(14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l10n.text('landingWorkflowTitle'),
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 8,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 56,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.text('landingWorkflowSubtitle'),
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 32),
-          Wrap(
-            spacing: 20,
-            runSpacing: 20,
-            children: List.generate(steps.length, (index) {
-              final entry = steps[index];
-              return SizedBox(
-                width: isNarrow
-                    ? double.infinity
-                    : math.max(260.0, contentWidth / 4 - 15),
-                child: _WorkflowStepCard(
-                  index: index + 1,
-                  icon: entry.$1,
-                  description: entry.$2,
+          const SizedBox(height: 16),
+          Column(
+            children: List.generate(3, (index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.75 - index * 0.1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.65),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }),
@@ -523,492 +562,149 @@ class _LandingPageState extends State<LandingPage> {
       ),
     );
   }
-
-  Widget _buildSecuritySection(BuildContext context) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final horizontalPadding = math.max(24.0, width * 0.08);
-    final contentWidth = width - horizontalPadding * 2;
-    final isNarrow = width < 960;
-
-    final cards = [
-      _FeatureCard(
-        icon: Icons.shield_outlined,
-        title: l10n.text('landingSecurityFeature1Title'),
-        description: l10n.text('landingSecurityFeature1Body'),
-      ),
-      _FeatureCard(
-        icon: Icons.https_outlined,
-        title: l10n.text('landingSecurityFeature2Title'),
-        description: l10n.text('landingSecurityFeature2Body'),
-      ),
-      _FeatureCard(
-        icon: Icons.support_agent_outlined,
-        title: l10n.text('landingSecurityFeature3Title'),
-        description: l10n.text('landingSecurityFeature3Body'),
-      ),
-    ];
-
-    return Container(
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-      padding: EdgeInsets.symmetric(
-        horizontal: horizontalPadding,
-        vertical: 96,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.text('landingSecurityTitle'),
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.text('landingSecuritySubtitle'),
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 32),
-          Wrap(
-            spacing: 20,
-            runSpacing: 20,
-            children: cards
-                .map((card) => SizedBox(
-                      width: isNarrow
-                          ? double.infinity
-                          : math.max(320.0, contentWidth / 2 - 10),
-                      child: card,
-                    ))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildPrivacySection(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = context.l10n;
-    final width = MediaQuery.of(context).size.width;
-    final padding = math.max(24.0, width * 0.08);
-
-    final highlightCards = [
-      _PrivacyHighlightCard(
-        icon: Icons.lock_outline,
-        title: l10n.text('landingPrivacyHighlightSecurityTitle'),
-        description: l10n.text('landingPrivacyHighlightSecurityBody'),
-      ),
-      _PrivacyHighlightCard(
-        icon: Icons.delete_forever_outlined,
-        title: l10n.text('landingPrivacyHighlightControlTitle'),
-        description: l10n.text('landingPrivacyHighlightControlBody'),
-      ),
-      _PrivacyHighlightCard(
-        icon: Icons.verified_user_outlined,
-        title: l10n.text('landingPrivacyHighlightSupportTitle'),
-        description: l10n.text('landingPrivacyHighlightSupportBody'),
-      ),
-    ];
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(padding, 80, padding, 80),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.text('landingPrivacySectionTitle'),
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.text('landingPrivacySectionSubtitle'),
-            style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 36),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 960;
-              if (isWide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < highlightCards.length; i++)
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(right: i == highlightCards.length - 1 ? 0 : 24),
-                          child: highlightCards[i],
-                        ),
-                      ),
-                  ],
-                );
-              }
-              return Wrap(
-                spacing: 20,
-                runSpacing: 20,
-                children: highlightCards
-                    .map((card) => SizedBox(
-                          width: math.min(constraints.maxWidth, 420),
-                          child: card,
-                        ))
-                    .toList(),
-              );
-            },
-          ),
-          const SizedBox(height: 32),
-          TextButton.icon(
-            onPressed: _openPrivacy,
-            icon: const Icon(Icons.arrow_forward),
-            label: Text(l10n.text('landingFooterPrivacy')),
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              textStyle: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  Widget _buildCtaSection(BuildContext context, AppState appState) {
-    final l10n = context.l10n;
-    final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final palette = invoiceTemplateSpec(InvoiceTemplate.emeraldStripe);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: math.max(24.0, width * 0.08),
-        vertical: 96,
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(36),
-          gradient: LinearGradient(
-            colors: [palette.headerGradientColors.first.toColor(), palette.headerGradientColors.last.toColor()],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: const [
-            BoxShadow(color: Colors.black26, blurRadius: 30, offset: Offset(0, 18)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.text('landingCtaTitle'),
-              style: theme.textTheme.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.text('landingCtaSubtitle'),
-              style: theme.textTheme.titleMedium?.copyWith(color: Colors.white.withOpacity(0.85)),
-            ),
-            const SizedBox(height: 28),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                FilledButton(
-                  onPressed: _openApp,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: palette.accent,
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                  ),
-                  child: Text(appState.isAuthenticated
-                      ? l10n.text('landingCtaButtonAuthed')
-                      : l10n.text('landingCtaButton')),
-                ),
-                if (appState.isGuest)
-                  OutlinedButton(
-                    onPressed: _openSignIn,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70),
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-                    ),
-                    child: Text(l10n.text('signInButton')),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFooter(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = context.l10n;
-    final width = MediaQuery.of(context).size.width;
-    final padding = math.max(24.0, width * 0.08);
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(padding, 48, padding, 64),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.text('appTitle'),
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            l10n.text('landingFooterCopyright').replaceFirst('{year}', DateTime.now().year.toString()),
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 20),
-          TextButton.icon(
-            onPressed: _openPrivacy,
-            icon: const Icon(Icons.privacy_tip_outlined),
-            label: Text(l10n.text('landingFooterPrivacy')),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openApp() {
-    Navigator.of(context).pushNamed('/app');
-  }
-
-  void _openPrivacy() {
-    Navigator.of(context).pushNamed('/privacy');
-  }
-
-  void _openSignIn() {
-    Navigator.of(context).pushNamed('/sign-in');
-  }
-
-  void _scrollTo(GlobalKey key) {
-    final targetContext = key.currentContext;
-    if (targetContext == null) {
-      return;
-    }
-    Scrollable.ensureVisible(
-      targetContext,
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeInOut,
-    );
-  }
 }
 
-class _LandingNavBar extends StatelessWidget {
-  const _LandingNavBar({
-    required this.onOpenProduct,
-    required this.onOpenTemplates,
-    required this.onOpenPricing,
-    required this.onOpenSupport,
-    required this.onOpenPrivacy,
-    required this.onLaunchApp,
-    required this.currentLocale,
-    required this.onLocaleSelected,
-    required this.isLocaleChanging,
-    this.onSignIn,
-  });
+class _WorkflowSection extends StatelessWidget {
+  const _WorkflowSection({required this.steps});
 
-  final VoidCallback onOpenProduct;
-  final VoidCallback onOpenTemplates;
-  final VoidCallback onOpenPricing;
-  final VoidCallback onOpenSupport;
-  final VoidCallback onOpenPrivacy;
-  final VoidCallback onLaunchApp;
-  final Locale currentLocale;
-  final Future<void> Function(Locale) onLocaleSelected;
-  final bool isLocaleChanging;
-  final VoidCallback? onSignIn;
+  final List<_WorkflowStep> steps;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = context.l10n;
-    final isNarrow = MediaQuery.of(context).size.width < 840;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              l10n.text('appTitle'),
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            if (!isNarrow)
-              Wrap(
-                spacing: 16,
-                alignment: WrapAlignment.center,
-                children: [
-                  _NavLink(label: l10n.text('landingNavProduct'), onTap: onOpenProduct),
-                  _NavLink(label: l10n.text('landingNavTemplates'), onTap: onOpenTemplates),
-                  _NavLink(label: l10n.text('landingNavPricing'), onTap: onOpenPricing),
-                  _NavLink(label: l10n.text('landingNavSupport'), onTap: onOpenSupport),
-                  _NavLink(label: l10n.text('landingNavPrivacy'), onTap: onOpenPrivacy),
-                ],
-              ),
-            const SizedBox(width: 16),
-            LanguageMenuButton(
-              currentLocale: currentLocale,
-              onSelected: onLocaleSelected,
-              isBusy: isLocaleChanging,
-              foregroundColor: Colors.white,
-              backgroundColor: Colors.white.withOpacity(0.12),
-              borderColor: Colors.white.withOpacity(0.3),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-            ),
-            const SizedBox(width: 16),
-            if (onSignIn != null)
-              TextButton(
-                onPressed: onSignIn,
-                style: TextButton.styleFrom(foregroundColor: Colors.white),
-                child: Text(l10n.text('signInButton')),
-              ),
-            FilledButton(
-              onPressed: onLaunchApp,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: theme.colorScheme.primary,
-              ),
-              child: Text(l10n.text('landingHeroPrimaryCta')),
-            ),
-          ],
+        const _SectionHeading(
+          title: 'Designed for the full billing workflow',
+          body: 'From the first draft to the paid receipt, Invoice Atlas keeps teams aligned and clients confident.',
         ),
-        if (isNarrow) ...[
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            children: [
-              LanguageMenuButton(
-                currentLocale: currentLocale,
-                onSelected: onLocaleSelected,
-                isBusy: isLocaleChanging,
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.white.withOpacity(0.12),
-                borderColor: Colors.white.withOpacity(0.3),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-              _NavChip(label: l10n.text('landingNavProduct'), onTap: onOpenProduct),
-              _NavChip(label: l10n.text('landingNavTemplates'), onTap: onOpenTemplates),
-              _NavChip(label: l10n.text('landingNavPricing'), onTap: onOpenPricing),
-              _NavChip(label: l10n.text('landingNavSupport'), onTap: onOpenSupport),
-              _NavChip(label: l10n.text('landingNavPrivacy'), onTap: onOpenPrivacy),
-            ],
-          ),
-        ],
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: steps
+              .map(
+                (step) => SizedBox(
+                  width: 320,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(theme.colorScheme.brightness == Brightness.dark ? 0.35 : 0.08),
+                          blurRadius: 26,
+                          offset: const Offset(0, 18),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(step.step, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
+                        const SizedBox(height: 12),
+                        Text(step.title, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        Text(step.body, style: theme.textTheme.bodyMedium),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
       ],
     );
   }
 }
 
-class _NavLink extends StatelessWidget {
-  const _NavLink({required this.label, required this.onTap});
+class _PricingSection extends StatelessWidget {
+  const _PricingSection({required this.plans, required this.onLaunch});
 
-  final String label;
-  final VoidCallback onTap;
+  final List<_PricingPlan> plans;
+  final VoidCallback onLaunch;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Text(
-          label,
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeading(
+          title: 'Pricing that scales with your billing volume',
+          body: 'Start free, upgrade when collaboration or automation becomes essential. No surprise fees—ever.',
         ),
-      ),
-    );
-  }
-}
-
-class _NavChip extends StatelessWidget {
-  const _NavChip({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      backgroundColor: Colors.white.withOpacity(0.18),
-      labelStyle: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.white),
-      label: Text(label),
-      onPressed: onTap,
-    );
-  }
-}
-
-class _HeroGlow extends StatelessWidget {
-  const _HeroGlow({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, color.withOpacity(0.0)],
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: plans
+              .map(
+                (plan) => SizedBox(
+                  width: 280,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: plan.featured
+                            ? theme.colorScheme.primary.withOpacity(0.3)
+                            : theme.colorScheme.outlineVariant,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(theme.colorScheme.brightness == Brightness.dark ? 0.35 : 0.08),
+                          blurRadius: 28,
+                          offset: const Offset(0, 18),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(plan.tier, style: theme.textTheme.titleLarge),
+                        const SizedBox(height: 4),
+                        Text(plan.description, style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 16),
+                        Text(plan.price, style: theme.textTheme.headlineSmall),
+                        const SizedBox(height: 16),
+                        ...plan.points.map(
+                          (point) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.check_circle, size: 18, color: theme.colorScheme.primary),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(point, style: theme.textTheme.bodySmall)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: onLaunch,
+                          child: const Text('Get started'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _HeroChip extends StatelessWidget {
-  const _HeroChip({required this.icon, required this.label});
+class _CallToAction extends StatelessWidget {
+  const _CallToAction({required this.onLaunch});
 
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.24)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: Colors.white),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
+  final VoidCallback onLaunch;
 
   @override
   Widget build(BuildContext context) {
@@ -1016,179 +712,89 @@ class _FeatureCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
         gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surface.withOpacity(0.98),
-            theme.colorScheme.surfaceVariant.withOpacity(0.72),
-          ],
+          colors: [theme.colorScheme.primary, theme.colorScheme.primaryContainer],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
-          ),
-        ],
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.08)),
+        borderRadius: BorderRadius.circular(32),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 28),
-          ),
-          const SizedBox(height: 18),
-          Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 10),
           Text(
-            description,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.72),
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-class _PrivacyHighlightCard extends StatelessWidget {
-  const _PrivacyHighlightCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary.withOpacity(0.12),
-            theme.colorScheme.secondaryContainer.withOpacity(0.18),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 24),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            title,
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            'Ready to send your next invoice?',
+            style: theme.textTheme.headlineMedium?.copyWith(color: theme.colorScheme.onPrimary),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           Text(
-            description,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              height: 1.5,
-              color: theme.colorScheme.onSurface.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-
-class _TemplateHeroCard extends StatelessWidget {
-  const _TemplateHeroCard({required this.spec});
-
-  final InvoiceTemplateSpec spec;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.16),
-            blurRadius: 40,
-            offset: const Offset(0, 28),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: spec.headerGradient,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  context.l10n.text('landingTemplateGlobalLabel'),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: spec.headerText,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  context.l10n.text('landingTemplateGlobalBody'),
-                  style: theme.textTheme.bodyMedium?.copyWith(color: spec.headerText.withOpacity(0.85)),
-                ),
-              ],
-            ),
+            'Spin up a polished invoice in minutes and keep every client touchpoint on brand.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onPrimary.withOpacity(0.9)),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            alignment: WrapAlignment.center,
+            children: [
+              FilledButton(
+                onPressed: onLaunch,
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.onPrimary,
+                  foregroundColor: theme.colorScheme.primary,
+                ),
+                child: const Text('Launch workspace'),
+              ),
+              OutlinedButton(
+                onPressed: onLaunch,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  side: BorderSide(color: theme.colorScheme.onPrimary.withOpacity(0.7)),
+                ),
+                child: const Text('View dashboard'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Footer extends StatelessWidget {
+  const _Footer({required this.appState, required this.l10n});
+
+  final AppState appState;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.surface,
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Invoice Atlas', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Create invoice and receipt PDFs that feel bespoke without fighting a designer.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(context.l10n.text('landingHeroPointPdf'), style: theme.textTheme.bodyMedium),
-                    const SizedBox(height: 6),
-                    Text(context.l10n.text('landingHeroPointGlobal'), style: theme.textTheme.bodyMedium),
-                  ],
-                ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pushNamed('/app'),
+                child: Text(l10n.text('launchAppButton')),
               ),
               const SizedBox(width: 12),
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: spec.badgeBackground,
-                  borderRadius: BorderRadius.circular(18),
+              OutlinedButton(
+                onPressed: () => appState.setLocale(
+                  appState.locale.languageCode == 'en' ? const Locale('ja') : const Locale('en'),
                 ),
-                child: Icon(Icons.receipt_long_outlined, color: spec.accent, size: 36),
+                child: Text(l10n.text('languageLabel')),
               ),
             ],
           ),
@@ -1198,441 +804,132 @@ class _TemplateHeroCard extends StatelessWidget {
   }
 }
 
-class _TemplatePreviewCard extends StatelessWidget {
-  const _TemplatePreviewCard({required this.template, required this.width});
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, required this.body});
 
-  final InvoiceTemplate template;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    final spec = invoiceTemplateSpec(template);
-    final theme = Theme.of(context);
-
-    return SizedBox(
-      width: width,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          color: spec.surface,
-          border: Border.all(color: spec.border.withOpacity(0.8)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 36,
-              offset: const Offset(0, 22),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: _TemplateMiniature(spec: spec),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              context.l10n.invoiceTemplateLabel(template),
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              context.l10n.text(spec.blurbKey),
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TemplateMiniature extends StatelessWidget {
-  const _TemplateMiniature({required this.spec});
-
-  final InvoiceTemplateSpec spec;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color headerText = spec.headerText;
-    final Color tableHeader = spec.tableHeader;
-    final Color tableHeaderText = spec.tableHeaderText;
-    final Color canvas = spec.canvasBackground ?? spec.surface;
-
-    Widget bar(Color color, {double height = 6, double widthFactor = 1}) {
-      return FractionallySizedBox(
-        widthFactor: widthFactor,
-        child: Container(
-          height: height,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-    }
-
-    return Container(
-      color: canvas,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            height: 64,
-            decoration: BoxDecoration(
-              gradient: spec.headerGradient,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: spec.surface.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: headerText.withOpacity(0.85),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 5,
-                        width: 60,
-                        decoration: BoxDecoration(
-                          color: headerText.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: spec.highlight?.withOpacity(0.25) ?? spec.surface.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Container(
-                    height: 5,
-                    width: 36,
-                    decoration: BoxDecoration(
-                      color: headerText.withOpacity(0.75),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            bar(spec.accent.withOpacity(0.65), widthFactor: 0.7),
-                            const SizedBox(height: 5),
-                            bar(spec.muted.withOpacity(0.3), widthFactor: 0.5),
-                            const SizedBox(height: 12),
-                            bar(spec.muted.withOpacity(0.25), widthFactor: 1),
-                            const SizedBox(height: 5),
-                            bar(spec.muted.withOpacity(0.2), widthFactor: 0.85),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: spec.balanceBackground.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              bar(spec.accent.withOpacity(0.6), height: 5, widthFactor: 0.7),
-                              const SizedBox(height: 6),
-                              bar(spec.accent.withOpacity(0.9), height: 8, widthFactor: 0.9),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: spec.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: spec.border.withOpacity(0.7)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Container(
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: tableHeader,
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Container(
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: tableHeaderText.withOpacity(0.85),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Container(
-                                      height: 6,
-                                      width: 30,
-                                      decoration: BoxDecoration(
-                                        color: tableHeaderText.withOpacity(0.7),
-                                        borderRadius: BorderRadius.circular(999),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: List.generate(3, (index) {
-                                  return Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 2,
-                                        child: bar(spec.muted.withOpacity(0.25 + index * 0.1), height: 5),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      bar(spec.accent.withOpacity(0.35 + index * 0.1), height: 5, widthFactor: 0.5),
-                                    ],
-                                  );
-                                }),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _JapanesePreviewCard extends StatelessWidget {
-  const _JapanesePreviewCard({required this.palette});
-
-  final InvoiceTemplateSpec palette;
+  final String title;
+  final String body;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: palette.border.withOpacity(0.8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            decoration: BoxDecoration(
-              gradient: palette.headerGradient,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  context.l10n.text('invoiceJapaneseTitle'),
-                  style: theme.textTheme.titleLarge?.copyWith(color: palette.headerText, fontWeight: FontWeight.bold),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('株式会社 架空商事', style: theme.textTheme.titleSmall?.copyWith(color: palette.headerText)),
-                    Text('〒150-0002 東京都渋谷区', style: theme.textTheme.bodySmall?.copyWith(color: palette.headerText.withOpacity(0.8))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          _PreviewRow(label: context.l10n.text('invoiceJapaneseNumberLabel'), value: 'INV-2024-081'),
-          _PreviewRow(label: context.l10n.text('invoiceJapaneseIssueLabel'), value: '2024年5月1日'),
-          _PreviewRow(label: context.l10n.text('invoiceJapaneseDueLabel'), value: '2024年5月31日'),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: palette.balanceBackground,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(context.l10n.text('landingTemplateJapaneseAmount'), style: theme.textTheme.titleSmall?.copyWith(color: palette.accent)),
-                const SizedBox(height: 6),
-                Text('¥480,000', style: theme.textTheme.headlineSmall?.copyWith(color: palette.accent, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 12),
+        Text(body, style: theme.textTheme.bodyMedium),
+      ],
     );
   }
 }
 
-class _PreviewRow extends StatelessWidget {
-  const _PreviewRow({required this.label, required this.value});
+class _Metric {
+  const _Metric({required this.value, required this.label});
 
-  final String label;
   final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  final String label;
 }
 
-class _WorkflowStepCard extends StatelessWidget {
-  const _WorkflowStepCard({
-    required this.index,
-    required this.icon,
+class _Feature {
+  const _Feature({required this.title, required this.body});
+
+  final String title;
+  final String body;
+}
+
+class _WorkflowStep {
+  const _WorkflowStep({required this.step, required this.title, required this.body});
+
+  final String step;
+  final String title;
+  final String body;
+}
+
+class _PricingPlan {
+  const _PricingPlan({
+    required this.tier,
+    required this.price,
     required this.description,
+    required this.points,
+    this.featured = false,
   });
 
-  final int index;
-  final IconData icon;
+  final String tier;
+  final String price;
   final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: theme.colorScheme.surface,
-        border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Text(
-              index.toString().padLeft(2, '0'),
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Icon(icon, size: 28, color: theme.colorScheme.primary),
-          const SizedBox(height: 12),
-          Text(description, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        ],
-      ),
-    );
-  }
+  final List<String> points;
+  final bool featured;
 }
 
-class _LandingLocaleOverlay extends StatelessWidget {
-  const _LandingLocaleOverlay();
+const _features = <_Feature>[
+  _Feature(
+    title: 'Editor that keeps context',
+    body: 'Update line items, payment terms, and brand colours while the PDF preview mirrors every change in real time.',
+  ),
+  _Feature(
+    title: 'Templates clients trust',
+    body: 'Choose clean finance-reviewed layouts with balance summaries, bilingual labels, and optional signature space.',
+  ),
+  _Feature(
+    title: 'Collaboration built-in',
+    body: 'Invite teammates, assign approvals, and leave comments without exposing the entire billing history.',
+  ),
+  _Feature(
+    title: 'Automations that feel human',
+    body: 'Schedule reminders, tailor follow-up copy, and monitor payment status from a single dashboard.',
+  ),
+];
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Positioned.fill(
-      child: DecoratedBox(
-        decoration: BoxDecoration(color: theme.colorScheme.surface.withOpacity(0.75)),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 60,
-                height: 60,
-                child: CircularProgressIndicator(strokeWidth: 4),
-              ),
-              const SizedBox(height: 16),
-              Text(context.l10n.text('loadingMessage'), style: theme.textTheme.titleMedium),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+const _workflowSteps = <_WorkflowStep>[
+  _WorkflowStep(
+    step: '01',
+    title: 'Personalise the canvas',
+    body: 'Upload your logo, choose a template, and set reusable blocks for service notes or tax language.',
+  ),
+  _WorkflowStep(
+    step: '02',
+    title: 'Fill once, reuse forever',
+    body: 'Store client records, payment terms, and bank info so new documents start from a polished base.',
+  ),
+  _WorkflowStep(
+    step: '03',
+    title: 'Share instantly',
+    body: 'Export vector-perfect PDFs, send secure links, or deliver branded emails with automatic reminders.',
+  ),
+];
 
-extension _ColorIntX on int {
-  Color toColor() => Color(this);
-}
+const _plans = <_PricingPlan>[
+  _PricingPlan(
+    tier: 'Starter',
+    price: '\$0',
+    description: 'For solo builders who need professional invoices without the busywork.',
+    points: [
+      'Unlimited invoices & receipts',
+      'Two premium template families',
+      'Smart reminders and status tracking',
+    ],
+  ),
+  _PricingPlan(
+    tier: 'Growth',
+    price: '\$24/mo',
+    featured: true,
+    description: 'Unlock collaboration, version history, and automation for scaling teams.',
+    points: [
+      'Everything in Starter',
+      'Approval workflows & roles',
+      'Template version history',
+      'Analytics workspace',
+    ],
+  ),
+  _PricingPlan(
+    tier: 'Enterprise',
+    price: 'Let’s talk',
+    description: 'SOC2-ready deployment with custom templates, SSO, and dedicated support.',
+    points: [
+      'Dedicated CSM & migration',
+      'Custom domains & SSO',
+      'Bespoke template engineering',
+    ],
+  ),
+];

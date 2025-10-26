@@ -5,17 +5,17 @@ import './globals.css';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  variable: '--font-plus-jakarta',
+  variable: '--font-sans',
 });
 
 export const metadata: Metadata = {
-  title: 'Invoice Atlas — Global Invoicing Reinvented',
+  title: 'Invoice Atlas — Professional Invoice & Receipt Generator',
   description:
-    'Generate polished invoices in minutes, collaborate with teams, and export high-fidelity PDFs that respect local business norms worldwide.',
+    'Design polished invoices and receipts in minutes. Preview finance-approved templates, collaborate with teammates, and export vector-perfect PDFs.',
   openGraph: {
     title: 'Invoice Atlas',
     description:
-      'Generate polished invoices in minutes, collaborate with teams, and export high-fidelity PDFs that respect local business norms worldwide.',
+      'Design polished invoices and receipts in minutes. Preview finance-approved templates, collaborate with teammates, and export vector-perfect PDFs.',
     url: 'https://invoice-atlas.example.com',
     siteName: 'Invoice Atlas',
   },
@@ -27,69 +27,79 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const year = new Date().getFullYear();
   return (
     <html lang="en" className={plusJakarta.variable}>
       <body>
-        <header className="navbar">
-          <div className="container navbar__inner">
-            <Link href="/" className="navbar__brand" prefetch={false}>
-              <span className="navbar__logo">IA</span>
-              <span className="navbar__tagline">Invoice Atlas · Documents without detours</span>
-            </Link>
-            <nav className="navbar__links">
-              <a href="#templates">Templates</a>
-              <a href="#features">Features</a>
-              <a href="#pricing">Pricing</a>
-              <a href="/privacy-policy">Privacy</a>
-              <Link href="/app" className="button button-primary navbar__cta" prefetch={false}>
-                Launch app
+        <div className="site-shell">
+          <header className="site-header">
+            <div className="container site-header__inner">
+              <Link href="/" className="site-brand" prefetch={false}>
+                <span className="site-brand__mark">IA</span>
+                <span className="site-brand__meta">
+                  <strong>Invoice Atlas</strong>
+                  <span>Polished billing in minutes</span>
+                </span>
               </Link>
-            </nav>
-          </div>
-        </header>
-        <main>{children}</main>
-        <footer className="footer">
-          <div className="container">
-            <div className="footer__inner">
+              <nav className="site-nav">
+                <a href="#features">Features</a>
+                <a href="#templates">Templates</a>
+                <a href="#workflow">Workflow</a>
+                <a href="#pricing">Pricing</a>
+                <Link href="/privacy-policy" prefetch={false}>
+                  Privacy
+                </Link>
+                <Link href="/app" className="button button--primary" prefetch={false}>
+                  Launch app
+                </Link>
+              </nav>
+            </div>
+          </header>
+          <main>{children}</main>
+          <footer className="site-footer">
+            <div className="container site-footer__grid">
               <div>
                 <h3>Invoice Atlas</h3>
                 <p>
-                  A refined invoicing workspace that blends a Next.js marketing story with a Flutter-powered editor so teams can learn,
-                  launch, and collaborate without switching tabs.
+                  Create invoice and receipt PDFs that feel bespoke without fighting a designer. The marketing site and the Flutter workspace share a single design system.
                 </p>
               </div>
               <div>
                 <h3>Explore</h3>
-                <ul className="list-reset" style={{ display: 'grid', gap: '0.6rem' }}>
+                <ul>
                   <li>
-                    <a href="#features">Features</a>
+                    <a href="#features">Feature tour</a>
+                  </li>
+                  <li>
+                    <a href="#templates">Template gallery</a>
                   </li>
                   <li>
                     <a href="#pricing">Pricing</a>
                   </li>
-                  <li>
-                    <a href="/privacy-policy">Privacy &amp; Policy</a>
-                  </li>
                 </ul>
               </div>
               <div>
-                <h3>Get help</h3>
-                <ul className="list-reset" style={{ display: 'grid', gap: '0.6rem' }}>
+                <h3>Company</h3>
+                <ul>
+                  <li>
+                    <Link href="/privacy-policy" prefetch={false}>
+                      Privacy policy
+                    </Link>
+                  </li>
                   <li>
                     <a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a>
                   </li>
                   <li>
-                    <a href="/admin">Admin console</a>
-                  </li>
-                  <li>
-                    <a href="/app">Launch the app</a>
+                    <Link href="/admin" prefetch={false}>
+                      Admin console
+                    </Link>
                   </li>
                 </ul>
               </div>
             </div>
-            <div className="footer__bottom">© {new Date().getFullYear()} Invoice Atlas. All rights reserved.</div>
-          </div>
-        </footer>
+            <div className="site-footer__meta">© {year} Invoice Atlas. All rights reserved.</div>
+          </footer>
+        </div>
       </body>
     </html>
   );

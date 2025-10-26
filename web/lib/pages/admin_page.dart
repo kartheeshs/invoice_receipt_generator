@@ -253,7 +253,7 @@ class AdminStandalonePage extends StatelessWidget {
                     : FilledButton.icon(
                         onPressed: () => Navigator.of(context).pushReplacementNamed('/app'),
                         icon: const Icon(Icons.open_in_new),
-                        label: Text(l10n.text('landingHeroPrimaryCta')),
+                        label: Text(l10n.text('launchAppButton')),
                       )),
           ),
         ],
