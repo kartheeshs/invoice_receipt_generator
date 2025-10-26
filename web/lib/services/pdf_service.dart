@@ -4,16 +4,15 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' show PdfGoogleFonts;
 
 import '../l10n/app_localizations.dart';
 import '../models/invoice.dart';
 import '../models/invoice_template_spec.dart';
 import '../models/user_profile.dart';
-import '../models/receipt.dart';
 
 class PdfService {
   _PdfFontBundle? _fontBundle;
@@ -58,72 +57,17 @@ class PdfService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
         theme: fonts.theme,
-        build: (context) {
-          final maxWidth = context.page.pageFormat.availableWidth;
-          return [
-            pw.DefaultTextStyle.merge(
-              style: pw.TextStyle(fontFallback: fonts.fallback),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: content
-                    .map((widget) => pw.SizedBox(width: maxWidth, child: widget))
-                    .toList(),
-              ),
-            ),
-          ];
-        },
+        build: (context) => [
+          pw.DefaultTextStyle.merge(
+            style: pw.TextStyle(fontFallback: fonts.fallback),
+            child: pw.Column(children: content),
+          ),
+        ],
       ),
     );
 
     final bytes = await pdf.save();
     _triggerDownload(bytes, 'invoice-${invoice.number.replaceAll('#', '')}.pdf');
-  }
-
-  Future<void> downloadReceipt({
-    required Receipt receipt,
-    required UserProfile profile,
-    required Locale locale,
-  }) async {
-    final l10n = AppLocalizations(locale);
-    final format = NumberFormat.currency(
-      locale: locale.toLanguageTag(),
-      name: receipt.currencyCode,
-      symbol: receipt.currencySymbol,
-    );
-    final dateFormat = DateFormat.yMMMMd(locale.toLanguageTag());
-    final fonts = await _ensureFonts();
-
-    final pdf = pw.Document();
-    final content = _buildReceiptPdf(
-      receipt: receipt,
-      profile: profile,
-      format: format,
-      dateFormat: dateFormat,
-      l10n: l10n,
-    );
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        theme: fonts.theme,
-        build: (context) {
-          final maxWidth = context.page.pageFormat.availableWidth;
-          return [
-            pw.DefaultTextStyle.merge(
-              style: pw.TextStyle(fontFallback: fonts.fallback),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: content.map((widget) => pw.SizedBox(width: maxWidth, child: widget)).toList(),
-              ),
-            ),
-          ];
-        },
-      ),
-    );
-
-    final bytes = await pdf.save();
-    _triggerDownload(bytes, 'receipt-${receipt.number.replaceAll('#', '')}.pdf');
   }
 
   List<pw.Widget> _buildGlobalPdf({
@@ -1979,198 +1923,6 @@ class PdfService {
     return widgets;
   }
 
-  List<pw.Widget> _buildReceiptPdf({
-    required Receipt receipt,
-    required UserProfile profile,
-    required NumberFormat format,
-    required DateFormat dateFormat,
-    required AppLocalizations l10n,
-  }) {
-    final companyName = profile.companyName.isNotEmpty ? profile.companyName : profile.displayName;
-    final companyAddress = profile.address.isNotEmpty ? profile.address : null;
-    final companyPhone = profile.phone.isNotEmpty ? profile.phone : null;
-    final clientName = receipt.clientName.isNotEmpty ? receipt.clientName : l10n.text('receiptClientNameLabel');
-    final clientEmail = receipt.clientEmail.isNotEmpty ? receipt.clientEmail : null;
-    final clientAddress = receipt.clientAddress.isNotEmpty ? receipt.clientAddress : null;
-    final paymentMethod = receipt.paymentMethod.isNotEmpty ? receipt.paymentMethod : l10n.text('receiptPaymentMethodLabel');
-    final paymentReference = receipt.paymentReference.isNotEmpty ? receipt.paymentReference : null;
-    final items = receipt.items.isNotEmpty
-        ? receipt.items
-        : [
-            ReceiptItem(
-              id: '${receipt.id}-fallback',
-              description: l10n.text('receiptItemDescriptionLabel'),
-              amount: receipt.total,
-            ),
-          ];
-    final note = receipt.notes.isNotEmpty ? receipt.notes : profile.tagline;
-
-    final tableRows = <pw.TableRow>[
-      pw.TableRow(
-        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-        children: [
-          pw.Padding(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: pw.Text(
-              l10n.text('receiptItemDescriptionLabel'),
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-          ),
-          pw.Padding(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: pw.Text(
-              l10n.text('receiptItemAmountLabel'),
-              textAlign: pw.TextAlign.right,
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      ...items.map(
-        (item) => pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.white),
-          children: [
-            pw.Padding(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: pw.Text(item.description.isNotEmpty ? item.description : l10n.text('receiptItemDescriptionLabel')),
-            ),
-            pw.Padding(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: pw.Text(format.format(item.amount), textAlign: pw.TextAlign.right),
-            ),
-          ],
-        ),
-      ),
-    ];
-
-    final totals = [
-      _receiptTotalRow(l10n.text('receiptSubtotalLabel'), format.format(receipt.subtotal)),
-      _receiptTotalRow(l10n.text('receiptTaxLabel'), format.format(receipt.tax)),
-      _receiptTotalRow(
-        l10n.text('receiptTotalLabel'),
-        format.format(receipt.total),
-        emphasize: true,
-      ),
-    ];
-
-    return [
-      pw.Text(
-        l10n.text('receiptFormTitle'),
-        style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
-      ),
-      pw.SizedBox(height: 12),
-      pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  companyName,
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                ),
-                if (profile.tagline.isNotEmpty)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 4),
-                    child: pw.Text(profile.tagline),
-                  ),
-                if (companyAddress != null)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 4),
-                    child: pw.Text(companyAddress),
-                  ),
-                if (companyPhone != null)
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(top: 4),
-                    child: pw.Text(companyPhone),
-                  ),
-              ],
-            ),
-          ),
-          pw.SizedBox(width: 16),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey300),
-              borderRadius: pw.BorderRadius.circular(8),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                _receiptLabelValue(l10n.text('receiptNumberLabel'), receipt.number),
-                _receiptLabelValue(l10n.text('receiptIssueDateLabel'), dateFormat.format(receipt.issueDate)),
-                _receiptLabelValue(l10n.text('receiptPaymentMethodLabel'), paymentMethod),
-                if (paymentReference != null)
-                  _receiptLabelValue(l10n.text('receiptPaymentReferenceLabel'), paymentReference),
-              ],
-            ),
-          ),
-        ],
-      ),
-      pw.SizedBox(height: 24),
-      pw.Container(
-        padding: const pw.EdgeInsets.all(16),
-        decoration: pw.BoxDecoration(
-          color: PdfColors.grey200,
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              clientName,
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            ),
-            if (clientEmail != null)
-              pw.Padding(
-                padding: const pw.EdgeInsets.only(top: 4),
-                child: pw.Text(clientEmail),
-              ),
-            if (clientAddress != null)
-              pw.Padding(
-                padding: const pw.EdgeInsets.only(top: 4),
-                child: pw.Text(clientAddress),
-              ),
-          ],
-        ),
-      ),
-      pw.SizedBox(height: 20),
-      pw.Text(l10n.text('receiptItemsHeading'), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-      pw.SizedBox(height: 8),
-      pw.Table(
-        border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-        columnWidths: const {
-          0: pw.FlexColumnWidth(3),
-          1: pw.FlexColumnWidth(1),
-        },
-        children: tableRows,
-      ),
-      pw.SizedBox(height: 16),
-      pw.Align(
-        alignment: pw.Alignment.centerRight,
-        child: pw.Container(
-          width: 220,
-          padding: const pw.EdgeInsets.all(12),
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfColors.grey300),
-            borderRadius: pw.BorderRadius.circular(8),
-          ),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: totals,
-          ),
-        ),
-      ),
-      if (note != null && note.isNotEmpty) ...[
-        pw.SizedBox(height: 20),
-        pw.Text(l10n.text('receiptNotesLabel'), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 6),
-        pw.Text(note),
-      ],
-    ];
-  }
-
   pw.Widget _pdfLedgerTable(
     _PdfBuildArgs args, {
     required _PdfPalette palette,
@@ -2347,62 +2099,22 @@ class PdfService {
     }
 
     final bundle = _PdfFontBundle(
-      base: await _loadFont('packages/google_fonts/google_fonts/Roboto-Regular.ttf'),
-      bold: await _loadFont('packages/google_fonts/google_fonts/Roboto-Bold.ttf'),
-      italic: await _loadFont('packages/google_fonts/google_fonts/Roboto-Italic.ttf'),
-      boldItalic: await _loadFont('packages/google_fonts/google_fonts/Roboto-BoldItalic.ttf'),
+      base: await PdfGoogleFonts.robotoRegular(),
+      bold: await PdfGoogleFonts.robotoBold(),
+      italic: await PdfGoogleFonts.robotoItalic(),
+      boldItalic: await PdfGoogleFonts.robotoBoldItalic(),
       fallback: <pw.Font>[
-        await _loadFont('packages/google_fonts/google_fonts/NotoSans-Regular.ttf'),
-        await _loadFont('packages/google_fonts/google_fonts/NotoSansJP-Regular.ttf'),
+        await PdfGoogleFonts.notoSansRegular(),
+        await PdfGoogleFonts.notoSansJPRegular(),
       ],
     );
     _fontBundle = bundle;
     return bundle;
   }
 
-  Future<pw.Font> _loadFont(String assetPath) async {
-    final data = await rootBundle.load(assetPath);
-    return pw.Font.ttf(data);
-  }
-
   PdfColor _pdfColor(int value) => PdfColor.fromInt(value);
 
   pw.Alignment _pdfAlignment(Alignment alignment) => pw.Alignment(alignment.x, alignment.y);
-
-  pw.Widget _receiptLabelValue(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 6),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            label,
-            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-          ),
-          pw.Text(
-            value,
-            style: const pw.TextStyle(fontWeight: pw.FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _receiptTotalRow(String label, String value, {bool emphasize = false}) {
-    final style = emphasize
-        ? const pw.TextStyle(fontWeight: pw.FontWeight.bold)
-        : const pw.TextStyle();
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 4),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(label, style: style),
-          pw.Text(value, style: style),
-        ],
-      ),
-    );
-  }
 }
 
 class _PdfFontBundle {

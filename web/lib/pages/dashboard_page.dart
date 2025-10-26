@@ -10,13 +10,11 @@ class DashboardPage extends StatelessWidget {
   const DashboardPage({
     super.key,
     required this.onCreateInvoice,
-    required this.onCreateReceipt,
     required this.onOpenSubscription,
     required this.onRequestSignIn,
   });
 
   final VoidCallback onCreateInvoice;
-  final VoidCallback onCreateReceipt;
   final Future<void> Function() onOpenSubscription;
   final Future<void> Function() onRequestSignIn;
 
@@ -100,23 +98,6 @@ class DashboardPage extends StatelessWidget {
                   SizedBox(
                     width: 320,
                     child: MetricCard(
-                      title: l10n.text('totalReceipts'),
-                      value: appState.receipts.length.toString(),
-                      subtitle: l10n.text('receiptsTab'),
-                      icon: Icons.receipt,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 320,
-                    child: MetricCard(
-                      title: l10n.text('receiptVolume'),
-                      value: currency.format(appState.receiptVolume),
-                      icon: Icons.attach_money,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 320,
-                    child: MetricCard(
                       title: l10n.text('averageInvoice'),
                       value: currency.format(appState.averageInvoice),
                       icon: Icons.trending_up,
@@ -183,15 +164,6 @@ class DashboardPage extends StatelessWidget {
                       title: l10n.text('createInvoiceAction'),
                       subtitle: l10n.text('invoicesEmptyBody'),
                       onPressed: onCreateInvoice,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 320,
-                    child: _QuickActionTile(
-                      icon: Icons.fact_check,
-                      title: l10n.text('createReceiptAction'),
-                      subtitle: l10n.text('receiptsEmptyBody'),
-                      onPressed: onCreateReceipt,
                     ),
                   ),
                   SizedBox(
