@@ -1228,11 +1228,11 @@ class _TemplatePreviewCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: spec.headerGradient,
+            AspectRatio(
+              aspectRatio: 4 / 3,
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(22),
+                child: _TemplateMiniature(spec: spec),
               ),
             ),
             const SizedBox(height: 18),
@@ -1247,6 +1247,215 @@ class _TemplatePreviewCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TemplateMiniature extends StatelessWidget {
+  const _TemplateMiniature({required this.spec});
+
+  final InvoiceTemplateSpec spec;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color headerText = spec.headerText;
+    final Color tableHeader = spec.tableHeader;
+    final Color tableHeaderText = spec.tableHeaderText;
+    final Color canvas = spec.canvasBackground ?? spec.surface;
+
+    Widget bar(Color color, {double height = 6, double widthFactor = 1}) {
+      return FractionallySizedBox(
+        widthFactor: widthFactor,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+
+    return Container(
+      color: canvas,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: spec.headerGradient,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: spec.surface.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: headerText.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 5,
+                        width: 60,
+                        decoration: BoxDecoration(
+                          color: headerText.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: spec.highlight?.withOpacity(0.25) ?? spec.surface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Container(
+                    height: 5,
+                    width: 36,
+                    decoration: BoxDecoration(
+                      color: headerText.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            bar(spec.accent.withOpacity(0.65), widthFactor: 0.7),
+                            const SizedBox(height: 5),
+                            bar(spec.muted.withOpacity(0.3), widthFactor: 0.5),
+                            const SizedBox(height: 12),
+                            bar(spec.muted.withOpacity(0.25), widthFactor: 1),
+                            const SizedBox(height: 5),
+                            bar(spec.muted.withOpacity(0.2), widthFactor: 0.85),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: spec.balanceBackground.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              bar(spec.accent.withOpacity(0.6), height: 5, widthFactor: 0.7),
+                              const SizedBox(height: 6),
+                              bar(spec.accent.withOpacity(0.9), height: 8, widthFactor: 0.9),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: spec.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: spec.border.withOpacity(0.7)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: tableHeader,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: Container(
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: tableHeaderText.withOpacity(0.85),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      height: 6,
+                                      width: 30,
+                                      decoration: BoxDecoration(
+                                        color: tableHeaderText.withOpacity(0.7),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: List.generate(3, (index) {
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: bar(spec.muted.withOpacity(0.25 + index * 0.1), height: 5),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      bar(spec.accent.withOpacity(0.35 + index * 0.1), height: 5, widthFactor: 0.5),
+                                    ],
+                                  );
+                                }),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

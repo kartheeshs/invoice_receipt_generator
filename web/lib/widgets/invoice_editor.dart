@@ -74,6 +74,31 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
     }
   }
 
+  void _updateTemplate(InvoiceTemplate template) {
+    final currentDocument = _workingInvoice.document;
+    final defaults = InvoiceDocument.defaults(template);
+    final defaultTypes = defaults.sections.map((section) => section.type).toSet();
+    final preserved = currentDocument.sections.where((section) {
+      if (section.type == InvoiceSectionType.custom) {
+        return true;
+      }
+      if (!defaultTypes.contains(section.type) && section.isRemovable) {
+        return true;
+      }
+      return false;
+    }).toList();
+
+    final mergedSections = [...defaults.sections, ...preserved];
+    final mergedDocument = defaults.copyWith(sections: mergedSections);
+
+    setState(() {
+      _workingInvoice = _workingInvoice.copyWith(
+        template: template,
+        document: mergedDocument,
+      );
+    });
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -270,14 +295,7 @@ class _InvoiceEditorState extends State<InvoiceEditor> {
       child: InkWell(
         onTap: !enabled
             ? null
-            : () {
-                setState(() {
-                  _workingInvoice = _workingInvoice.copyWith(
-                    template: template,
-                    document: InvoiceDocument.defaults(template),
-                  );
-                });
-              },
+            : () => _updateTemplate(template),
         borderRadius: BorderRadius.circular(20),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -2707,20 +2725,23 @@ class _TemplatePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget previewLine(double widthFactor, Color color, {double height = 6}) {
+    final Color onHeader = spec.headerText;
+    final Color tableHeader = spec.tableHeader;
+    final Color tableHeaderText = spec.tableHeaderText;
+    final Color canvas = spec.canvasBackground ?? spec.surface;
+
+    Widget pill(Color color, {double height = 8, double widthFactor = 1}) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final maxWidth = constraints.maxWidth;
-          final width = (maxWidth.isFinite ? maxWidth : 120.0) * widthFactor;
-
+          final maxWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : 120.0;
           return Align(
             alignment: Alignment.centerLeft,
             child: Container(
-              width: width,
               height: height,
+              width: maxWidth * widthFactor,
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           );
@@ -2728,65 +2749,186 @@ class _TemplatePreview extends StatelessWidget {
       );
     }
 
-    return DecoratedBox(
+    return Container(
       decoration: BoxDecoration(
-        color: spec.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: spec.border.withOpacity(0.8)),
+        color: canvas,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: spec.border.withOpacity(0.9)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            height: 56,
+            height: 68,
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               gradient: spec.headerGradient,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: spec.surface.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: onHeader.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 6,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          color: onHeader.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: spec.highlight?.withOpacity(0.25) ?? spec.surface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Container(
+                    height: 6,
+                    width: 48,
+                    decoration: BoxDecoration(
+                      color: onHeader.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  previewLine(0.6, spec.accent.withOpacity(0.7), height: 8),
-                  const SizedBox(height: 6),
-                  previewLine(0.35, spec.accent.withOpacity(0.35)),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(3, (index) {
-                              return Row(
-                                children: [
-                                  Expanded(
-                                    child: previewLine(
-                                      1,
-                                      spec.muted.withOpacity(0.25 + (index * 0.1)),
-                                      height: 7,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  previewLine(0.2, spec.accent.withOpacity(0.4), height: 7),
-                                ],
-                              );
-                            }),
-                          ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            pill(spec.accent.withOpacity(0.6), widthFactor: 0.7),
+                            const SizedBox(height: 6),
+                            pill(spec.muted.withOpacity(0.3), widthFactor: 0.5),
+                            const SizedBox(height: 14),
+                            pill(spec.muted.withOpacity(0.25), widthFactor: 1),
+                            const SizedBox(height: 6),
+                            pill(spec.muted.withOpacity(0.2), widthFactor: 0.9),
+                          ],
                         ),
-                        const SizedBox(height: 10),
-                        Container(
-                          height: 32,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: spec.balanceBackground.withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              pill(spec.accent.withOpacity(0.6), height: 6, widthFactor: 0.7),
+                              const SizedBox(height: 8),
+                              pill(spec.accent.withOpacity(0.9), height: 10, widthFactor: 0.9),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: spec.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: spec.border.withOpacity(0.7)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: tableHeader,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: Container(
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: tableHeaderText.withOpacity(0.85),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      height: 8,
+                                      width: 40,
+                                      decoration: BoxDecoration(
+                                        color: tableHeaderText.withOpacity(0.7),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: List.generate(3, (index) {
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: pill(spec.muted.withOpacity(0.25 + index * 0.1), height: 7),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      pill(spec.accent.withOpacity(0.35 + index * 0.1), height: 7, widthFactor: 0.6),
+                                    ],
+                                  );
+                                }),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

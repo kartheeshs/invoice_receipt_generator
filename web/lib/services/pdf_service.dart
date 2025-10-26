@@ -2098,18 +2098,31 @@ class PdfService {
       return cached;
     }
 
-    final bundle = _PdfFontBundle(
-      base: await PdfGoogleFonts.robotoRegular(),
-      bold: await PdfGoogleFonts.robotoBold(),
-      italic: await PdfGoogleFonts.robotoItalic(),
-      boldItalic: await PdfGoogleFonts.robotoBoldItalic(),
-      fallback: <pw.Font>[
-        await PdfGoogleFonts.notoSansRegular(),
-        await PdfGoogleFonts.notoSansJPRegular(),
-      ],
-    );
-    _fontBundle = bundle;
-    return bundle;
+    try {
+      final bundle = _PdfFontBundle(
+        base: await PdfGoogleFonts.robotoRegular(),
+        bold: await PdfGoogleFonts.robotoBold(),
+        italic: await PdfGoogleFonts.robotoItalic(),
+        boldItalic: await PdfGoogleFonts.robotoBoldItalic(),
+        fallback: <pw.Font>[
+          await PdfGoogleFonts.notoSansRegular(),
+          await PdfGoogleFonts.notoSansJPRegular(),
+        ],
+      );
+      _fontBundle = bundle;
+      return bundle;
+    } catch (error) {
+      debugPrint('Failed to load Google PDF fonts: $error');
+      final bundle = _PdfFontBundle(
+        base: pw.Font.helvetica(),
+        bold: pw.Font.helveticaBold(),
+        italic: pw.Font.helveticaOblique(),
+        boldItalic: pw.Font.helveticaBoldOblique(),
+        fallback: const <pw.Font>[],
+      );
+      _fontBundle = bundle;
+      return bundle;
+    }
   }
 
   PdfColor _pdfColor(int value) => PdfColor.fromInt(value);

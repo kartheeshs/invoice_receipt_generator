@@ -37,6 +37,7 @@ export default function RootLayout({
               <span className="navbar__tagline">Invoice Atlas · Documents without detours</span>
             </Link>
             <nav className="navbar__links">
+              <a href="#templates">Templates</a>
               <a href="#features">Features</a>
               <a href="#pricing">Pricing</a>
               <a href="/privacy-policy">Privacy</a>
