@@ -17,10 +17,10 @@ export default function AdminLandingPage() {
           the Invoice Atlas web application. Launch the console below and sign in with your administrator credentials.
         </p>
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <Link className="button-primary" href="/app?view=admin">
+          <Link className="button button-primary" href="/app?view=admin">
             Open admin console
           </Link>
-          <Link className="secondary-button" href="/">
+          <Link className="button button-secondary" href="/">
             Return to marketing site
           </Link>
         </div>

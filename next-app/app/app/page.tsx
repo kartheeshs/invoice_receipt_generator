@@ -24,15 +24,15 @@ export default function FlutterShellPage() {
             <p className="app-shell__eyebrow">Embedded preview</p>
             <h1>Invoice Atlas workspace</h1>
             <p>
-              The Flutter experience loads inside this frame so you can keep the marketing site and the product in one place.
-              Use the button on the right to pop the workspace into a dedicated tab whenever you need more room.
+              The Flutter experience loads inside this frame so you can keep the marketing site and the product in one place. Use the
+              button on the right to pop the workspace into a dedicated tab whenever you need more room.
             </p>
           </div>
           <div className="app-shell__actions">
-            <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="primary-button">
+            <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="button button-primary">
               Open full app
             </Link>
-            <Link prefetch={false} href="/" className="secondary-button">
+            <Link prefetch={false} href="/" className="button button-secondary">
               Back to marketing site
             </Link>
           </div>
@@ -42,10 +42,10 @@ export default function FlutterShellPage() {
             <div className="app-shell__error">
               <h2>We couldn&apos;t load the Flutter workspace.</h2>
               <p>
-                Double-check the deployed web build URL or run <code>flutter build web --base-href /flutter/</code> to refresh
-                the static files inside <code>public/flutter</code>.
+                Double-check the deployed web build URL or run <code>flutter build web --base-href /flutter/</code> to refresh the static
+                files inside <code>public/flutter</code>.
               </p>
-              <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="primary-button">
+              <Link prefetch={false} href={flutterUrl} target="_blank" rel="noreferrer" className="button button-primary">
                 Try opening in a new tab
               </Link>
             </div>

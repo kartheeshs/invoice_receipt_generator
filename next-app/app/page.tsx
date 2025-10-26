@@ -82,32 +82,32 @@ export default function LandingPage() {
   return (
     <>
       <section className="hero">
-        <div className="section hero-grid">
-          <div className="hero-copy">
+        <div className="container hero__inner">
+          <div className="hero__content">
             <span className="eyebrow">Invoice design without the spreadsheet stress</span>
             <h1>Build polished, on-brand invoices in minutes.</h1>
-            <p>
-              Invoice Atlas combines a Next.js marketing site with a Flutter workspace so prospects can learn and launch in one
-              flow. Craft invoices, receipts, and statements that respect local standards while still feeling uniquely yours.
+            <p className="hero__lede">
+              Invoice Atlas combines a Next.js marketing site with a Flutter workspace so prospects can learn and launch in one flow.
+              Craft invoices, receipts, and statements that respect local standards while still feeling uniquely yours.
             </p>
-            <div className="hero-actions">
-              <Link href="/app" className="primary-button" prefetch={false}>
+            <div className="hero__actions">
+              <Link href="/app" className="button button-primary" prefetch={false}>
                 Launch the app
               </Link>
-              <Link href="#features" className="secondary-button">
+              <Link href="#features" className="button button-secondary">
                 Explore features
               </Link>
             </div>
-            <div className="hero-metric-row">
+            <div className="hero__metrics">
               {stats.map((stat) => (
-                <div key={stat.label}>
+                <div key={stat.label} className="metric-card">
                   <strong>{stat.value}</strong>
                   <p>{stat.label}</p>
                 </div>
               ))}
             </div>
           </div>
-          <div className="hero-preview">
+          <div className="hero__visual">
             <div className="preview-card">
               <div className="preview-header">
                 <span className="preview-badge">Canvas preview</span>
@@ -120,11 +120,11 @@ export default function LandingPage() {
               </div>
               <div className="preview-footer">
                 <div>
-                  <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Balance due</div>
+                  <span>Balance due</span>
                   <strong>$3,240.00</strong>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Due</div>
+                <div>
+                  <span>Due</span>
                   <strong>Jul 30</strong>
                 </div>
               </div>
@@ -133,72 +133,82 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="features" className="section features">
-        <div className="section-heading">
-          <span className="eyebrow">Workflow</span>
-          <h2>Purpose-built for operators who obsess over detail</h2>
-          <p>
-            Drag to compose, localize every label, and export a PDF that mirrors your brand guidelines. No plugins or design handoff
-            required.
-          </p>
-        </div>
-        <div className="feature-grid">
-          {features.map((feature) => (
-            <article key={feature.title} className="feature-card">
-              <h3>{feature.title}</h3>
-              <p>{feature.body}</p>
-            </article>
-          ))}
-        </div>
-        <div className="roadmap-grid" style={{ marginTop: '3rem' }}>
-          {roadmap.map((item) => (
-            <article key={item.step} className="roadmap-step">
-              <span className="eyebrow" style={{ justifyContent: 'flex-start' }}>
-                Step {item.step}
-              </span>
-              <strong>{item.title}</strong>
-              <p>{item.body}</p>
-            </article>
-          ))}
+      <section id="features" className="section">
+        <div className="container">
+          <div className="section__heading">
+            <span className="eyebrow">Workflow</span>
+            <h2>Purpose-built for operators who obsess over detail</h2>
+            <p>
+              Drag to compose, localize every label, and export a PDF that mirrors your brand guidelines. No plugins or design handoff
+              required.
+            </p>
+          </div>
+          <div className="feature-grid">
+            {features.map((feature) => (
+              <article key={feature.title} className="feature-card">
+                <h3>{feature.title}</h3>
+                <p>{feature.body}</p>
+              </article>
+            ))}
+          </div>
+          <div className="roadmap-grid">
+            {roadmap.map((item) => (
+              <article key={item.step} className="roadmap-step">
+                <span className="eyebrow" style={{ justifyContent: 'flex-start' }}>
+                  Step {item.step}
+                </span>
+                <strong>{item.title}</strong>
+                <p>{item.body}</p>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
       <section id="pricing" className="section pricing">
-        <div className="section-heading">
-          <span className="eyebrow">Pricing</span>
-          <h2>Choose the plan that matches your momentum</h2>
-          <p>Stay free as long as you need, then graduate to growth when finance is ready for deeper controls.</p>
-        </div>
-        <div className="pricing-grid">
-          {plans.map((plan) => (
-            <article key={plan.tier} className={`plan-card${plan.featured ? ' featured' : ''}`}>
-              <div className="plan-header">
-                <span className="plan-tier">{plan.tier}</span>
-                <span className="plan-price">{plan.price}</span>
-              </div>
-              <p className="plan-description">{plan.description}</p>
-              <ul>
-                {plan.points.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
-              <Link href="/app" className={`plan-button${plan.featured ? ' primary' : ''}`} prefetch={false}>
-                {plan.featured ? 'Upgrade to Growth' : 'Start building'}
-              </Link>
-            </article>
-          ))}
+        <div className="container">
+          <div className="section__heading">
+            <span className="eyebrow">Pricing</span>
+            <h2>Choose the plan that matches your momentum</h2>
+            <p>Stay free as long as you need, then graduate to growth when finance is ready for deeper controls.</p>
+          </div>
+          <div className="pricing-grid">
+            {plans.map((plan) => (
+              <article key={plan.tier} className={`plan-card${plan.featured ? ' featured' : ''}`}>
+                <div className="plan-header">
+                  <span className="plan-tier">{plan.tier}</span>
+                  <span className="plan-price">{plan.price}</span>
+                </div>
+                <p className="plan-description">{plan.description}</p>
+                <ul>
+                  {plan.points.map((point) => (
+                    <li key={point}>{point}</li>
+                  ))}
+                </ul>
+                <Link
+                  href="/app"
+                  className={`button ${plan.featured ? 'button-primary' : 'button-secondary'} plan-button`}
+                  prefetch={false}
+                >
+                  {plan.featured ? 'Upgrade to Growth' : 'Start building'}
+                </Link>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
       <section className="section cta">
-        <div className="cta-banner">
-          <div>
-            <h2>Your next invoice can feel like a brand moment.</h2>
-            <p>Spin up the Flutter workspace, drop in your assets, and export a client-ready PDF before the coffee cools.</p>
+        <div className="container">
+          <div className="cta-banner">
+            <div>
+              <h2>Your next invoice can feel like a brand moment.</h2>
+              <p>Spin up the Flutter workspace, drop in your assets, and export a client-ready PDF before the coffee cools.</p>
+            </div>
+            <Link href="/app" className="button button-light" prefetch={false}>
+              Open the workspace
+            </Link>
           </div>
-          <Link href="/app" className="primary-button" prefetch={false}>
-            Open the workspace
-          </Link>
         </div>
       </section>
     </>

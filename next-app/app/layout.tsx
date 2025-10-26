@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
@@ -29,53 +30,63 @@ export default function RootLayout({
   return (
     <html lang="en" className={plusJakarta.variable}>
       <body>
-        <div className="navbar">
-          <div className="navbar-inner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div className="badge">Invoice Atlas</div>
-              <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
-                Design-led invoices, powered by Flutter
-              </span>
-            </div>
-            <nav className="nav-links">
+        <header className="navbar">
+          <div className="container navbar__inner">
+            <Link href="/" className="navbar__brand" prefetch={false}>
+              <span className="navbar__logo">IA</span>
+              <span className="navbar__tagline">Invoice Atlas · Documents without detours</span>
+            </Link>
+            <nav className="navbar__links">
               <a href="#features">Features</a>
               <a href="#pricing">Pricing</a>
               <a href="/privacy-policy">Privacy</a>
-              <a className="primary-button" href="/app">
+              <Link href="/app" className="button button-primary navbar__cta" prefetch={false}>
                 Launch app
-              </a>
+              </Link>
             </nav>
           </div>
-        </div>
+        </header>
         <main>{children}</main>
         <footer className="footer">
-          <div className="footer-inner">
-            <div>
-              <h3>Invoice Atlas</h3>
-              <p>
-                A refined invoicing workspace that blends a Next.js marketing story with a Flutter-powered editor so teams can
-                learn, launch, and collaborate without switching tabs.
-              </p>
+          <div className="container">
+            <div className="footer__inner">
+              <div>
+                <h3>Invoice Atlas</h3>
+                <p>
+                  A refined invoicing workspace that blends a Next.js marketing story with a Flutter-powered editor so teams can learn,
+                  launch, and collaborate without switching tabs.
+                </p>
+              </div>
+              <div>
+                <h3>Explore</h3>
+                <ul className="list-reset" style={{ display: 'grid', gap: '0.6rem' }}>
+                  <li>
+                    <a href="#features">Features</a>
+                  </li>
+                  <li>
+                    <a href="#pricing">Pricing</a>
+                  </li>
+                  <li>
+                    <a href="/privacy-policy">Privacy &amp; Policy</a>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3>Get help</h3>
+                <ul className="list-reset" style={{ display: 'grid', gap: '0.6rem' }}>
+                  <li>
+                    <a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a>
+                  </li>
+                  <li>
+                    <a href="/admin">Admin console</a>
+                  </li>
+                  <li>
+                    <a href="/app">Launch the app</a>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <div>
-              <h3>Explore</h3>
-              <ul className="list-reset" style={{ display: 'grid', gap: '0.5rem' }}>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#pricing">Pricing</a></li>
-                <li><a href="/privacy-policy">Privacy &amp; Policy</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3>Get help</h3>
-              <ul className="list-reset" style={{ display: 'grid', gap: '0.5rem' }}>
-                <li><a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a></li>
-                <li><a href="/admin">Admin console</a></li>
-                <li><a href="/app">Launch the app</a></li>
-              </ul>
-            </div>
-          </div>
-          <div style={{ marginTop: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            © {new Date().getFullYear()} Invoice Atlas. All rights reserved.
+            <div className="footer__bottom">© {new Date().getFullYear()} Invoice Atlas. All rights reserved.</div>
           </div>
         </footer>
       </body>
