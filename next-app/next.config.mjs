@@ -4,18 +4,7 @@ const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/app',
-        destination: '/flutter-app/index.html',
-      },
-      {
-        source: '/app/:path*',
-        destination: '/flutter-app/:path*',
-      },
-    ];
-  },
+  output: 'export',
 };
 
 export default nextConfig;

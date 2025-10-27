@@ -1,44 +1,54 @@
-# Invoice Atlas marketing site
+# Invoice Atlas web workspace
 
-This Next.js application provides a search-friendly marketing layer for the Invoice Atlas platform. The Flutter web
-client is served beneath the `/app` path so marketing pages remain SEO-friendly while the interactive experience runs
-unchanged.
+This project contains the marketing site and client-side workspace for Invoice Atlas, rebuilt entirely with Next.js. The `/app` route mirrors the original Flutter UI: a sidebar with dashboard, invoices, templates, clients, and settings links; an invoice editor with live preview; recent activity; and supporting sections for templates and client insights.
 
 ## Development
 
-```
+```bash
 cd next-app
-pnpm install # or npm install / yarn install
-pnpm dev
+npm install
+npm run dev
 ```
 
-The development server will be available at `http://localhost:3000`.
+The dev server runs at `http://localhost:3000`. The marketing site is rendered on the index route, while `/app` loads the interactive invoice workspace.
 
-## Deploying the Flutter web build
+## Environment variables
 
-1. Build the Flutter web client using a base href that matches the `/app` prefix:
+Create a `.env.local` file if you want to connect to Firebase:
+
+```env
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_WEB_API_KEY=your-web-api-key
+```
+
+When the keys are omitted the workspace falls back to bundled sample data so the UI remains functional offline.
+
+## Scripts
+
+- `npm run dev` – start the Next.js development server
+- `npm run build` – create a production build
+- `npm run export` – run `next export` against the previous build
+- `npm run build:static` – build and export into `out/` for Firebase Hosting
+- `npm run lint` – run ESLint
+
+## Deployment
+
+1. Generate a static export:
+   ```bash
+   npm run build:static
    ```
-   flutter build web --base-href /app/
-   ```
-2. Copy the contents of `web/build/web` into `next-app/public/flutter-app`.
-3. Deploy the Next.js site (for example with Vercel or Firebase Hosting). Requests to `/app` will automatically serve
-the Flutter application, while `/` and other marketing routes remain statically generated.
+2. Deploy the `out/` directory. For Firebase Hosting this repository already points `firebase.json` to `next-app/out`.
 
-## Available scripts
+## Project structure
 
-- `pnpm dev` – start the Next.js dev server.
-- `pnpm build` – create an optimized production build.
-- `pnpm start` – run the built app in production mode.
-- `pnpm lint` – run ESLint checks.
+- `app/` – App Router routes and shared UI
+- `lib/` – invoice utilities, Firebase helpers, and sample data
+- `public/` – static assets (logos, favicons, etc.)
+- `app/app/page.tsx` – main workspace view
+- `app/privacy-policy/page.tsx` – privacy policy page styled with the shared design system
 
-## Directory structure
+## UI notes
 
-- `app/` – App Router routes and shared UI components.
-- `public/` – Static assets and the Flutter build output (`public/flutter-app`).
-- `app/privacy-policy` – SEO-friendly privacy policy page reflecting platform commitments.
-
-## SEO benefits
-
-- Marketing pages render on the server, delivering meaningful HTML to search engines.
-- Canonical navigation keeps `/app` reserved for the interactive Flutter experience without compromising discoverability.
-
+- The sidebar replicates the Flutter layout but uses semantic HTML and CSS utilities
+- PDF downloads rely on `window.print()` so they work without extra binaries in the browser
+- All sections are responsive down to small screens, stacking the sidebar above the content when the viewport narrows

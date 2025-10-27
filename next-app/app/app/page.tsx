@@ -25,6 +25,47 @@ const statusOptions: { value: InvoiceStatus; label: string; tone: 'neutral' | 'a
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
 
+const navItems: { href: string; label: string; hint: string }[] = [
+  { href: '#dashboard', label: 'Dashboard', hint: 'Overview & health' },
+  { href: '#invoice-editor', label: 'Invoices', hint: 'Compose & send billing' },
+  { href: '#recent', label: 'Activity', hint: 'Track recent updates' },
+  { href: '#templates', label: 'Templates', hint: 'Switch visual styles' },
+  { href: '#clients', label: 'Clients', hint: 'Customer history' },
+  { href: '#settings', label: 'Settings', hint: 'Business profile' },
+];
+
+const templateGallery = [
+  {
+    id: 'wave-blue',
+    name: 'Wave Blue',
+    description: 'Rounded corners and a flowing accent for creative studios.',
+    accent: 'linear-gradient(135deg, rgba(37,99,235,0.9), rgba(129,140,248,0.9))',
+  },
+  {
+    id: 'minimal-slate',
+    name: 'Minimal Slate',
+    description: 'Crisp typography and generous whitespace for consultancies.',
+    accent: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(148,163,184,0.85))',
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset Gradient',
+    description: 'Warm gradient headers ideal for boutique agencies.',
+    accent: 'linear-gradient(135deg, #f97316, #fb7185)',
+  },
+];
+
+type ClientSummary = {
+  key: string;
+  name: string;
+  email: string;
+  invoices: number;
+  outstanding: number;
+  lastInvoice?: string;
+  status: InvoiceStatus;
+  currency: string;
+};
+
 function formatFriendlyDate(value: string): string {
   if (!value) return '';
   const parsed = new Date(value);
@@ -80,172 +121,9 @@ export default function WorkspacePage() {
     }
 
     load();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
-
-  function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
-    setDraft((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function updateLine(id: string, field: keyof InvoiceLine, value: string) {
-    setDraft((prev) => ({
-      ...prev,
-      lines: prev.lines.map((line) => (line.id === id ? ensureLine(line, field, value) : line)),
-    }));
-  }
-
-  function addLine() {
-    setDraft((prev) => ({ ...prev, lines: [...prev.lines, createEmptyLine()] }));
-  }
-
-  function removeLine(id: string) {
-    setDraft((prev) => {
-      const nextLines = prev.lines.filter((line) => line.id !== id);
-      return {
-        ...prev,
-        lines: nextLines.length ? nextLines : [createEmptyLine()],
-      };
-    });
-  }
-
-  async function handleSave(event?: FormEvent) {
-    event?.preventDefault();
-    const preparedLines = cleanLines(draft.lines);
-    if (!preparedLines.length) {
-      setAlertMessage('Add at least one line item before saving.');
-      setSaveState('error');
-      return;
-    }
-
-    setSaveState('saving');
-    setAlertMessage('');
-    try {
-      let record: InvoiceRecord;
-      if (firebaseConfigured) {
-        record = await saveInvoice({ draft: { ...draft, lines: preparedLines } });
-      } else {
-        const fallbackTotals = calculateTotals(preparedLines, draft.taxRate);
-        record = {
-          id: `local-${Date.now()}`,
-          ...draft,
-          lines: preparedLines,
-          subtotal: fallbackTotals.subtotal,
-          taxAmount: fallbackTotals.taxAmount,
-          total: fallbackTotals.total,
-          createdAt: new Date().toISOString(),
-        };
-      }
-
-      setRecentInvoices((current) => [record, ...current].slice(0, 8));
-      setDraft((prev) => ({
-        ...createEmptyDraft(),
-        currency: prev.currency,
-        businessName: prev.businessName,
-        businessAddress: prev.businessAddress,
-      }));
-      setSaveState('success');
-      setAlertMessage('Invoice saved successfully.');
-    } catch (error) {
-      console.error(error);
-      setSaveState('error');
-      setAlertMessage(error instanceof Error ? error.message : 'Failed to save invoice.');
-    }
-  }
-
-  function handleDownload() {
-    const printableLines = cleanLines(draft.lines);
-    const hasLines = printableLines.length > 0;
-    const lines = hasLines ? printableLines : draft.lines;
-    const computedTotals = calculateTotals(lines, draft.taxRate);
-    const title = draft.clientName ? `Invoice-${draft.clientName.replace(/\s+/g, '-')}` : 'Invoice-draft';
-
-    const popup = window.open('', '_blank', 'width=900,height=700');
-    if (!popup) {
-      setAlertMessage('Allow pop-ups to download the PDF preview.');
-      return;
-    }
-
-    popup.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${title}</title>
-  <style>
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 2.5rem; color: #111827; }
-    h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-    .meta { display: flex; justify-content: space-between; gap: 2rem; margin-bottom: 2rem; }
-    .meta section { flex: 1; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
-    th, td { text-align: left; padding: 0.75rem 0.6rem; border-bottom: 1px solid #E5E7EB; font-size: 0.95rem; }
-    th { background: #F3F4F6; font-weight: 600; }
-    tfoot td { border-bottom: none; font-weight: 600; }
-    .totals { margin-top: 1.5rem; width: 340px; margin-left: auto; }
-    .totals div { display: flex; justify-content: space-between; padding: 0.4rem 0; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Invoice</h1>
-    <div class="meta">
-      <section>
-        <strong>From</strong>
-        <p>${draft.businessName || 'Your business'}</p>
-        <p>${draft.businessAddress || ''}</p>
-      </section>
-      <section>
-        <strong>Bill to</strong>
-        <p>${draft.clientName || ''}</p>
-        <p>${draft.clientEmail || ''}</p>
-      </section>
-      <section>
-        <strong>Dates</strong>
-        <p>Issued: ${formatFriendlyDate(draft.issueDate)}</p>
-        <p>Due: ${formatFriendlyDate(draft.dueDate)}</p>
-      </section>
-    </div>
-  </header>
-  <table>
-    <thead>
-      <tr>
-        <th>Description</th>
-        <th style="width: 100px;">Qty</th>
-        <th style="width: 140px;">Rate</th>
-        <th style="width: 160px;">Line total</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${lines
-        .map(
-          (line) => `
-        <tr>
-          <td>${line.description || 'Line item'}</td>
-          <td>${line.quantity}</td>
-          <td>${formatCurrency(line.rate, draft.currency)}</td>
-          <td>${formatCurrency(line.quantity * line.rate, draft.currency)}</td>
-        </tr>`
-        )
-        .join('')}
-    </tbody>
-  </table>
-  <div class="totals">
-    <div><span>Subtotal</span><span>${formatCurrency(computedTotals.subtotal, draft.currency)}</span></div>
-    <div><span>Tax (${(draft.taxRate * 100).toFixed(1)}%)</span><span>${formatCurrency(computedTotals.taxAmount, draft.currency)}</span></div>
-    <div><span>Total</span><span>${formatCurrency(computedTotals.total, draft.currency)}</span></div>
-  </div>
-  <p style="margin-top: 1.5rem;">${draft.notes || ''}</p>
-  <script>window.print();</script>
-</body>
-</html>`);
-    popup.document.close();
-  }
-
-  return (
+    return (
     <div className="workspace">
-      <section className="workspace__intro">
+      <section className="workspace__intro" id="dashboard">
         <div className="container workspace__intro-grid">
           <div>
             <span className="badge">Web workspace</span>
@@ -273,35 +151,51 @@ export default function WorkspacePage() {
               </div>
             )}
           </div>
-          <aside>
-            <div className="workspace__summary-card">
-              <strong>Key metrics</strong>
-              <ul>
-                <li>
-                  <span>Total outstanding</span>
-                  <strong>
-                    {formatCurrency(
-                      recentInvoices.filter((invoice) => invoice.status !== 'paid').reduce((total, invoice) => total + invoice.total, 0),
-                      draft.currency,
-                    )}
-                  </strong>
-                </li>
-                <li>
-                  <span>Average payment time</span>
-                  <strong>5.3 days</strong>
-                </li>
-                <li>
-                  <span>Templates in use</span>
-                  <strong>4</strong>
-                </li>
-              </ul>
-            </div>
-          </aside>
         </div>
       </section>
 
-      <div className="container workspace__grid">
-        <section className="editor-card">
+      <div className="workspace__layout">
+        <div className="container workspace__layout-inner">
+          <aside className="workspace__sidebar" aria-label="Workspace navigation">
+            <div className="workspace__sidebar-header">
+              <h2>Workspace menu</h2>
+              <p>Jump between dashboards, invoice tools, and client records in one hub.</p>
+            </div>
+            <nav className="workspace__nav">
+              {navItems.map((item) => (
+                <Link key={item.href} href={item.href} className={`workspace__nav-item${item.href === '#dashboard' ? ' workspace__nav-item--active' : ''}`} prefetch={false}>
+                  <span>{item.label}</span>
+                  <small>{item.hint}</small>
+                </Link>
+              ))}
+            </nav>
+            <div className="workspace__summary-card">
+              <strong>Billing health</strong>
+              <ul>
+                <li>
+                  <span>Total outstanding</span>
+                  <strong>{formatCurrency(outstandingTotal, draft.currency)}</strong>
+                </li>
+                <li>
+                  <span>Saved invoices</span>
+                  <strong>{recentInvoices.length}</strong>
+                </li>
+                <li>
+                  <span>Reminder emails</span>
+                  <strong>Enabled</strong>
+                </li>
+              </ul>
+            </div>
+            <div className="workspace__sidebar-footer">
+              <p>
+                Need a hand? Visit the <Link href="/privacy-policy" prefetch={false}>help center</Link> or chat with finance.
+              </p>
+            </div>
+          </aside>
+
+          <div className="workspace__content">
+            <div className="workspace__grid" id="invoice-editor">
+              <section className="editor-card">
           <header className="editor-card__header">
             <div>
               <h2>Create an invoice</h2>
@@ -486,7 +380,7 @@ export default function WorkspacePage() {
 
         <aside className="preview-card">
           <div className="preview-card__header">
-            <span className={`status-pill status-pill--${draft.status}`}>{statusOptions.find((option) => option.value === draft.status)?.label}</span>
+            <span className={`status-pill status-pill--${draft.status}`}>{statusLookup.get(draft.status)?.label}</span>
             <div>
               <strong>{draft.businessName || 'Your business'}</strong>
               <span>{draft.businessAddress}</span>
@@ -548,54 +442,164 @@ export default function WorkspacePage() {
         </aside>
       </div>
 
-      <section className="container workspace__recent" id="recent">
-        <header className="workspace__recent-header">
-          <div>
-            <h2>Recent invoices</h2>
-            <p>Monitor status changes, due dates, and totals at a glance.</p>
-          </div>
-          <Link href="/" className="button button--ghost">
-            Back to marketing site
-          </Link>
-        </header>
 
-        {loadingInvoices ? (
-          <div className="recent-grid recent-grid--loading">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="recent-card recent-card--placeholder" />
-            ))}
-          </div>
-        ) : (
-          <div className="recent-grid">
-            {recentInvoices.map((invoice) => (
-              <article key={invoice.id} className="recent-card">
-                <div className="recent-card__row">
-                  <div>
-                    <h3>{invoice.clientName}</h3>
-                    <span>{invoice.clientEmail}</span>
-                  </div>
-                  <span className={`status-pill status-pill--${invoice.status}`}>{statusOptions.find((option) => option.value === invoice.status)?.label}</span>
+            <section className="workspace__recent" id="recent">
+              <header className="workspace__recent-header">
+                <div>
+                  <h2>Recent invoices</h2>
+                  <p>Monitor status changes, due dates, and totals at a glance.</p>
                 </div>
-                <div className="recent-card__row recent-card__row--meta">
-                  <div>
-                    <span>Issued</span>
-                    <strong>{formatFriendlyDate(invoice.issueDate)}</strong>
-                  </div>
-                  <div>
-                    <span>Due</span>
-                    <strong>{formatFriendlyDate(invoice.dueDate)}</strong>
-                  </div>
-                  <div>
-                    <span>Total</span>
-                    <strong>{formatCurrency(invoice.total, invoice.currency)}</strong>
-                  </div>
+                <Link href="/" className="button button--ghost" prefetch={false}>
+                  Back to marketing site
+                </Link>
+              </header>
+
+              {loadingInvoices ? (
+                <div className="recent-grid recent-grid--loading">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="recent-card recent-card--placeholder" />
+                  ))}
                 </div>
-                {invoice.notes && <p className="recent-card__notes">{invoice.notes}</p>}
-              </article>
-            ))}
+              ) : (
+                <div className="recent-grid">
+                  {recentInvoices.map((invoice) => (
+                    <article key={invoice.id} className="recent-card">
+                      <div className="recent-card__row">
+                        <div>
+                          <h3>{invoice.clientName}</h3>
+                          <span>{invoice.clientEmail}</span>
+                        </div>
+                        <span className={`status-pill status-pill--${invoice.status}`}>{statusLookup.get(invoice.status)?.label}</span>
+                      </div>
+                      <div className="recent-card__row recent-card__row--meta">
+                        <div>
+                          <span>Issued</span>
+                          <strong>{formatFriendlyDate(invoice.issueDate)}</strong>
+                        </div>
+                        <div>
+                          <span>Due</span>
+                          <strong>{formatFriendlyDate(invoice.dueDate)}</strong>
+                        </div>
+                        <div>
+                          <span>Total</span>
+                          <strong>{formatCurrency(invoice.total, invoice.currency)}</strong>
+                        </div>
+                      </div>
+                      {invoice.notes && <p className="recent-card__notes">{invoice.notes}</p>}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="workspace__templates" id="templates">
+              <header className="workspace__section-header">
+                <div>
+                  <h2>Template gallery</h2>
+                  <p>Choose a visual language before sending the next invoice.</p>
+                </div>
+                <button type="button" className="button button--ghost">Browse all</button>
+              </header>
+              <div className="template-grid">
+                {templateGallery.map((template) => (
+                  <article key={template.id} className="template-card">
+                    <div className="template-card__preview" style={{ background: template.accent }}>
+                      <span>{template.name}</span>
+                    </div>
+                    <div className="template-card__body">
+                      <strong>{template.name}</strong>
+                      <p>{template.description}</p>
+                      <button type="button" className="button button--primary">Use template</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="workspace__clients" id="clients">
+              <header className="workspace__section-header">
+                <div>
+                  <h2>Clients</h2>
+                  <p>Track outstanding balances and follow-up dates for key accounts.</p>
+                </div>
+                <button type="button" className="button button--ghost">Add client</button>
+              </header>
+              {clientSummaries.length ? (
+                <div className="clients-grid">
+                  {clientSummaries.map((client) => (
+                    <article key={client.key} className="client-card">
+                      <div className="client-card__header">
+                        <div>
+                          <h3>{client.name}</h3>
+                          {client.email && <span>{client.email}</span>}
+                        </div>
+                        <span className={`status-pill status-pill--${client.status}`}>{statusLookup.get(client.status)?.label}</span>
+                      </div>
+                      <div className="client-card__meta">
+                        <div>
+                          <span>Outstanding</span>
+                          <strong>{formatCurrency(client.outstanding, client.currency || draft.currency)}</strong>
+                        </div>
+                        <div>
+                          <span>Invoices</span>
+                          <strong>{client.invoices}</strong>
+                        </div>
+                        <div>
+                          <span>Last invoice</span>
+                          <strong>{formatFriendlyDate(client.lastInvoice ?? '')}</strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="workspace__empty">Save an invoice to start building your client directory.</div>
+              )}
+            </section>
+
+            <section className="workspace__settings" id="settings">
+              <header className="workspace__section-header">
+                <div>
+                  <h2>Workspace settings</h2>
+                  <p>Update your default business profile, taxes, and automation rules.</p>
+                </div>
+              </header>
+              <div className="settings-card">
+                <dl className="settings-card__grid">
+                  <div>
+                    <dt>Business name</dt>
+                    <dd>{draft.businessName || 'Atlas Studio'}</dd>
+                  </div>
+                  <div>
+                    <dt>Business address</dt>
+                    <dd>{draft.businessAddress || '88 Harbor Lane, Portland, OR'}</dd>
+                  </div>
+                  <div>
+                    <dt>Default currency</dt>
+                    <dd>{draft.currency}</dd>
+                  </div>
+                  <div>
+                    <dt>Tax rate</dt>
+                    <dd>{(draft.taxRate * 100).toFixed(1)}%</dd>
+                  </div>
+                  <div>
+                    <dt>Reminder emails</dt>
+                    <dd>Enabled — send 3 days before due date</dd>
+                  </div>
+                  <div>
+                    <dt>PDF language</dt>
+                    <dd>English + Japanese</dd>
+                  </div>
+                </dl>
+                <div className="settings-card__actions">
+                  <button type="button" className="button button--primary">Update profile</button>
+                  <button type="button" className="button button--ghost">Manage automations</button>
+                </div>
+              </div>
+            </section>
           </div>
-        )}
-      </section>
+        </div>
+      </div>
     </div>
   );
 }
