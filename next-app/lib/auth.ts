@@ -43,7 +43,9 @@ function mapFirebaseError(code?: string): string {
 
 export async function signInWithEmailPassword(email: string, password: string): Promise<AuthSession> {
   if (!firebaseConfigured || !firebaseApiKey) {
-    throw new Error('Firebase configuration is missing. Set NEXT_PUBLIC_FIREBASE_PROJECT_ID and NEXT_PUBLIC_FIREBASE_WEB_API_KEY.');
+    throw new Error(
+      'Firebase configuration is missing. Set NEXT_PUBLIC_FIREBASE_PROJECT_ID and NEXT_PUBLIC_FIREBASE_API_KEY (see next-app/.env.example).',
+    );
   }
 
   const payload = {

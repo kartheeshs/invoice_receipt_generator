@@ -1,6 +1,6 @@
 # Invoice Atlas web workspace
 
-This project contains the marketing site and client-side workspace for Invoice Atlas, rebuilt entirely with Next.js. The `/app` route mirrors the original Flutter UI: a sidebar with dashboard, invoices, templates, clients, and settings links; an invoice editor with live preview; recent activity; and supporting sections for templates and client insights.
+This project contains the marketing site and client-side workspace for Invoice Atlas, rebuilt entirely with Next.js. The `/app` route mirrors the original Flutter UI: a top navigation bar with dashboard, invoices, templates, clients, activity, and settings links; an invoice editor with live preview; recent activity; and supporting sections for templates and client insights.
 
 ## Development
 
@@ -14,11 +14,16 @@ The dev server runs at `http://localhost:3000`. The marketing site is rendered o
 
 ## Environment variables
 
-Create a `.env.local` file if you want to connect to Firebase:
+Create a `.env.local` file (or copy `.env.example`) if you want to connect to Firebase:
 
 ```env
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_WEB_API_KEY=your-web-api-key
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=invoice-receipt-generator-g7.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=invoice-receipt-generator-g7
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=invoice-receipt-generator-g7.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=798489264335
+NEXT_PUBLIC_FIREBASE_APP_ID=1:798489264335:web:b1bc7f6fe8dc5e68de37ba
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-TKYV2VSPMZ
 ```
 
 When the keys are omitted the workspace falls back to bundled sample data so the UI remains functional offline.
@@ -49,6 +54,6 @@ When the keys are omitted the workspace falls back to bundled sample data so the
 
 ## UI notes
 
-- The sidebar replicates the Flutter layout but uses semantic HTML and CSS utilities
+- The top navigation replicates the Flutter layout but uses semantic HTML and CSS utilities
 - PDF downloads rely on `window.print()` so they work without extra binaries in the browser
-- All sections are responsive down to small screens, stacking the sidebar above the content when the viewport narrows
+- All sections are responsive down to small screens, collapsing the navigation into a horizontal scrollable list when the viewport narrows

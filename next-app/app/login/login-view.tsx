@@ -64,7 +64,7 @@ export default function LoginView(): JSX.Element {
 
     if (!firebaseConfigured) {
       setStatus('error');
-      setMessage('Firebase environment variables are missing. Add NEXT_PUBLIC_FIREBASE_PROJECT_ID and NEXT_PUBLIC_FIREBASE_WEB_API_KEY.');
+      setMessage('Firebase environment variables are missing. Copy next-app/.env.example to .env.local and update it with your Firebase project.');
       return;
     }
 
@@ -142,7 +142,7 @@ export default function LoginView(): JSX.Element {
 
               {!firebaseConfigured && (
                 <div className="auth-callout" role="note">
-                  <strong>Configuration required:</strong> Update your <code>.env.local</code> with Firebase web credentials to enable authentication.
+                  <strong>Configuration required:</strong> Copy <code>.env.example</code> to <code>.env.local</code> and keep the Firebase keys provided in this repository (or replace them with your own credentials).
                 </div>
               )}
 
@@ -179,7 +179,7 @@ export default function LoginView(): JSX.Element {
               <ul>
                 <li>Create invoices with a template gallery that mirrors the Flutter experience.</li>
                 <li>Track payment status, reminders, and outstanding balances in one place.</li>
-                <li>Switch between dashboard, invoice editor, templates, and client directories from the sidebar menu.</li>
+                <li>Switch between dashboard, invoice editor, templates, and client directories from the top navigation bar.</li>
               </ul>
               <Link className="button button--ghost" href="/app" prefetch={false}>
                 Explore the workspace

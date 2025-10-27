@@ -4,7 +4,7 @@ Next.js と Firebase を組み合わせて構築した請求書・領収書ジ�
 
 ## 主な機能
 
-- 📊 サイドメニュー付きダッシュボードで「ダッシュボード / 請求書 / テンプレート / クライアント / 設定」を素早く行き来
+- 📊 トップナビゲーション付きダッシュボードで「ダッシュボード / 請求書 / テンプレート / クライアント / 設定」を素早く行き来
 - 🧾 請求書エディタとライブプレビューを同一画面に配置し、数値入力と同時に金額を再計算
 - 📄 ワンクリックで印刷用 HTML を生成し PDF としてダウンロード
 - ☁️ Firebase Firestore を利用した請求書の保存と最新履歴の取得（認証情報が未設定の場合はサンプルデータを表示）
@@ -30,10 +30,15 @@ Next.js と Firebase を組み合わせて構築した請求書・領収書ジ�
    cd next-app
    npm install
    ```
-2. Firebase プロジェクトを利用する場合は `.env.local` を作成し、以下の環境変数を設定します。
+2. Firebase プロジェクトを利用する場合は `.env.local` を作成（または `next-app/.env.example` をコピー）し、以下の環境変数を設定します。
    ```env
-   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-   NEXT_PUBLIC_FIREBASE_WEB_API_KEY=your-web-api-key
+   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=invoice-receipt-generator-g7.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=invoice-receipt-generator-g7
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=invoice-receipt-generator-g7.firebasestorage.app
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=798489264335
+   NEXT_PUBLIC_FIREBASE_APP_ID=1:798489264335:web:b1bc7f6fe8dc5e68de37ba
+   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-TKYV2VSPMZ
    ```
 3. 開発サーバーを起動
    ```bash

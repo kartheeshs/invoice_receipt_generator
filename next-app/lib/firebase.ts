@@ -1,13 +1,21 @@
 import { InvoiceDraft, InvoiceLine, InvoiceRecord, calculateTotals, cleanLines } from './invoices';
 
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? '';
-const apiKey = process.env.NEXT_PUBLIC_FIREBASE_WEB_API_KEY?.trim() ?? '';
+const config = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() ?? '',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim() ?? '',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? '',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ?? '',
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim() ?? '',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim() ?? '',
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.trim() ?? '',
+};
 
-export const firebaseConfigured = Boolean(projectId && apiKey);
-export const firebaseApiKey = apiKey;
+export const firebaseConfig = config;
+export const firebaseConfigured = Boolean(config.projectId && config.apiKey);
+export const firebaseApiKey = config.apiKey;
 
 const baseUrl = firebaseConfigured
-  ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
+  ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents`
   : '';
 
 const invoicesUrl = firebaseConfigured ? `${baseUrl}/invoices` : '';
@@ -39,10 +47,10 @@ function buildString(value: string): FirestoreValue {
 }
 
 function withApiKey(url: string): string {
-  if (!apiKey) {
+  if (!firebaseApiKey) {
     return url;
   }
-  return url.includes('?') ? `${url}&key=${apiKey}` : `${url}?key=${apiKey}`;
+  return url.includes('?') ? `${url}&key=${firebaseApiKey}` : `${url}?key=${firebaseApiKey}`;
 }
 
 function encodeLine(line: InvoiceLine): FirestoreValue {
