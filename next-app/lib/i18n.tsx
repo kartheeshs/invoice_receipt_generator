@@ -96,6 +96,7 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.nav.activity': 'アクティビティ',
     'workspace.nav.settings': '設定',
     'workspace.hint': 'Firebase のデモ環境に接続しています。',
+    'workspace.userMenu.label': 'アカウント操作',
     'workspace.actions.save': '請求書を保存',
     'workspace.actions.saving': '保存中…',
     'workspace.actions.download': 'PDF をダウンロード',
@@ -103,11 +104,15 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.actions.preview': 'プレビューを表示',
     'workspace.actions.createInvoice': '請求書を作成',
     'workspace.actions.viewDashboard': 'ダッシュボードを見る',
+    'workspace.actions.signIn': 'サインイン',
+    'workspace.actions.signOut': 'サインアウト',
+    'workspace.actions.adminConsole': '管理コンソール',
     'workspace.alert.success': 'Firestore に請求書を保存しました。',
     'workspace.alert.offline': 'Firebase に接続できません。サンプル請求書を表示しています。',
     'workspace.alert.offlineStored': 'Firebase が未設定のため、このセッション内にローカル保存しました。',
     'workspace.alert.error': '請求書を保存できませんでした。',
     'workspace.alert.downloaded': '請求書の PDF をダウンロードしました。',
+    'workspace.alert.signedOut': 'サインアウトしました。Firebase と同期するには再度サインインしてください。',
     'workspace.status.draft': '下書き',
     'workspace.status.sent': '送信済み',
     'workspace.status.paid': '支払い済み',
@@ -148,6 +153,7 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.field.businessAddress': '住所',
     'workspace.field.clientName': '顧客名',
     'workspace.field.clientEmail': '顧客メール',
+    'workspace.field.clientAddress': '顧客住所',
     'workspace.field.issueDate': '発行日',
     'workspace.field.dueDate': '支払期日',
     'workspace.field.currency': '通貨',
@@ -166,36 +172,48 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.summary.notes': '支払い条件やメモ',
     'workspace.template.bestFor': 'おすすめ用途',
     'workspace.template.highlights': '特長',
-    'workspace.template.wave-blue.name': 'Wave Blue',
-    'workspace.template.wave-blue.description': 'グラデーションヘッダーとバランスバッジで印象を残すレイアウト。',
-    'workspace.template.wave-blue.bestFor': '鮮やかで洗練された請求書を求めるクリエイティブチーム向け。',
-    'workspace.template.wave-blue.highlights.0': 'ヒーローバランスバッジ',
-    'workspace.template.wave-blue.highlights.1': 'バイリンガルラベル対応',
-    'workspace.template.wave-blue.highlights.2': '整ったテーブル合計',
-    'workspace.template.minimal-slate.name': 'Minimal Slate',
-    'workspace.template.minimal-slate.description': '落ち着いたモノクロ配色で明瞭さを重視したレイアウト。',
-    'workspace.template.minimal-slate.bestFor': '保守的で信頼感のある帳票が必要なプロフェッショナルサービス向け。',
-    'workspace.template.minimal-slate.highlights.0': '落ち着いたニュートラルパレット',
-    'workspace.template.minimal-slate.highlights.1': '署名欄に最適なフッター',
-    'workspace.template.minimal-slate.highlights.2': '自動で揃う合計欄',
+    'workspace.template.villa-coastal.name': 'Villa Coastal',
+    'workspace.template.villa-coastal.description': 'リゾートの領収書をイメージしたブルーのヘッダーと予約サマリーを備えたレイアウトです。',
+    'workspace.template.villa-coastal.bestFor': 'ホテルやバケーションレンタルなど、滞在内容をわかりやすくまとめたいチームに最適。',
+    'workspace.template.villa-coastal.highlights.0': 'ワイドなコースタルヘッダー',
+    'workspace.template.villa-coastal.highlights.1': '予約・支払いバッジ',
+    'workspace.template.villa-coastal.highlights.2': '軽やかな区切り線で読みやすい明細',
+    'workspace.template.atelier-minimal.name': 'Atelier Minimal',
+    'workspace.template.atelier-minimal.description': 'ハイコントラストなモノクロ配色で、余白を生かした洗練されたレイアウトです。',
+    'workspace.template.atelier-minimal.bestFor': 'ブティックスタジオやコンサルティングなど、タイムレスな帳票を求めるチーム向け。',
+    'workspace.template.atelier-minimal.highlights.0': '落ち着いたニュートラルパレット',
+    'workspace.template.atelier-minimal.highlights.1': '右寄せのメタデータカラム',
+    'workspace.template.atelier-minimal.highlights.2': '署名しやすいサマリーフッター',
     'workspace.template.classic-ledger.name': 'Classic Ledger',
     'workspace.template.classic-ledger.description': '印刷にも強いモノクロレイアウトで永続的なデザイン。',
     'workspace.template.classic-ledger.bestFor': '法務・財務チームなど、色を使わないフォーマットを求めるケースに。',
     'workspace.template.classic-ledger.highlights.0': '高コントラストのテーブル',
     'workspace.template.classic-ledger.highlights.1': '署名欄付きフッター',
     'workspace.template.classic-ledger.highlights.2': '印刷に最適な設計',
-    'workspace.template.emerald-ledger.name': 'Emerald Ledger',
-    'workspace.template.emerald-ledger.description': 'フレッシュなグリーンのアクセントとカード型サマリーで定期請求に最適。',
-    'workspace.template.emerald-ledger.bestFor': '定期的な請求を行うサブスクリプション・SaaS チームに。',
-    'workspace.template.emerald-ledger.highlights.0': 'バランスサマリーカード',
-    'workspace.template.emerald-ledger.highlights.1': 'リマインダー用コールアウト',
-    'workspace.template.emerald-ledger.highlights.2': '支払い手順ブロック',
+    'workspace.template.aqua-ledger.name': 'Aqua Ledger',
+    'workspace.template.aqua-ledger.description': 'ティールのバナーと交互の行シェーディングで、サブスクリプション請求をスタイリッシュに見せます。',
+    'workspace.template.aqua-ledger.bestFor': 'SaaS やプロダクトチームなど、定期的な請求を行うケースに最適。',
+    'workspace.template.aqua-ledger.highlights.0': 'バランスステータスカプセル',
+    'workspace.template.aqua-ledger.highlights.1': '交互のアクアストライプ',
+    'workspace.template.aqua-ledger.highlights.2': '支払いリマインダー付きメモ',
     'workspace.template.seikyu.name': '請求書（Seikyūsho）',
     'workspace.template.seikyu.description': '日本語と英語の見出し、判子欄、税サマリーを備えたレイアウト。',
     'workspace.template.seikyu.bestFor': '日本の取引先へローカライズした請求書を発行するチーム向け。',
     'workspace.template.seikyu.highlights.0': '判子欄付きフッター',
     'workspace.template.seikyu.highlights.1': '税サマリー行',
     'workspace.template.seikyu.highlights.2': '二言語のカラム',
+    'workspace.template.royal-balance.name': 'Royal Balance',
+    'workspace.template.royal-balance.description': 'マゼンタとバイオレットのグラデーションヘッダーで、高級感のある請求書を演出します。',
+    'workspace.template.royal-balance.bestFor': 'プレミアムなクリエイティブ案件やキャンペーン請求に最適。',
+    'workspace.template.royal-balance.highlights.0': 'グラデーションのヒーローヘッダー',
+    'workspace.template.royal-balance.highlights.1': 'バランスバッジと強調された合計',
+    'workspace.template.royal-balance.highlights.2': '柔らかなノートエリア',
+    'workspace.template.harbour-slate.name': 'Harbour Slate',
+    'workspace.template.harbour-slate.description': '旅行明細に合わせたブルーグレーのヘッダーと予約サマリーを備えたレイアウトです。',
+    'workspace.template.harbour-slate.bestFor': 'ホテルや旅行代理店など、滞在情報を丁寧にまとめたいケースに。',
+    'workspace.template.harbour-slate.highlights.0': '滞在サマリー向けのメタカラム',
+    'workspace.template.harbour-slate.highlights.1': 'スリムなキーラインと整列テーブル',
+    'workspace.template.harbour-slate.highlights.2': '署名用のフッター領域',
     'workspace.templates.instructions': 'テンプレートを選んで請求書をスタイリングします。',
     'workspace.templates.count': '{count} 件のテンプレート',
     'workspace.templates.spotlight': '注目のテンプレート',
@@ -216,6 +234,7 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.clients.heading': '顧客サマリー',
     'workspace.clients.description': '顧客ごとの未回収残高と最近の請求書を確認できます。',
     'workspace.clients.add': '顧客を追加',
+    'workspace.clients.autofillHint': '保存済みの顧客を選ぶと詳細が自動入力されます。',
     'workspace.activity.heading': '最近のアクティビティ',
     'workspace.activity.description': '保存、リマインダー、支払い状況を最新順で表示します。',
     'workspace.activity.viewAdmin': '管理コンソールを見る',
@@ -242,6 +261,7 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.placeholder.businessAddress': '〒100-0005 東京都千代田区丸の内 1-9-1',
     'workspace.placeholder.clientName': 'ノースウィンド株式会社',
     'workspace.placeholder.clientEmail': 'client@example.com',
+    'workspace.placeholder.clientAddress': '〒100-0005 東京都千代田区丸の内 1-9-1',
     'workspace.preview.businessPlaceholder': '会社名を入力してください',
     'workspace.preview.addressPlaceholder': '会社住所を追加してください',
     'workspace.preview.totalDue': '支払予定額',
@@ -265,6 +285,7 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.preview.totalDual': '合計 / Total',
     'workspace.preview.clientPlaceholder': '顧客名',
     'workspace.preview.emailPlaceholder': 'client@email.com',
+    'workspace.preview.addressPlaceholder': '顧客住所を追加',
     'workspace.preview.linePlaceholderJa': 'サービス',
     'workspace.preview.linePlaceholder': '明細を入力',
     'workspace.preview.paymentSummary': '支払いサマリー',
@@ -280,6 +301,8 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.pdf.billTo': '請求先',
     'workspace.pdf.issueDate': '発行日',
     'workspace.pdf.dueDate': '支払期日',
+    'workspace.pdf.status': 'ステータス',
+    'workspace.pdf.currency': '通貨',
     'workspace.pdf.description': '明細',
     'workspace.pdf.quantity': '数量',
     'workspace.pdf.rate': '単価',
@@ -394,7 +417,15 @@ function applyParams(template: string, params?: TranslateParams): string {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('easy-invoice-language') as Language | null;
+      if (stored === 'en' || stored === 'ja') {
+        return stored;
+      }
+    }
+    return 'en';
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -402,11 +433,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
     const stored = window.localStorage.getItem('easy-invoice-language') as Language | null;
     if (stored === 'en' || stored === 'ja') {
-      setLanguage(stored);
       return;
     }
     const browser = window.navigator.language.startsWith('ja') ? 'ja' : 'en';
-    setLanguage(browser);
+    setLanguage((current) => (current === browser ? current : browser));
   }, []);
 
   useEffect(() => {

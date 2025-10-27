@@ -1,6 +1,7 @@
 import { firebaseApiKey, firebaseConfigured } from './firebase';
 
 const identityBaseUrl = 'https://identitytoolkit.googleapis.com/v1/accounts';
+const fallbackAdminEmails = new Set(['admin@easyinvoicegm7.example.com']);
 
 export interface AuthSession {
   idToken: string;
@@ -9,7 +10,10 @@ export interface AuthSession {
   localId: string;
   expiresIn: number;
   displayName?: string;
+  role?: UserRole;
 }
+
+export type UserRole = 'admin' | 'member';
 
 export interface PersistOptions {
   remember: boolean;
@@ -39,6 +43,68 @@ function mapFirebaseError(code?: string): string {
     default:
       return 'Unable to sign in with Firebase Authentication right now. Please try again in a moment.';
   }
+}
+
+type LookupUser = {
+  displayName?: string;
+  email?: string;
+  customAttributes?: string;
+  customClaims?: Record<string, unknown>;
+};
+
+type LookupResponse = {
+  users?: LookupUser[];
+};
+
+function resolveRole(email: string | undefined, claims?: Record<string, unknown>): UserRole {
+  const lower = email?.toLowerCase();
+  if (claims && typeof claims.role === 'string') {
+    return claims.role === 'admin' ? 'admin' : 'member';
+  }
+  if (lower && fallbackAdminEmails.has(lower)) {
+    return 'admin';
+  }
+  return 'member';
+}
+
+function parseClaims(user: LookupUser): Record<string, unknown> | undefined {
+  if (user.customClaims && typeof user.customClaims === 'object') {
+    return user.customClaims;
+  }
+  if (typeof user.customAttributes === 'string') {
+    try {
+      return JSON.parse(user.customAttributes) as Record<string, unknown>;
+    } catch (error) {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+async function fetchAccountProfile(idToken: string, email?: string): Promise<{ displayName?: string; role: UserRole }>
+{
+  const response = await fetch(`${identityBaseUrl}:lookup?key=${firebaseApiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const fallbackRole = resolveRole(email, undefined);
+    return { displayName: undefined, role: fallbackRole };
+  }
+
+  const payload = (await response.json()) as LookupResponse;
+  const user = payload.users?.[0];
+  if (!user) {
+    const fallbackRole = resolveRole(email, undefined);
+    return { displayName: undefined, role: fallbackRole };
+  }
+
+  const claims = parseClaims(user);
+  const role = resolveRole(user.email ?? email, claims);
+  return { displayName: user.displayName, role };
 }
 
 export async function signInWithEmailPassword(email: string, password: string): Promise<AuthSession> {
@@ -74,13 +140,25 @@ export async function signInWithEmailPassword(email: string, password: string): 
   }
 
   const data = await response.json();
+
+  let profileDisplayName: string | undefined = data.displayName;
+  let role: UserRole = resolveRole(data.email, undefined);
+  try {
+    const profile = await fetchAccountProfile(data.idToken, data.email);
+    profileDisplayName = profile.displayName ?? profileDisplayName ?? data.email;
+    role = profile.role;
+  } catch (error) {
+    role = resolveRole(data.email, undefined);
+  }
+
   return {
     idToken: data.idToken,
     refreshToken: data.refreshToken,
     email: data.email,
     localId: data.localId,
-    displayName: data.displayName,
+    displayName: profileDisplayName ?? data.email,
     expiresIn: normaliseExpiresIn(data.expiresIn),
+    role,
   } satisfies AuthSession;
 }
 
@@ -99,6 +177,7 @@ export function persistSession(session: AuthSession, options: PersistOptions = {
     localId: session.localId,
     displayName: session.displayName ?? session.email,
     expiresAt: Date.now() + session.expiresIn * 1000,
+    role: session.role ?? 'member',
   };
 
   storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
@@ -121,6 +200,7 @@ export type StoredSession = {
   localId: string;
   displayName: string;
   expiresAt: number;
+  role: UserRole;
 };
 
 export function loadSession(): StoredSession | null {
@@ -138,6 +218,9 @@ export function loadSession(): StoredSession | null {
     if (!parsed.expiresAt || parsed.expiresAt < Date.now()) {
       clearSession();
       return null;
+    }
+    if (parsed.role !== 'admin') {
+      parsed.role = 'member';
     }
     return parsed;
   } catch (error) {

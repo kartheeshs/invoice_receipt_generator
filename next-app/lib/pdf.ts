@@ -1,4 +1,5 @@
 import { InvoiceDraft, InvoiceLine, formatCurrency } from './invoices';
+import { getInvoiceTemplate, type InvoiceTemplate, type TemplatePdfPalette, type RGB } from './templates';
 
 type Totals = {
   subtotal: number;
@@ -11,6 +12,9 @@ type PdfLabels = {
   billTo: string;
   issueDate: string;
   dueDate: string;
+  statusLabel: string;
+  statusValue: string;
+  currency: string;
   description: string;
   quantity: string;
   rate: string;
@@ -27,6 +31,7 @@ type PdfOptions = {
   locale: string;
   currency: string;
   labels: PdfLabels;
+  templateId: string;
 };
 
 function escapePdfText(value: string): string {
@@ -46,9 +51,40 @@ function formatDisplayDate(value: string | undefined, locale: string): string {
   }
 }
 
-function writeText(ops: string[], text: string, x: number, y: number, size = 12, font = 'F1'): void {
+function colorToPdf(color: RGB): string {
+  return color.map((channel) => (channel / 255).toFixed(3)).join(' ');
+}
+
+function setFillColor(ops: string[], color: RGB): void {
+  ops.push(`${colorToPdf(color)} rg`);
+}
+
+function setStrokeColor(ops: string[], color: RGB): void {
+  ops.push(`${colorToPdf(color)} RG`);
+}
+
+function drawRect(ops: string[], x: number, y: number, width: number, height: number, color: RGB): void {
+  ops.push('q');
+  setFillColor(ops, color);
+  ops.push(`${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re`);
+  ops.push('f');
+  ops.push('Q');
+}
+
+function writeText(
+  ops: string[],
+  text: string,
+  x: number,
+  y: number,
+  size = 12,
+  font = 'F1',
+  color?: RGB,
+): void {
   if (!text) return;
   ops.push('BT');
+  if (color) {
+    setFillColor(ops, color);
+  }
   ops.push(`/${font} ${size} Tf`);
   ops.push(`1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm`);
   ops.push(`(${escapePdfText(text)}) Tj`);
@@ -63,11 +99,12 @@ function writeMultiline(
   size = 10,
   font = 'F1',
   leading = 14,
+  color?: RGB,
 ): number {
   let y = startY;
   lines.forEach((line) => {
     if (line.trim().length > 0) {
-      writeText(ops, line, x, y, size, font);
+      writeText(ops, line, x, y, size, font, color);
       y -= leading;
     }
   });
@@ -103,95 +140,179 @@ function buildPdfStream(objects: string[]): Uint8Array {
   return pdfBytes;
 }
 
-function buildContentStream(draft: InvoiceDraft, totals: Totals, locale: string, currency: string, labels: PdfLabels): string {
+function buildContentStream(
+  draft: InvoiceDraft,
+  totals: Totals,
+  locale: string,
+  currency: string,
+  labels: PdfLabels,
+  template: InvoiceTemplate,
+): string {
+  const palette: TemplatePdfPalette = template.pdfPalette;
   const ops: string[] = [];
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 56;
+  const contentWidth = pageWidth - margin * 2;
+  const headerHeight = 96;
+  const headerPadding = 18;
+  const accentWidth = palette.accentBar ? 14 : 0;
+  const headerY = pageHeight - margin - headerHeight;
 
-  let y = pageHeight - margin;
-  writeText(ops, labels.invoiceTitle, margin, y, 22, 'F2');
-
-  y -= 28;
-  const businessName = draft.businessName.trim() || '—';
-  writeText(ops, businessName, margin, y, 12, 'F2');
-
-  y -= 16;
-  const addressLines = draft.businessAddress ? draft.businessAddress.split(/\r?\n/) : [];
-  if (addressLines.length > 0) {
-    y = writeMultiline(ops, addressLines, margin, y, 10, 'F1');
+  drawRect(ops, margin, headerY, contentWidth, headerHeight, palette.header);
+  if (palette.accentBar) {
+    drawRect(ops, pageWidth - margin - accentWidth, headerY, accentWidth, headerHeight, palette.accentBar);
   }
 
-  const infoX = pageWidth - margin - 200;
+  const headerX = margin + headerPadding;
+  let headerTextY = headerY + headerHeight - headerPadding;
+  writeText(ops, labels.invoiceTitle, headerX, headerTextY, 20, 'F2', palette.headerText);
+  headerTextY -= 22;
+
+  const businessName = draft.businessName.trim() || '—';
+  writeText(ops, businessName, headerX, headerTextY, 12, 'F2', palette.headerText);
+  headerTextY -= 16;
+
+  const addressLines = draft.businessAddress ? draft.businessAddress.split(/\r?\n/) : [];
+  if (addressLines.length > 0) {
+    headerTextY = writeMultiline(ops, addressLines, headerX, headerTextY, 10, 'F1', 13, palette.headerText) + 8;
+  }
+
+  const badgeWidth = 180;
+  const badgeHeight = 72;
+  const badgeX = pageWidth - margin - badgeWidth - (palette.accentBar ? accentWidth + 10 : 0);
+  const badgeY = headerY + headerHeight - badgeHeight - headerPadding + 6;
+  drawRect(ops, badgeX, badgeY, badgeWidth, badgeHeight, palette.badgeBackground);
+  writeText(ops, labels.total, badgeX + 14, badgeY + badgeHeight - 18, 10, 'F1', palette.mutedText);
+  writeText(ops, formatCurrency(totals.total, currency, locale), badgeX + 14, badgeY + badgeHeight - 38, 16, 'F2', palette.badgeText);
+  const statusString = `${labels.statusLabel}: ${labels.statusValue}`;
+  writeText(ops, statusString, badgeX + 14, badgeY + 16, 9, 'F1', palette.mutedText);
+
   writeText(
     ops,
     `${labels.issueDate}: ${formatDisplayDate(draft.issueDate, locale)}`,
-    infoX,
-    pageHeight - margin - 8,
-    10,
+    badgeX,
+    headerY + 18,
+    9,
     'F1',
+    palette.headerText,
   );
   writeText(
     ops,
     `${labels.dueDate}: ${formatDisplayDate(draft.dueDate, locale)}`,
-    infoX,
-    pageHeight - margin - 24,
-    10,
+    badgeX,
+    headerY + 4,
+    9,
     'F1',
+    palette.headerText,
   );
 
-  y = Math.min(y, pageHeight - margin - 90);
-  writeText(ops, labels.billTo, margin, y, 12, 'F2');
+  let y = headerY - 28;
+  writeText(ops, labels.billTo, margin, y, 11, 'F2', palette.bodyText);
   y -= 16;
-  writeText(ops, draft.clientName.trim() || '—', margin, y, 11, 'F1');
+  writeText(ops, draft.clientName.trim() || '—', margin, y, 11, 'F1', palette.bodyText);
   if (draft.clientEmail.trim()) {
     y -= 14;
-    writeText(ops, draft.clientEmail.trim(), margin, y, 10, 'F1');
+    writeText(ops, draft.clientEmail.trim(), margin, y, 10, 'F1', palette.mutedText);
+  }
+  if (draft.clientAddress.trim()) {
+    y -= 14;
+    y = writeMultiline(ops, draft.clientAddress.split(/\r?\n/), margin, y, 10, 'F1', 13, palette.mutedText);
   }
 
-  y -= 22;
-  const headerY = y;
-  writeText(ops, labels.description, margin, headerY, 10, 'F2');
-  writeText(ops, labels.quantity, margin + 300, headerY, 10, 'F2');
-  writeText(ops, labels.rate, margin + 380, headerY, 10, 'F2');
-  writeText(ops, labels.amount, margin + 460, headerY, 10, 'F2');
+  const metaColumnX = pageWidth - margin - 200;
+  let metaY = headerY - 28;
+  writeText(ops, labels.issueDate, metaColumnX, metaY, 9, 'F1', palette.mutedText);
+  metaY -= 12;
+  writeText(ops, formatDisplayDate(draft.issueDate, locale), metaColumnX, metaY, 10, 'F1', palette.bodyText);
+  metaY -= 16;
+  writeText(ops, labels.dueDate, metaColumnX, metaY, 9, 'F1', palette.mutedText);
+  metaY -= 12;
+  writeText(ops, formatDisplayDate(draft.dueDate, locale), metaColumnX, metaY, 10, 'F1', palette.bodyText);
+  metaY -= 16;
+  writeText(ops, labels.currency, metaColumnX, metaY, 9, 'F1', palette.mutedText);
+  metaY -= 12;
+  writeText(ops, draft.currency, metaColumnX, metaY, 10, 'F1', palette.bodyText);
 
-  y = headerY - 18;
+  y -= 24;
+  const tableHeaderY = y;
+  drawRect(ops, margin, tableHeaderY, contentWidth, 24, palette.tableHeader);
+  const descX = margin + 12;
+  const qtyX = margin + 290;
+  const rateX = margin + 360;
+  const amountX = pageWidth - margin - 90;
+  const headerBaseline = tableHeaderY + 16;
+  writeText(ops, labels.description, descX, headerBaseline, 10, 'F2', palette.tableHeaderText);
+  writeText(ops, labels.quantity, qtyX, headerBaseline, 10, 'F2', palette.tableHeaderText);
+  writeText(ops, labels.rate, rateX, headerBaseline, 10, 'F2', palette.tableHeaderText);
+  writeText(ops, labels.amount, amountX, headerBaseline, 10, 'F2', palette.tableHeaderText);
+
+  let rowY = tableHeaderY - 8;
+  const rowHeight = 20;
   const lines = draft.lines.length ? draft.lines : ([] as InvoiceLine[]);
-  lines.forEach((line) => {
+  lines.forEach((line, index) => {
+    const stripeY = rowY - rowHeight + 6;
+    if (palette.tableStripe && index % 2 === 0) {
+      drawRect(ops, margin, stripeY, contentWidth, rowHeight, palette.tableStripe);
+    }
     const description = line.description.trim() || '—';
     const quantity = line.quantity.toFixed(2).replace(/\.00$/, '');
     const rate = formatCurrency(line.rate, currency, locale);
     const lineTotal = formatCurrency(line.quantity * line.rate, currency, locale);
-    writeText(ops, description, margin, y, 10, 'F1');
-    writeText(ops, quantity, margin + 300, y, 10, 'F1');
-    writeText(ops, rate, margin + 380, y, 10, 'F1');
-    writeText(ops, lineTotal, margin + 460, y, 10, 'F1');
-    y -= 16;
+    writeText(ops, description, descX, rowY, 10, 'F1', palette.bodyText);
+    writeText(ops, quantity, qtyX, rowY, 10, 'F1', palette.bodyText);
+    writeText(ops, rate, rateX, rowY, 10, 'F1', palette.bodyText);
+    writeText(ops, lineTotal, amountX, rowY, 10, 'F1', palette.bodyText);
+    rowY -= rowHeight;
   });
 
-  y -= 12;
-  writeText(ops, labels.subtotal, margin + 320, y, 10, 'F2');
-  writeText(ops, formatCurrency(totals.subtotal, currency, locale), margin + 460, y, 10, 'F1');
-  y -= 14;
-  writeText(ops, labels.tax, margin + 320, y, 10, 'F2');
-  writeText(ops, formatCurrency(totals.taxAmount, currency, locale), margin + 460, y, 10, 'F1');
-  y -= 18;
-  writeText(ops, labels.total, margin + 320, y, 12, 'F2');
-  writeText(ops, formatCurrency(totals.total, currency, locale), margin + 460, y, 12, 'F2');
+  rowY -= 8;
+  drawRect(ops, margin, rowY + 6, contentWidth, 0.6, palette.border);
 
+  const subtotalY = rowY - 6;
+  writeText(ops, labels.subtotal, amountX - 110, subtotalY, 10, 'F1', palette.mutedText);
+  writeText(ops, formatCurrency(totals.subtotal, currency, locale), amountX, subtotalY, 10, 'F1', palette.bodyText);
+
+  const taxY = subtotalY - 16;
+  writeText(ops, labels.tax, amountX - 110, taxY, 10, 'F1', palette.mutedText);
+  writeText(ops, formatCurrency(totals.taxAmount, currency, locale), amountX, taxY, 10, 'F1', palette.bodyText);
+
+  const totalY = taxY - 22;
+  writeText(ops, labels.total, amountX - 110, totalY, 12, 'F2', palette.header);
+  writeText(ops, formatCurrency(totals.total, currency, locale), amountX, totalY, 12, 'F2', palette.header);
+
+  let notesY = totalY - 28;
   if (draft.notes.trim()) {
-    y -= 28;
-    writeText(ops, labels.notes, margin, y, 11, 'F2');
-    y -= 16;
-    writeMultiline(ops, draft.notes.split(/\r?\n/), margin, y, 10, 'F1');
+    const noteLines = draft.notes.split(/\r?\n/);
+    const noteHeight = noteLines.length * 14 + 30;
+    const notesBoxY = notesY - noteHeight + 10;
+    drawRect(ops, margin, notesBoxY, contentWidth, noteHeight, palette.notesBackground);
+    writeText(ops, labels.notes, margin + 12, notesBoxY + noteHeight - 20, 10, 'F2', palette.mutedText);
+    writeMultiline(ops, noteLines, margin + 12, notesBoxY + noteHeight - 36, 10, 'F1', 14, palette.bodyText);
+    notesY = notesBoxY - 16;
+  }
+
+  if (template.supportsJapanese) {
+    const hankoSize = 70;
+    const hankoX = pageWidth - margin - hankoSize;
+    const hankoY = notesY - hankoSize - 16;
+    const hankoFill: RGB = [255, 255, 255];
+    drawRect(ops, hankoX, hankoY, hankoSize, hankoSize, hankoFill);
+    setStrokeColor(ops, palette.border);
+    ops.push('q');
+    ops.push(`${hankoX.toFixed(2)} ${hankoY.toFixed(2)} ${hankoSize.toFixed(2)} ${hankoSize.toFixed(2)} re`);
+    ops.push('S');
+    ops.push('Q');
+    writeText(ops, '印', hankoX + hankoSize / 2 - 8, hankoY + hankoSize / 2 + 6, 18, 'F2', palette.bodyText);
+    writeText(ops, 'Authorised seal', hankoX + 4, hankoY - 8, 9, 'F1', palette.mutedText);
   }
 
   return ops.join('\n');
 }
 
-export function generateInvoicePdf({ draft, totals, locale, currency, labels }: PdfOptions): Blob {
-  const content = buildContentStream(draft, totals, locale, currency, labels);
+export function generateInvoicePdf({ draft, totals, locale, currency, labels, templateId }: PdfOptions): Blob {
+  const template = getInvoiceTemplate(templateId);
+  const content = buildContentStream(draft, totals, locale, currency, labels, template);
   const encoder = new TextEncoder();
   const contentBytes = encoder.encode(content);
 

@@ -74,11 +74,14 @@ export default function LoginView(): JSX.Element {
     setMessage(t('login.status.signingIn', 'Signing you in…'));
 
     try {
-      const session = await signInWithEmailPassword(email, password);
-      persistSession(session, { remember });
+      const authSession = await signInWithEmailPassword(email, password);
+      persistSession(authSession, { remember });
       setStatus('success');
       setMessage(t('login.status.success', 'Signed in successfully. Redirecting…'));
-      router.replace('/app');
+      const redirectParam = params?.get('next');
+      const fallbackRedirect = authSession.role === 'admin' ? '/admin/console' : '/app';
+      const redirectTarget = redirectParam && redirectParam.startsWith('/') ? redirectParam : fallbackRedirect;
+      router.replace(redirectTarget);
     } catch (error) {
       const fallback = t('login.error.generic', 'Unable to sign in. Please try again later.');
       const friendlyMessage = error instanceof Error && error.message ? error.message : fallback;

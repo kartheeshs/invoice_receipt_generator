@@ -147,8 +147,10 @@ function parseDocument(document: FirestoreDocument): InvoiceRecord | null {
   const draftBase: Omit<InvoiceRecord, 'id' | 'createdAt' | 'subtotal' | 'taxAmount' | 'total'> = {
     clientName: decodeString(fields.clientName),
     clientEmail: decodeString(fields.clientEmail),
+    clientAddress: decodeString(fields.clientAddress),
     businessName: decodeString(fields.businessName),
     businessAddress: decodeString(fields.businessAddress),
+    templateId: decodeString(fields.templateId) || 'villa-coastal',
     issueDate: decodeString(fields.issueDate),
     dueDate: decodeString(fields.dueDate),
     currency: decodeString(fields.currency) || 'USD',
@@ -232,8 +234,10 @@ export async function saveInvoice({ draft }: SaveInvoiceOptions): Promise<Invoic
   const fields: Record<string, FirestoreValue> = {
     clientName: buildString(draft.clientName.trim()),
     clientEmail: buildString(draft.clientEmail.trim()),
+    clientAddress: buildString(draft.clientAddress.trim()),
     businessName: buildString(draft.businessName.trim()),
     businessAddress: buildString(draft.businessAddress.trim()),
+    templateId: buildString(draft.templateId),
     issueDate: buildString(draft.issueDate),
     dueDate: buildString(draft.dueDate),
     currency: buildString(draft.currency),

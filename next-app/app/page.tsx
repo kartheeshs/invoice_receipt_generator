@@ -43,15 +43,15 @@ const features = [
 
 const templates: TemplatePreview[] = [
   {
-    slug: 'wave-blue',
-    name: 'Wave Blue',
-    tagline: 'Gradient masthead with balance badge and polished totals.',
-    accent: '#2563EB',
-    accentSoft: 'rgba(37, 99, 235, 0.14)',
-    header: ['#1D4ED8', '#60A5FA'],
-    border: 'rgba(37, 99, 235, 0.18)',
-    tableHeader: '#1D4ED8',
-    stripe: 'rgba(37, 99, 235, 0.08)',
+    slug: 'villa-coastal',
+    name: 'Villa Coastal',
+    tagline: 'Azure header with booking summary badge for hospitality teams.',
+    accent: '#1D5FBF',
+    accentSoft: 'rgba(29, 95, 191, 0.14)',
+    header: ['#0B366B', '#3CA1FF'],
+    border: 'rgba(29, 95, 191, 0.18)',
+    tableHeader: '#1D5FBF',
+    stripe: 'rgba(28, 123, 230, 0.08)',
   },
   {
     slug: 'classic-ledger',
@@ -65,15 +65,26 @@ const templates: TemplatePreview[] = [
     stripe: 'rgba(15, 23, 42, 0.05)',
   },
   {
-    slug: 'emerald-stripe',
-    name: 'Emerald Stripe',
-    tagline: 'Fresh greens with card-style totals and signature block.',
-    accent: '#047857',
-    accentSoft: 'rgba(4, 120, 87, 0.16)',
-    header: ['#0F766E', '#22C55E'],
-    border: 'rgba(4, 120, 87, 0.22)',
+    slug: 'harbour-slate',
+    name: 'Harbour Slate',
+    tagline: 'Travel folio layout with grey-blue masthead and stay summary.',
+    accent: '#1D4E89',
+    accentSoft: 'rgba(29, 78, 137, 0.14)',
+    header: ['#012A4A', '#5FA8D3'],
+    border: 'rgba(29, 78, 137, 0.18)',
+    tableHeader: '#1D4E89',
+    stripe: 'rgba(148, 163, 184, 0.12)',
+  },
+  {
+    slug: 'aqua-ledger',
+    name: 'Aqua Ledger',
+    tagline: 'Teal balance capsule with alternating aqua striping.',
+    accent: '#14B8A6',
+    accentSoft: 'rgba(20, 184, 166, 0.16)',
+    header: ['#0F766E', '#22D3EE'],
+    border: 'rgba(20, 184, 166, 0.22)',
     tableHeader: '#0F766E',
-    stripe: 'rgba(4, 120, 87, 0.08)',
+    stripe: 'rgba(45, 212, 191, 0.12)',
   },
   {
     slug: 'seikyu',
@@ -182,9 +193,10 @@ const plansJa = [
 ];
 
 const templateTaglinesJa: Record<string, string> = {
-  'wave-blue': 'グラデーションヘッダーとバランスバッジで魅せるデザイン。',
+  'villa-coastal': 'リゾートの領収書を思わせるブルーのヘッダーと予約サマリーが特徴です。',
   'classic-ledger': '正式な帳票に最適なモノクロレイアウト。',
-  'emerald-stripe': 'カード型トータルと署名欄を備えたフレッシュなグリーン。',
+  'harbour-slate': '旅行明細に合わせたブルーグレーのヘッダーと予約サマリーが特徴です。',
+  'aqua-ledger': 'バランスカプセルと交互のティールストライプでモダンな印象に。',
   seikyu: 'バイリンガル見出しと判子スペース付きの請求書。',
 };
 

@@ -17,6 +17,9 @@ import { firebaseConfigured, fetchRecentInvoices, saveInvoice } from '../../lib/
 import { sampleInvoices } from '../../lib/sample-data';
 import { useTranslation } from '../../lib/i18n';
 import { generateInvoicePdf } from '../../lib/pdf';
+import { invoiceTemplates } from '../../lib/templates';
+import { matchClients, type ClientDirectoryEntry } from '../../lib/clients';
+import { clearSession, loadSession, SESSION_STORAGE_KEY, type StoredSession } from '../../lib/auth';
 import LanguageSwitcher from '../components/language-switcher';
 
 type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings';
@@ -26,16 +29,6 @@ type Section = {
   label: string;
   description: string;
   icon: string;
-};
-
-type TemplateDefinition = {
-  id: string;
-  name: string;
-  description: string;
-  accent: string;
-  accentSoft: string;
-  bestFor: string;
-  highlights: string[];
 };
 
 type ClientSummary = {
@@ -63,54 +56,6 @@ const statusOptions: { value: InvoiceStatus; label: string }[] = [
   { value: 'sent', label: 'Sent' },
   { value: 'paid', label: 'Paid' },
   { value: 'overdue', label: 'Overdue' },
-];
-
-const templateCatalog: TemplateDefinition[] = [
-  {
-    id: 'wave-blue',
-    name: 'Wave Blue',
-    description: 'Gradient header, balance badge, and crisp table styling designed for agencies and studios.',
-    accent: 'linear-gradient(135deg, rgba(37,99,235,0.95), rgba(129,140,248,0.95))',
-    accentSoft: 'rgba(37, 99, 235, 0.12)',
-    bestFor: 'Creative teams who want a vibrant, polished statement.',
-    highlights: ['Hero balance badge', 'Bilingual labels ready', 'Clean table totals'],
-  },
-  {
-    id: 'minimal-slate',
-    name: 'Minimal Slate',
-    description: 'Monochrome layout with subtle dividers and a focus on clarity for consulting firms.',
-    accent: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(100,116,139,0.85))',
-    accentSoft: 'rgba(15, 23, 42, 0.1)',
-    bestFor: 'Professional services requiring a conservative, finance-first aesthetic.',
-    highlights: ['Muted neutral palette', 'Signature-ready footer', 'Auto-aligned totals'],
-  },
-  {
-    id: 'classic-ledger',
-    name: 'Classic Ledger',
-    description: 'Timeless black-and-white framing with crisp dividers for print-perfect invoices.',
-    accent: 'linear-gradient(135deg, rgba(248,250,252,0.98), rgba(226,232,240,0.98))',
-    accentSoft: 'rgba(15, 23, 42, 0.08)',
-    bestFor: 'Legal and finance teams that require a neutral, no-colour layout.',
-    highlights: ['High-contrast tables', 'Signature-ready footer', 'Print-friendly design'],
-  },
-  {
-    id: 'emerald-ledger',
-    name: 'Emerald Ledger',
-    description: 'Fresh green accents with card-style totals and payment reminders built into the footer.',
-    accent: 'linear-gradient(135deg, rgba(16,185,129,0.95), rgba(22,163,74,0.9))',
-    accentSoft: 'rgba(16, 185, 129, 0.12)',
-    bestFor: 'Subscription or SaaS teams sending recurring invoices.',
-    highlights: ['Balance summary sidebar', 'Reminder callouts', 'Payment instructions block'],
-  },
-  {
-    id: 'seikyu',
-    name: 'Seikyūsho',
-    description: 'Bilingual Japanese / English headings, hanko placeholder, and tax summary grid.',
-    accent: 'linear-gradient(135deg, rgba(239,68,68,0.95), rgba(249,115,22,0.9))',
-    accentSoft: 'rgba(239, 68, 68, 0.12)',
-    bestFor: 'Teams invoicing Japanese clients with localised terminology.',
-    highlights: ['Hanko-ready footer', 'Tax summary rows', 'Dual-language columns'],
-  },
 ];
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
@@ -143,7 +88,6 @@ function ensureLine(line: InvoiceLine, field: keyof InvoiceLine, value: string):
 
 export default function WorkspacePage() {
   const [activeSection, setActiveSection] = useState<SectionId>('dashboard');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>(templateCatalog[0]?.id ?? 'wave-blue');
   const [draft, setDraft] = useState<InvoiceDraft>(() => createEmptyDraft());
   const [recentInvoices, setRecentInvoices] = useState<InvoiceRecord[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
@@ -151,8 +95,30 @@ export default function WorkspacePage() {
   const [alertMessage, setAlertMessage] = useState<string>('');
   const [invoiceView, setInvoiceView] = useState<'edit' | 'preview'>('edit');
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [session, setSession] = useState<StoredSession | null>(null);
+  const [clientMatches, setClientMatches] = useState<ClientDirectoryEntry[]>([]);
+  const [showClientMatches, setShowClientMatches] = useState<boolean>(false);
   const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
+  const isSignedIn = Boolean(session);
+  const isAdmin = session?.role === 'admin';
+  const sessionDisplayName = session?.displayName ?? session?.email ?? '';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    setSession(loadSession());
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === SESSION_STORAGE_KEY) {
+        setSession(loadSession());
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -198,7 +164,7 @@ export default function WorkspacePage() {
   );
   const localizedTemplates = useMemo(
     () =>
-      templateCatalog.map((template) => ({
+      invoiceTemplates.map((template) => ({
         ...template,
         name: t(`workspace.template.${template.id}.name`, template.name),
         description: t(`workspace.template.${template.id}.description`, template.description),
@@ -214,9 +180,10 @@ export default function WorkspacePage() {
     [t],
   );
   const statusLookup = useMemo(() => new Map(localizedStatusOptions.map((option) => [option.value, option.label])), [localizedStatusOptions]);
+  const selectedTemplateId = draft.templateId || invoiceTemplates[0]?.id || 'villa-coastal';
   const activeTemplate = useMemo(
-    () => localizedTemplates.find((template) => template.id === selectedTemplate) ?? localizedTemplates[0],
-    [localizedTemplates, selectedTemplate],
+    () => localizedTemplates.find((template) => template.id === selectedTemplateId) ?? localizedTemplates[0],
+    [localizedTemplates, selectedTemplateId],
   );
 
   const outstandingTotal = useMemo(
@@ -324,6 +291,37 @@ export default function WorkspacePage() {
     });
   }
 
+  function handleSignOut() {
+    clearSession();
+    setSession(null);
+    setAlertMessage(
+      t('workspace.alert.signedOut', 'Signed out. Sign in again to sync invoices with Firebase.'),
+    );
+    setSaveState('success');
+  }
+
+  function handleClientNameChange(value: string) {
+    updateDraftField('clientName', value);
+    if (value.trim().length >= 2) {
+      const matches = matchClients(value).slice(0, 5);
+      setClientMatches(matches);
+      setShowClientMatches(matches.length > 0);
+    } else {
+      setShowClientMatches(false);
+    }
+  }
+
+  function applyClientMatch(entry: ClientDirectoryEntry) {
+    setDraft((prev) => ({
+      ...prev,
+      clientName: entry.name,
+      clientEmail: entry.email,
+      clientAddress: entry.address,
+    }));
+    setClientMatches([]);
+    setShowClientMatches(false);
+  }
+
   async function handleSave(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (saveState === 'saving') {
@@ -339,6 +337,7 @@ export default function WorkspacePage() {
       ...draft,
       clientName: draft.clientName.trim(),
       clientEmail: draft.clientEmail.trim(),
+      clientAddress: draft.clientAddress.trim(),
       businessName: draft.businessName.trim(),
       businessAddress: draft.businessAddress.trim(),
       notes: draft.notes.trim(),
@@ -392,12 +391,16 @@ export default function WorkspacePage() {
       const cleanedLines = cleanLines(draft.lines);
       const pdfDraft: InvoiceDraft = { ...draft, lines: cleanedLines.length ? cleanedLines : draft.lines };
       const pdfTotals = calculateTotals(pdfDraft.lines, pdfDraft.taxRate);
-      const pdfLabel = (key: string, fallback: string) => (language === 'ja' ? fallback : t(key, fallback));
+      const pdfLabel = (key: string, fallback: string) => t(key, fallback);
+      const statusValue = statusLookup.get(draft.status) ?? draft.status;
       const pdfLabels = {
         invoiceTitle: pdfLabel('workspace.pdf.invoiceTitle', 'Invoice'),
         billTo: pdfLabel('workspace.pdf.billTo', 'Bill to'),
         issueDate: pdfLabel('workspace.pdf.issueDate', 'Issue date'),
         dueDate: pdfLabel('workspace.pdf.dueDate', 'Due date'),
+        statusLabel: pdfLabel('workspace.pdf.status', 'Status'),
+        statusValue,
+        currency: pdfLabel('workspace.pdf.currency', 'Currency'),
         description: pdfLabel('workspace.pdf.description', 'Description'),
         quantity: pdfLabel('workspace.pdf.quantity', 'Qty'),
         rate: pdfLabel('workspace.pdf.rate', 'Rate'),
@@ -408,7 +411,14 @@ export default function WorkspacePage() {
         notes: pdfLabel('workspace.pdf.notes', 'Notes'),
       };
 
-      const blob = generateInvoicePdf({ draft: pdfDraft, totals: pdfTotals, locale, currency: draft.currency, labels: pdfLabels });
+      const blob = generateInvoicePdf({
+        draft: pdfDraft,
+        totals: pdfTotals,
+        locale,
+        currency: draft.currency,
+        labels: pdfLabels,
+        templateId: selectedTemplateId,
+      });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       const safeClient = pdfDraft.clientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'invoice';
@@ -429,17 +439,21 @@ export default function WorkspacePage() {
     }
   }
 
+  function handleSelectTemplate(templateId: string) {
+    setDraft((prev) => ({ ...prev, templateId }));
+  }
+
   function renderTemplateThumbnails({ showDetails = false }: { showDetails?: boolean } = {}) {
     return (
       <div className={`template-thumbnail-grid${showDetails ? ' template-thumbnail-grid--detailed' : ''}`}>
         {localizedTemplates.map((template) => {
-          const isActive = template.id === selectedTemplate;
+          const isActive = template.id === selectedTemplateId;
           const primaryHighlight = template.highlights[0] ?? template.description;
           return (
             <button
               key={template.id}
               type="button"
-              onClick={() => setSelectedTemplate(template.id)}
+              onClick={() => handleSelectTemplate(template.id)}
               className={`template-thumbnail${isActive ? ' template-thumbnail--active' : ''}`}
               aria-pressed={isActive}
             >
@@ -654,15 +668,47 @@ export default function WorkspacePage() {
                         onChange={(event) => updateDraftField('businessAddress', event.target.value)}
                       />
                     </div>
-                    <div>
+                    <div className="client-field">
                       <label htmlFor="clientName">{t('workspace.field.clientName', 'Client name')}</label>
                       <input
                         id="clientName"
                         type="text"
                         value={draft.clientName}
                         placeholder={t('workspace.placeholder.clientName', 'Northwind Co.')}
-                        onChange={(event) => updateDraftField('clientName', event.target.value)}
+                        autoComplete="organization"
+                        aria-autocomplete="list"
+                        aria-expanded={showClientMatches}
+                        aria-controls="client-suggestions"
+                        onChange={(event) => handleClientNameChange(event.target.value)}
+                        onFocus={() => {
+                          if (draft.clientName.trim().length >= 2) {
+                            const matches = matchClients(draft.clientName).slice(0, 5);
+                            setClientMatches(matches);
+                            setShowClientMatches(matches.length > 0);
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setShowClientMatches(false), 120);
+                        }}
                       />
+                      <p className="input-hint">{t('workspace.clients.autofillHint', 'Start typing to autofill saved client details.')}</p>
+                      {showClientMatches && clientMatches.length > 0 && (
+                        <ul id="client-suggestions" className="client-suggestions" role="listbox">
+                          {clientMatches.map((entry) => (
+                            <li key={entry.email} role="option">
+                              <button
+                                type="button"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => applyClientMatch(entry)}
+                              >
+                                <span>{entry.name}</span>
+                                <small>{entry.email}</small>
+                                <small>{entry.address}</small>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                     <div>
                       <label htmlFor="clientEmail">{t('workspace.field.clientEmail', 'Client email')}</label>
@@ -672,6 +718,16 @@ export default function WorkspacePage() {
                         value={draft.clientEmail}
                         placeholder={t('workspace.placeholder.clientEmail', 'client@email.com')}
                         onChange={(event) => updateDraftField('clientEmail', event.target.value)}
+                      />
+                    </div>
+                    <div className="editor-card__full">
+                      <label htmlFor="clientAddress">{t('workspace.field.clientAddress', 'Client address')}</label>
+                      <textarea
+                        id="clientAddress"
+                        value={draft.clientAddress}
+                        placeholder={t('workspace.placeholder.clientAddress', 'Via Tammaricella 128, Rome, Italy')}
+                        rows={2}
+                        onChange={(event) => updateDraftField('clientAddress', event.target.value)}
                       />
                     </div>
                   </div>
@@ -923,6 +979,7 @@ export default function WorkspacePage() {
                           <span className="preview__label">{billToLabel}</span>
                           <strong>{draft.clientName || t('workspace.preview.clientPlaceholder', 'Client name')}</strong>
                           <span>{draft.clientEmail || t('workspace.preview.emailPlaceholder', 'client@email.com')}</span>
+                          {draft.clientAddress && <span className="preview__address">{draft.clientAddress}</span>}
                         </div>
                         <div>
                           <span className="preview__label">{issuedLabel}</span>
@@ -956,7 +1013,7 @@ export default function WorkspacePage() {
                         ))}
                       </div>
 
-                      {activeTemplate.id === 'emerald-ledger' && (
+                      {activeTemplate.id === 'aqua-ledger' && (
                         <div className="preview__summary-card">
                           <header>
                             <span>{t('workspace.preview.paymentSummary', 'Payment summary')}</span>
@@ -1180,7 +1237,8 @@ export default function WorkspacePage() {
             <div>
               <dt>{t('workspace.settings.template', 'Template')}</dt>
               <dd>
-                {localizedTemplates.find((template) => template.id === selectedTemplate)?.name || localizedTemplates[0].name}
+                {localizedTemplates.find((template) => template.id === selectedTemplateId)?.name ||
+                  localizedTemplates[0].name}
               </dd>
             </div>
           </dl>
@@ -1258,6 +1316,25 @@ export default function WorkspacePage() {
         </nav>
         <div className="workspace-topbar__controls">
           <LanguageSwitcher variant="compact" />
+          <div className="workspace-user-menu" role="group" aria-label={t('workspace.userMenu.label', 'Account actions')}>
+            {isSignedIn ? (
+              <>
+                <span className="workspace-user-menu__name">{sessionDisplayName}</span>
+                {isAdmin && (
+                  <Link className="workspace-user-menu__link" href="/admin/console" prefetch={false}>
+                    {t('workspace.actions.adminConsole', 'Admin console')}
+                  </Link>
+                )}
+                <button type="button" className="workspace-user-menu__button" onClick={handleSignOut}>
+                  {t('workspace.actions.signOut', 'Sign out')}
+                </button>
+              </>
+            ) : (
+              <Link className="workspace-user-menu__button" href="/login" prefetch={false}>
+                {t('workspace.actions.signIn', 'Sign in')}
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 

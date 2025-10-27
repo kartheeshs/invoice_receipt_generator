@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   adminVitals,
   adminHealthChecks,
@@ -14,6 +15,7 @@ import { InvoiceRecord, describeStatus, formatCurrency, type InvoiceStatus } fro
 import { firebaseConfigured, fetchRecentInvoices } from '../../../lib/firebase';
 import { sampleInvoices } from '../../../lib/sample-data';
 import { useTranslation } from '../../../lib/i18n';
+import { loadSession } from '../../../lib/auth';
 
 type TimelineEntry = {
   id: string;
@@ -25,12 +27,26 @@ type TimelineEntry = {
 };
 
 export default function AdminConsolePage() {
+  const router = useRouter();
+  const [authorized, setAuthorized] = useState<boolean>(false);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(sampleInvoices);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { locale, t } = useTranslation();
 
   useEffect(() => {
+    const session = loadSession();
+    if (!session || session.role !== 'admin') {
+      router.replace('/login?error=access-denied&next=/admin/console');
+      return;
+    }
+    setAuthorized(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!authorized) {
+      return;
+    }
     let active = true;
 
     async function load() {
@@ -60,7 +76,7 @@ export default function AdminConsolePage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [authorized, t]);
 
   const outstanding = useMemo(
     () => invoices.filter((invoice) => invoice.status !== 'paid').reduce((sum, invoice) => sum + invoice.total, 0),
@@ -100,6 +116,10 @@ export default function AdminConsolePage() {
   const updatedLabel = t('admin.console.metrics.updated', 'Updated {time}', {
     time: new Date().toLocaleTimeString(locale),
   });
+
+  if (!authorized) {
+    return null;
+  }
 
   return (
     <div className="admin-console">

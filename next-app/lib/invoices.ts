@@ -10,8 +10,10 @@ export interface InvoiceLine {
 export interface InvoiceDraft {
   clientName: string;
   clientEmail: string;
+  clientAddress: string;
   businessName: string;
   businessAddress: string;
+  templateId: string;
   issueDate: string;
   dueDate: string;
   currency: string;
@@ -50,8 +52,10 @@ export function createEmptyDraft(): InvoiceDraft {
   return {
     clientName: '',
     clientEmail: '',
+    clientAddress: '',
     businessName: '',
     businessAddress: '',
+    templateId: 'villa-coastal',
     issueDate: formatISODate(today),
     dueDate: formatISODate(dueDate),
     currency: 'USD',
