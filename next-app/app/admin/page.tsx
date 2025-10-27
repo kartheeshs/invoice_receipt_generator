@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Admin Access — Invoice Atlas',
+  title: 'Admin Access — Easy Invoice GM7',
   description:
-    'Secure entry point for Invoice Atlas administrators. Launch the dedicated admin console within the web application.',
+    'Secure entry point for Easy Invoice GM7 administrators. Launch the dedicated admin console within the web application.',
 };
 
 export default function AdminLandingPage() {
@@ -18,7 +18,7 @@ export default function AdminLandingPage() {
           <h1 style={{ marginTop: '1rem' }}>Secure access required</h1>
           <p style={{ marginTop: '0.75rem', lineHeight: 1.7 }}>
             Administrators manage workspaces, subscriptions, and compliance logs inside the dedicated console embedded in the
-            Invoice Atlas web application. Launch the console below and sign in with your administrator credentials.
+            Easy Invoice GM7 web application. Launch the console below and sign in with your administrator credentials.
           </p>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '1.75rem' }}>
             <Link className="button button--primary" href="/admin/console">
@@ -30,7 +30,7 @@ export default function AdminLandingPage() {
           </div>
           <small style={{ display: 'block', marginTop: '1.5rem', color: 'var(--text-muted)' }}>
             Trouble accessing your account? Email{' '}
-            <a href="mailto:admin@invoice-atlas.example.com">admin@invoice-atlas.example.com</a>.
+            <a href="mailto:admin@easyinvoicegm7.example.com">admin@easyinvoicegm7.example.com</a>.
           </small>
         </div>
       </div>

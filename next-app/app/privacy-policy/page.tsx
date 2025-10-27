@@ -23,7 +23,7 @@ const sections: { title: string; body: ReactNode }[] = [
     title: 'Responsibility',
     body: (
       <p>
-        Invoice Atlas is a neutral platform. Any fraudulent or unlawful activity conducted through the service is the
+        Easy Invoice GM7 is a neutral platform. Any fraudulent or unlawful activity conducted through the service is the
         responsibility of the user who performed the action. We cooperate with legitimate investigations when required
         by law.
       </p>
@@ -35,7 +35,7 @@ const sections: { title: string; body: ReactNode }[] = [
       <p>
         While we cannot assume liability for user actions, our support team will help you recover from mistakes and
         incidents. Contact us at{' '}
-        <a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a>{' '}
+        <a href="mailto:support@easyinvoicegm7.example.com">support@easyinvoicegm7.example.com</a>{' '}
         and we will respond as quickly as we can.
       </p>
     ),
@@ -58,9 +58,9 @@ const highlights = [
 ];
 
 export const metadata = {
-  title: 'Privacy Policy — Invoice Atlas',
+  title: 'Privacy Policy — Easy Invoice GM7',
   description:
-    'Understand how Invoice Atlas protects your invoicing data, respects deletion requests, and outlines user responsibilities.',
+    'Understand how Easy Invoice GM7 protects your invoicing data, respects deletion requests, and outlines user responsibilities.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -72,7 +72,7 @@ export default function PrivacyPolicyPage() {
             <span className="badge badge--muted">Privacy &amp; Policy</span>
             <h1>Our commitment to your data</h1>
             <p>
-              We built Invoice Atlas for responsible teams that care about privacy. This document explains how we
+              We built Easy Invoice GM7 for responsible teams that care about privacy. This document explains how we
               protect your workspace and what responsibilities you accept when using the platform.
             </p>
           </div>
@@ -103,7 +103,7 @@ export default function PrivacyPolicyPage() {
             <h2>Contact</h2>
             <p>
               Questions or concerns? Email{' '}
-              <a href="mailto:privacy@invoice-atlas.example.com">privacy@invoice-atlas.example.com</a>. We respond to
+              <a href="mailto:privacy@easyinvoicegm7.example.com">privacy@easyinvoicegm7.example.com</a>. We respond to
               most requests within two business days.
             </p>
           </div>

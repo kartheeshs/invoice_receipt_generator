@@ -1,6 +1,6 @@
-# Invoice Atlas web workspace
+# Easy Invoice GM7 web workspace
 
-This project contains the marketing site and client-side workspace for Invoice Atlas, rebuilt entirely with Next.js. The `/app` route mirrors the original Flutter UI: a top navigation bar with dashboard, invoices, templates, clients, activity, and settings links; an invoice editor with live preview; recent activity; and supporting sections for templates and client insights.
+This project contains the marketing site and client-side workspace for Easy Invoice GM7, rebuilt entirely with Next.js. The `/app` route mirrors the original Flutter UI: a top navigation bar with dashboard, invoices, templates, clients, activity, and settings links; an invoice editor with live preview; recent activity; and supporting sections for templates and client insights.
 
 ## Development
 

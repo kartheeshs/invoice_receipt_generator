@@ -9,17 +9,17 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Invoice Atlas — Professional Invoice & Receipt Generator',
+  title: 'Easy Invoice GM7 — Modern Invoice & Receipt Workspace',
   description:
-    'Design polished invoices and receipts in minutes. Preview finance-approved templates, collaborate with teammates, and export vector-perfect PDFs.',
+    'Create polished invoices, switch between branded templates, and sync with Firebase in a single browser-first workspace.',
   openGraph: {
-    title: 'Invoice Atlas',
+    title: 'Easy Invoice GM7',
     description:
-      'Design polished invoices and receipts in minutes. Preview finance-approved templates, collaborate with teammates, and export vector-perfect PDFs.',
-    url: 'https://invoice-atlas.example.com',
-    siteName: 'Invoice Atlas',
+      'Create polished invoices, switch between branded templates, and sync with Firebase in a single browser-first workspace.',
+    url: 'https://easy-invoice-gm7.example.com',
+    siteName: 'Easy Invoice GM7',
   },
-  metadataBase: new URL('https://invoice-atlas.example.com'),
+  metadataBase: new URL('https://easy-invoice-gm7.example.com'),
 };
 
 export default function RootLayout({
@@ -35,10 +35,12 @@ export default function RootLayout({
           <header className="site-header">
             <div className="container site-header__inner">
               <Link href="/" className="site-brand" prefetch={false}>
-                <span className="site-brand__mark">IA</span>
+                <span className="site-brand__mark">
+                  <img src="/easy-invoice-gm7-logo.svg" alt="Easy Invoice GM7" />
+                </span>
                 <span className="site-brand__meta">
-                  <strong>Invoice Atlas</strong>
-                  <span>Polished billing in minutes</span>
+                  <strong>Easy Invoice GM7</strong>
+                  <span>Modern billing workspace</span>
                 </span>
               </Link>
               <nav className="site-nav">
@@ -62,9 +64,9 @@ export default function RootLayout({
           <footer className="site-footer">
             <div className="container site-footer__grid">
               <div>
-                <h3>Invoice Atlas</h3>
+                <h3>Easy Invoice GM7</h3>
                 <p>
-                  Create invoice and receipt PDFs that feel bespoke without fighting a designer. The marketing site and the web workspace share a single design system.
+                  Create invoice and receipt PDFs that feel bespoke without fighting a designer. The marketing site and the workspace share a single design system.
                 </p>
               </div>
               <div>
@@ -90,7 +92,7 @@ export default function RootLayout({
                     </Link>
                   </li>
                   <li>
-                    <a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a>
+                    <a href="mailto:support@easyinvoicegm7.example.com">support@easyinvoicegm7.example.com</a>
                   </li>
                   <li>
                     <Link href="/admin" prefetch={false}>
@@ -100,7 +102,7 @@ export default function RootLayout({
                 </ul>
               </div>
             </div>
-            <div className="site-footer__meta">© {year} Invoice Atlas. All rights reserved.</div>
+            <div className="site-footer__meta">© {year} Easy Invoice GM7. All rights reserved.</div>
           </footer>
         </div>
       </body>

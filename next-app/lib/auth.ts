@@ -15,7 +15,7 @@ export interface PersistOptions {
   remember: boolean;
 }
 
-export const SESSION_STORAGE_KEY = 'invoice-atlas.session';
+export const SESSION_STORAGE_KEY = 'easyinvoicegm7.session';
 
 function normaliseExpiresIn(expiresIn: string | number | undefined): number {
   if (!expiresIn) {

@@ -93,7 +93,7 @@ export default function LoginView(): JSX.Element {
       <div className="auth-hero">
         <div className="container">
           <span className="badge">Welcome back</span>
-          <h1>Sign in to Invoice Atlas</h1>
+          <h1>Sign in to Easy Invoice GM7</h1>
           <p>Enter your workspace email address to continue where you left off.</p>
         </div>
       </div>

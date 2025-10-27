@@ -95,7 +95,7 @@ export default function AdminConsolePage() {
       <div className="admin-console__masthead">
         <div className="container">
           <span className="badge">Administrator area</span>
-          <h1>Invoice Atlas admin console</h1>
+          <h1>Easy Invoice GM7 admin console</h1>
           <p>
             Audit activity, monitor system health, and keep the support desk flowing smoothly. Workspace users cannot access
             this page.

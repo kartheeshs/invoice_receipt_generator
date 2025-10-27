@@ -230,7 +230,7 @@ export default function LandingPage() {
             <span className="badge" style={{ width: 'fit-content' }}>
               Live preview
             </span>
-            <h3 style={{ margin: 0, color: 'var(--text-strong)' }}>Invoice Atlas Canvas</h3>
+            <h3 style={{ margin: 0, color: 'var(--text-strong)' }}>Easy Invoice GM7 Canvas</h3>
             <p style={{ margin: 0 }}>
               Every tweak you make—colours, copy, payments—updates the PDF instantly so you always know what clients will see.
             </p>
@@ -289,7 +289,7 @@ export default function LandingPage() {
         <div className="section-heading">
           <h2>Designed for the full billing workflow</h2>
           <p>
-            From the first draft to the paid receipt, Invoice Atlas keeps teams aligned and clients confident.
+            From the first draft to the paid receipt, Easy Invoice GM7 keeps teams aligned and clients confident.
           </p>
         </div>
         <div className="workflow-timeline" style={{ marginTop: '2rem' }}>

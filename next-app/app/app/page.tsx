@@ -983,64 +983,38 @@ export default function WorkspacePage() {
   return (
     <div className="workspace-shell workspace-shell--topnav">
       <div className="workspace-topbar">
-        <div className="workspace-topbar__primary">
-          <div className="workspace-shell__brand">
-            <span className="workspace-shell__logo">IA</span>
-            <div>
-              <strong>Invoice Atlas</strong>
-              <span>Browser workspace</span>
-            </div>
+        <div className="workspace-shell__brand">
+          <img
+            src="/easy-invoice-gm7-logo.svg"
+            alt="Easy Invoice GM7"
+            className="workspace-shell__logo"
+            width={44}
+            height={44}
+          />
+          <div>
+            <strong>Easy Invoice GM7</strong>
+            <span>Billing workspace</span>
           </div>
-          <nav className="workspace-topbar__nav" aria-label="Workspace sections">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={`workspace-topbar__nav-item${
-                  activeSection === section.id ? ' workspace-topbar__nav-item--active' : ''
-                }`}
-                onClick={() => setActiveSection(section.id)}
-              >
-                <span className="workspace-topbar__nav-icon" aria-hidden="true">
-                  {section.icon}
-                </span>
-                <div>
-                  <strong>{section.label}</strong>
-                  <small>{section.description}</small>
-                </div>
-              </button>
-            ))}
-          </nav>
         </div>
-        <div className="workspace-topbar__meta">
-          <div className="workspace-shell__summary">
-            <strong>Workspace snapshot</strong>
-            <ul>
-              <li>
-                <span>Outstanding</span>
-                <strong>{formatCurrency(outstandingTotal, draft.currency)}</strong>
-              </li>
-              <li>
-                <span>Invoices tracked</span>
-                <strong>{recentInvoices.length}</strong>
-              </li>
-              <li>
-                <span>Selected template</span>
-                <strong>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Wave Blue'}</strong>
-              </li>
-            </ul>
-          </div>
-          {!firebaseConfigured && (
-            <p className="workspace-topbar__offline">Connect Firebase credentials to persist data for your workspace.</p>
-          )}
-          <p className="workspace-topbar__support">
-            Need help? Visit the{' '}
-            <Link href="/privacy-policy" prefetch={false}>
-              help center
-            </Link>{' '}
-            or email support.
-          </p>
-        </div>
+        <nav className="workspace-topbar__nav" aria-label="Workspace sections">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`workspace-topbar__nav-item${
+                activeSection === section.id ? ' workspace-topbar__nav-item--active' : ''
+              }`}
+              onClick={() => setActiveSection(section.id)}
+              title={section.description}
+              aria-pressed={activeSection === section.id}
+            >
+              <span className="workspace-topbar__nav-icon" aria-hidden="true">
+                {section.icon}
+              </span>
+              <span className="workspace-topbar__nav-label">{section.label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
 
       <div className="workspace-shell__main">
@@ -1050,6 +1024,11 @@ export default function WorkspacePage() {
             <div>
               <h1>{activeMeta?.label}</h1>
               <p>{activeMeta?.description}</p>
+              {!firebaseConfigured && (
+                <span className="workspace-shell__hint">
+                  Connected to demo data until Firebase credentials are added.
+                </span>
+              )}
             </div>
           </div>
           {activeSection !== 'invoices' ? (
