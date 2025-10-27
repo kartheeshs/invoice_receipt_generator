@@ -917,53 +917,59 @@ export default function WorkspacePage() {
   const activeMeta = sections.find((section) => section.id === activeSection);
 
   return (
-    <div className="workspace-shell">
-      <aside className="workspace-shell__sidebar">
-        <div className="workspace-shell__brand">
-          <span className="workspace-shell__logo">IA</span>
-          <div>
-            <strong>Invoice Atlas</strong>
-            <span>Browser workspace</span>
+    <div className="workspace-shell workspace-shell--topnav">
+      <div className="workspace-topbar">
+        <div className="workspace-topbar__primary">
+          <div className="workspace-shell__brand">
+            <span className="workspace-shell__logo">IA</span>
+            <div>
+              <strong>Invoice Atlas</strong>
+              <span>Browser workspace</span>
+            </div>
           </div>
+          <nav className="workspace-topbar__nav" aria-label="Workspace sections">
+            {sections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className={`workspace-topbar__nav-item${
+                  activeSection === section.id ? ' workspace-topbar__nav-item--active' : ''
+                }`}
+                onClick={() => setActiveSection(section.id)}
+              >
+                <span className="workspace-topbar__nav-icon" aria-hidden="true">
+                  {section.icon}
+                </span>
+                <div>
+                  <strong>{section.label}</strong>
+                  <small>{section.description}</small>
+                </div>
+              </button>
+            ))}
+          </nav>
         </div>
-        <nav className="workspace-shell__nav">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              className={`workspace-shell__nav-item${activeSection === section.id ? ' workspace-shell__nav-item--active' : ''}`}
-              onClick={() => setActiveSection(section.id)}
-            >
-              <span className="workspace-shell__nav-icon" aria-hidden>{section.icon}</span>
-              <div>
-                <strong>{section.label}</strong>
-                <span>{section.description}</span>
-              </div>
-            </button>
-          ))}
-        </nav>
-        <div className="workspace-shell__summary">
-          <strong>Workspace summary</strong>
-          <ul>
-            <li>
-              <span>Outstanding</span>
-              <strong>{formatCurrency(outstandingTotal, draft.currency)}</strong>
-            </li>
-            <li>
-              <span>Invoices tracked</span>
-              <strong>{recentInvoices.length}</strong>
-            </li>
-            <li>
-              <span>Selected template</span>
-              <strong>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Wave Blue'}</strong>
-            </li>
-          </ul>
+        <div className="workspace-topbar__meta">
+          <div className="workspace-shell__summary">
+            <strong>Workspace snapshot</strong>
+            <ul>
+              <li>
+                <span>Outstanding</span>
+                <strong>{formatCurrency(outstandingTotal, draft.currency)}</strong>
+              </li>
+              <li>
+                <span>Invoices tracked</span>
+                <strong>{recentInvoices.length}</strong>
+              </li>
+              <li>
+                <span>Selected template</span>
+                <strong>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Wave Blue'}</strong>
+              </li>
+            </ul>
+          </div>
           {!firebaseConfigured && (
-            <p className="workspace-shell__offline">Connect Firebase credentials to persist data for your workspace.</p>
+            <p className="workspace-topbar__offline">Connect Firebase credentials to persist data for your workspace.</p>
           )}
-        </div>
-        <div className="workspace-shell__footer">
-          <p>
+          <p className="workspace-topbar__support">
             Need help? Visit the{' '}
             <Link href="/privacy-policy" prefetch={false}>
               help center
@@ -971,7 +977,7 @@ export default function WorkspacePage() {
             or email support.
           </p>
         </div>
-      </aside>
+      </div>
 
       <div className="workspace-shell__main">
         <header className="workspace-shell__header">
