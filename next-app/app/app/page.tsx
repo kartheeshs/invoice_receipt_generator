@@ -17,7 +17,7 @@ import {
 import { firebaseConfigured, fetchRecentInvoices, saveInvoice } from '../../lib/firebase';
 import { sampleInvoices } from '../../lib/sample-data';
 
-type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings' | 'admin';
+type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings';
 
 type Section = {
   id: SectionId;
@@ -54,7 +54,6 @@ const sections: Section[] = [
   { id: 'clients', label: 'Clients', description: 'Track customer history', icon: '👥' },
   { id: 'activity', label: 'Activity', description: 'Monitor timeline & reminders', icon: '🕒' },
   { id: 'settings', label: 'Settings', description: 'Default business preferences', icon: '⚙️' },
-  { id: 'admin', label: 'Admin', description: 'Workspace health & access', icon: '🛡️' },
 ];
 
 const statusOptions: { value: InvoiceStatus; label: string }[] = [
@@ -104,18 +103,6 @@ const templateCatalog: TemplateDefinition[] = [
 ];
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
-
-const adminVitals = [
-  { label: 'Active users', value: '128', delta: '+12.5%' },
-  { label: 'Pending approvals', value: '6', delta: '-2 vs last week' },
-  { label: 'PDF renders (24h)', value: '312', delta: '+48' },
-];
-
-const healthChecks = [
-  { name: 'Firestore connectivity', status: 'Operational', detail: 'Latency 82ms avg' },
-  { name: 'PDF rendering queue', status: 'Operational', detail: 'No backlog' },
-  { name: 'Email delivery', status: 'Degraded', detail: '1.2% soft bounce — monitoring' },
-];
 
 function formatFriendlyDate(value?: string): string {
   if (!value) return '—';
@@ -831,9 +818,9 @@ export default function WorkspacePage() {
               <h2>Activity timeline</h2>
               <p>Review invoice saves, reminders, and payments from newest to oldest.</p>
             </div>
-            <button type="button" className="button button--ghost" onClick={() => setActiveSection('admin')}>
-              View admin log
-            </button>
+            <Link className="button button--ghost" href="/admin/console" prefetch={false}>
+              View admin console
+            </Link>
           </header>
           {activityFeed.length ? (
             <ul className="timeline">
@@ -908,100 +895,6 @@ export default function WorkspacePage() {
     );
   }
 
-  function renderAdmin() {
-    return (
-      <div className="workspace-section">
-        <div className="panel">
-          <header className="panel__header">
-            <div>
-              <h2>Admin dashboard</h2>
-              <p>Monitor workspace health, audit activity, and review support status.</p>
-            </div>
-            <Link className="button button--ghost" href="/admin" prefetch={false}>
-              Admin landing
-            </Link>
-          </header>
-          <div className="workspace-metrics">
-            {adminVitals.map((metric) => (
-              <article key={metric.label} className="metric-card metric-card--compact">
-                <strong className="metric-value">{metric.value}</strong>
-                <span className="metric-label">{metric.label}</span>
-                <small>{metric.delta}</small>
-              </article>
-            ))}
-          </div>
-          <div className="admin-grid">
-            <section>
-              <h3>System health</h3>
-              <ul className="admin-health">
-                {healthChecks.map((check) => (
-                  <li key={check.name}>
-                    <div>
-                      <strong>{check.name}</strong>
-                      <span>{check.detail}</span>
-                    </div>
-                    <span className={`status-pill status-pill--${check.status === 'Operational' ? 'success' : 'warning'}`}>
-                      {check.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>Latest activity</h3>
-              <div className="table table--dense">
-                <div className="table__row table__row--head">
-                  <span>Invoice</span>
-                  <span>Client</span>
-                  <span>Status</span>
-                  <span>Total</span>
-                </div>
-                {(recentInvoices.slice(0, 6)).map((invoice) => (
-                  <div key={invoice.id} className="table__row">
-                    <span>{invoice.id}</span>
-                    <span>{invoice.clientName || 'Client'}</span>
-                    <span>
-                      <span className={`status-pill status-pill--${invoice.status}`}>
-                        {statusLookup.get(invoice.status)}
-                      </span>
-                    </span>
-                    <span>{formatCurrency(invoice.total, invoice.currency)}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-            <section>
-              <h3>Support queue</h3>
-              <ul className="admin-support">
-                <li>
-                  <div>
-                    <strong>billing@lumina.ai</strong>
-                    <span>Asked for bank transfer confirmation</span>
-                  </div>
-                  <small>Updated 2h ago</small>
-                </li>
-                <li>
-                  <div>
-                    <strong>ops@northwind.co</strong>
-                    <span>Automation rules review scheduled</span>
-                  </div>
-                  <small>Due tomorrow</small>
-                </li>
-                <li>
-                  <div>
-                    <strong>finance@atlas.example</strong>
-                    <span>Monthly reconciliation export generated</span>
-                  </div>
-                  <small>Completed 6h ago</small>
-                </li>
-              </ul>
-            </section>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   function renderActiveSection() {
     switch (activeSection) {
       case 'dashboard':
@@ -1016,8 +909,6 @@ export default function WorkspacePage() {
         return renderActivity();
       case 'settings':
         return renderSettings();
-      case 'admin':
-        return renderAdmin();
       default:
         return null;
     }

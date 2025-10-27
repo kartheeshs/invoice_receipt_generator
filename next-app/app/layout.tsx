@@ -49,6 +49,9 @@ export default function RootLayout({
                 <Link href="/privacy-policy" prefetch={false}>
                   Privacy
                 </Link>
+                <Link href="/login" prefetch={false}>
+                  Sign in
+                </Link>
                 <Link href="/app" className="button button--primary" prefetch={false}>
                   Launch app
                 </Link>
