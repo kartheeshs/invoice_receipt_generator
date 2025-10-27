@@ -11,54 +11,35 @@ import {
   cleanLines,
   createEmptyDraft,
   createEmptyLine,
+  describeStatus,
   formatCurrency,
 } from '../../lib/invoices';
 import { firebaseConfigured, fetchRecentInvoices, saveInvoice } from '../../lib/firebase';
 import { sampleInvoices } from '../../lib/sample-data';
 
-const statusOptions: { value: InvoiceStatus; label: string; tone: 'neutral' | 'accent' | 'success' | 'warning' }[] = [
-  { value: 'draft', label: 'Draft', tone: 'neutral' },
-  { value: 'sent', label: 'Sent', tone: 'accent' },
-  { value: 'paid', label: 'Paid', tone: 'success' },
-  { value: 'overdue', label: 'Overdue', tone: 'warning' },
-];
+type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings' | 'admin';
 
-const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
+type Section = {
+  id: SectionId;
+  label: string;
+  description: string;
+  icon: string;
+};
 
-const navItems: { href: string; label: string; hint: string }[] = [
-  { href: '#dashboard', label: 'Dashboard', hint: 'Overview & health' },
-  { href: '#invoice-editor', label: 'Invoices', hint: 'Compose & send billing' },
-  { href: '#recent', label: 'Activity', hint: 'Track recent updates' },
-  { href: '#templates', label: 'Templates', hint: 'Switch visual styles' },
-  { href: '#clients', label: 'Clients', hint: 'Customer history' },
-  { href: '#settings', label: 'Settings', hint: 'Business profile' },
-];
-
-const templateGallery = [
-  {
-    id: 'wave-blue',
-    name: 'Wave Blue',
-    description: 'Rounded corners and a flowing accent for creative studios.',
-    accent: 'linear-gradient(135deg, rgba(37,99,235,0.9), rgba(129,140,248,0.9))',
-  },
-  {
-    id: 'minimal-slate',
-    name: 'Minimal Slate',
-    description: 'Crisp typography and generous whitespace for consultancies.',
-    accent: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(148,163,184,0.85))',
-  },
-  {
-    id: 'sunset',
-    name: 'Sunset Gradient',
-    description: 'Warm gradient headers ideal for boutique agencies.',
-    accent: 'linear-gradient(135deg, #f97316, #fb7185)',
-  },
-];
+type TemplateDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  accent: string;
+  accentSoft: string;
+  bestFor: string;
+  highlights: string[];
+};
 
 type ClientSummary = {
   key: string;
   name: string;
-  email: string;
+  email: string | undefined;
   invoices: number;
   outstanding: number;
   lastInvoice?: string;
@@ -66,11 +47,87 @@ type ClientSummary = {
   currency: string;
 };
 
-function formatFriendlyDate(value: string): string {
-  if (!value) return '';
+const sections: Section[] = [
+  { id: 'dashboard', label: 'Overview', description: 'Pulse of your billing workspace', icon: '📊' },
+  { id: 'invoices', label: 'Invoices', description: 'Compose and preview drafts', icon: '🧾' },
+  { id: 'templates', label: 'Templates', description: 'Switch the invoice look & feel', icon: '🎨' },
+  { id: 'clients', label: 'Clients', description: 'Track customer history', icon: '👥' },
+  { id: 'activity', label: 'Activity', description: 'Monitor timeline & reminders', icon: '🕒' },
+  { id: 'settings', label: 'Settings', description: 'Default business preferences', icon: '⚙️' },
+  { id: 'admin', label: 'Admin', description: 'Workspace health & access', icon: '🛡️' },
+];
+
+const statusOptions: { value: InvoiceStatus; label: string }[] = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'sent', label: 'Sent' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'overdue', label: 'Overdue' },
+];
+
+const templateCatalog: TemplateDefinition[] = [
+  {
+    id: 'wave-blue',
+    name: 'Wave Blue',
+    description: 'Gradient header, balance badge, and crisp table styling designed for agencies and studios.',
+    accent: 'linear-gradient(135deg, rgba(37,99,235,0.95), rgba(129,140,248,0.95))',
+    accentSoft: 'rgba(37, 99, 235, 0.12)',
+    bestFor: 'Creative teams who want a vibrant, polished statement.',
+    highlights: ['Hero balance badge', 'Bilingual labels ready', 'Clean table totals'],
+  },
+  {
+    id: 'minimal-slate',
+    name: 'Minimal Slate',
+    description: 'Monochrome layout with subtle dividers and a focus on clarity for consulting firms.',
+    accent: 'linear-gradient(135deg, rgba(15,23,42,0.95), rgba(100,116,139,0.85))',
+    accentSoft: 'rgba(15, 23, 42, 0.1)',
+    bestFor: 'Professional services requiring a conservative, finance-first aesthetic.',
+    highlights: ['Muted neutral palette', 'Signature-ready footer', 'Auto-aligned totals'],
+  },
+  {
+    id: 'emerald-ledger',
+    name: 'Emerald Ledger',
+    description: 'Fresh green accents with card-style totals and payment reminders built into the footer.',
+    accent: 'linear-gradient(135deg, rgba(16,185,129,0.95), rgba(22,163,74,0.9))',
+    accentSoft: 'rgba(16, 185, 129, 0.12)',
+    bestFor: 'Subscription or SaaS teams sending recurring invoices.',
+    highlights: ['Balance summary sidebar', 'Reminder callouts', 'Payment instructions block'],
+  },
+  {
+    id: 'seikyu',
+    name: 'Seikyūsho',
+    description: 'Bilingual Japanese / English headings, hanko placeholder, and tax summary grid.',
+    accent: 'linear-gradient(135deg, rgba(239,68,68,0.95), rgba(249,115,22,0.9))',
+    accentSoft: 'rgba(239, 68, 68, 0.12)',
+    bestFor: 'Teams invoicing Japanese clients with localised terminology.',
+    highlights: ['Hanko-ready footer', 'Tax summary rows', 'Dual-language columns'],
+  },
+];
+
+const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
+
+const adminVitals = [
+  { label: 'Active users', value: '128', delta: '+12.5%' },
+  { label: 'Pending approvals', value: '6', delta: '-2 vs last week' },
+  { label: 'PDF renders (24h)', value: '312', delta: '+48' },
+];
+
+const healthChecks = [
+  { name: 'Firestore connectivity', status: 'Operational', detail: 'Latency 82ms avg' },
+  { name: 'PDF rendering queue', status: 'Operational', detail: 'No backlog' },
+  { name: 'Email delivery', status: 'Degraded', detail: '1.2% soft bounce — monitoring' },
+];
+
+function formatFriendlyDate(value?: string): string {
+  if (!value) return '—';
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function ensureLine(line: InvoiceLine, field: keyof InvoiceLine, value: string): InvoiceLine {
@@ -87,28 +144,31 @@ function ensureLine(line: InvoiceLine, field: keyof InvoiceLine, value: string):
 }
 
 export default function WorkspacePage() {
+  const [activeSection, setActiveSection] = useState<SectionId>('dashboard');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(templateCatalog[0]?.id ?? 'wave-blue');
   const [draft, setDraft] = useState<InvoiceDraft>(() => createEmptyDraft());
   const [recentInvoices, setRecentInvoices] = useState<InvoiceRecord[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [alertMessage, setAlertMessage] = useState<string>('');
 
   useEffect(() => {
     let active = true;
 
-    async function load() {
+    async function loadInvoices() {
       try {
         if (firebaseConfigured) {
-          const invoices = await fetchRecentInvoices(8);
+          const invoices = await fetchRecentInvoices(12);
           if (!active) return;
           setRecentInvoices(invoices.length ? invoices : sampleInvoices);
         } else if (active) {
           setRecentInvoices(sampleInvoices);
         }
       } catch (error) {
-        if (!active) return;
         console.error(error);
-        setAlertMessage('Unable to reach Firestore. Showing sample invoices instead.');
+        if (!active) return;
+        setAlertMessage('Unable to reach Firestore. Displaying sample invoices.');
+        setSaveState('error');
         setRecentInvoices(sampleInvoices);
       } finally {
         if (active) {
@@ -117,16 +177,15 @@ export default function WorkspacePage() {
       }
     }
 
-    load();
+    loadInvoices();
 
     return () => {
       active = false;
     };
   }, []);
 
-  const statusLookup = useMemo(() => new Map(statusOptions.map((option) => [option.value, option])), []);
-
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
+  const statusLookup = useMemo(() => new Map(statusOptions.map((option) => [option.value, option.label])), []);
 
   const outstandingTotal = useMemo(
     () =>
@@ -136,26 +195,39 @@ export default function WorkspacePage() {
     [recentInvoices],
   );
 
+  const paidThisMonth = useMemo(() => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    return recentInvoices
+      .filter((invoice) => {
+        if (invoice.status !== 'paid') return false;
+        const issued = invoice.createdAt ? new Date(invoice.createdAt) : new Date(invoice.issueDate);
+        return issued.getMonth() === month && issued.getFullYear() === year;
+      })
+      .reduce((sum, invoice) => sum + invoice.total, 0);
+  }, [recentInvoices]);
+
   const clientSummaries = useMemo(() => {
     const summaries = new Map<string, ClientSummary>();
 
     for (const invoice of recentInvoices) {
       const key = invoice.clientEmail || invoice.clientName || invoice.id;
       const outstanding = invoice.status === 'paid' ? 0 : invoice.total;
-      const previous = summaries.get(key);
       const candidateDate = invoice.issueDate ? new Date(invoice.issueDate) : undefined;
+      const existing = summaries.get(key);
 
-      if (previous) {
-        const previousDate = previous.lastInvoice ? new Date(previous.lastInvoice) : undefined;
-        const useCandidate = candidateDate && (!previousDate || candidateDate > previousDate);
+      if (existing) {
+        const previousDate = existing.lastInvoice ? new Date(existing.lastInvoice) : undefined;
+        const shouldReplace = candidateDate && (!previousDate || candidateDate > previousDate);
 
         summaries.set(key, {
-          ...previous,
-          invoices: previous.invoices + 1,
-          outstanding: previous.outstanding + outstanding,
-          lastInvoice: useCandidate ? invoice.issueDate : previous.lastInvoice,
-          status: useCandidate ? invoice.status : previous.status,
-          currency: invoice.currency || previous.currency,
+          ...existing,
+          invoices: existing.invoices + 1,
+          outstanding: existing.outstanding + outstanding,
+          lastInvoice: shouldReplace ? invoice.issueDate : existing.lastInvoice,
+          status: shouldReplace ? invoice.status : existing.status,
+          currency: invoice.currency || existing.currency,
         });
       } else {
         summaries.set(key, {
@@ -172,6 +244,22 @@ export default function WorkspacePage() {
     }
 
     return Array.from(summaries.values()).sort((a, b) => b.outstanding - a.outstanding);
+  }, [recentInvoices]);
+
+  const activityFeed = useMemo(() => {
+    return recentInvoices
+      .map((invoice) => ({
+        id: invoice.id,
+        title: `${invoice.clientName || 'Client'} — ${describeStatus(invoice.status)}`,
+        amount: formatCurrency(invoice.total, invoice.currency),
+        timestamp: invoice.createdAt || invoice.issueDate,
+        status: invoice.status,
+      }))
+      .sort((a, b) => {
+        const dateA = new Date(a.timestamp ?? '').getTime();
+        const dateB = new Date(b.timestamp ?? '').getTime();
+        return dateB - dateA;
+      });
   }, [recentInvoices]);
 
   function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
@@ -235,7 +323,7 @@ export default function WorkspacePage() {
           createdAt: new Date().toISOString(),
         };
 
-        setRecentInvoices((prev) => [offlineRecord, ...prev].slice(0, 8));
+        setRecentInvoices((prev) => [offlineRecord, ...prev].slice(0, 12));
         setAlertMessage('Firebase is not configured. Stored invoice locally for this session.');
         setSaveState('success');
         setLoadingInvoices(false);
@@ -245,7 +333,7 @@ export default function WorkspacePage() {
       const saved = await saveInvoice({ draft: preparedDraft });
       setRecentInvoices((prev) => {
         const filtered = prev.filter((invoice) => invoice.id !== saved.id);
-        return [saved, ...filtered].slice(0, 8);
+        return [saved, ...filtered].slice(0, 12);
       });
       setAlertMessage('Invoice saved to Firestore.');
       setSaveState('success');
@@ -265,478 +353,775 @@ export default function WorkspacePage() {
     window.print();
   }
 
-  return (
-    <div className="workspace">
-      <section className="workspace__intro" id="dashboard">
-        <div className="container workspace__intro-grid">
-          <div>
-            <span className="badge">Web workspace</span>
-            <h1>Craft invoices, send them, and track the follow-up.</h1>
-            <p>
-              Build professional invoices directly in the browser. Every edit updates the preview instantly and can be saved to
-              Firebase for your team.
-            </p>
-            <div className="workspace__cta">
-              <button type="button" className="button button--primary" onClick={() => handleSave()} disabled={saveState === 'saving'}>
-                {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
-              </button>
-              <button type="button" className="button button--ghost" onClick={handleDownload}>
-                Download PDF preview
-              </button>
-            </div>
-            {!firebaseConfigured && (
-              <p className="workspace__notice">
-                Connect Firebase credentials to persist data. Until then, changes stay local and sample invoices appear below.
-              </p>
-            )}
-            {alertMessage && (
-              <div className={`workspace__alert workspace__alert--${saveState}`} role="status">
-                {alertMessage}
-              </div>
-            )}
-          </div>
+  function renderDashboard() {
+    return (
+      <div className="workspace-section">
+        <div className="workspace-metrics">
+          <article className="metric-card">
+            <header>
+              <span className="metric-label">Outstanding balance</span>
+              <span className="metric-icon">💳</span>
+            </header>
+            <strong className="metric-value">{formatCurrency(outstandingTotal, draft.currency)}</strong>
+            <p>{recentInvoices.length ? `${recentInvoices.length} invoices tracked` : 'No invoices yet'}</p>
+          </article>
+          <article className="metric-card">
+            <header>
+              <span className="metric-label">Paid this month</span>
+              <span className="metric-icon">✅</span>
+            </header>
+            <strong className="metric-value">{formatCurrency(paidThisMonth, draft.currency)}</strong>
+            <p>Auto-reconciled with client receipts</p>
+          </article>
+          <article className="metric-card">
+            <header>
+              <span className="metric-label">Average payment time</span>
+              <span className="metric-icon">⏱️</span>
+            </header>
+            <strong className="metric-value">9.4 days</strong>
+            <p>Down 2.1 days vs last month</p>
+          </article>
+          <article className="metric-card">
+            <header>
+              <span className="metric-label">Templates in use</span>
+              <span className="metric-icon">🖌️</span>
+            </header>
+            <strong className="metric-value">{templateCatalog.length}</strong>
+            <p>Switch templates from the gallery</p>
+          </article>
         </div>
-      </section>
 
-      <div className="workspace__layout">
-        <div className="container workspace__layout-inner">
-          <aside className="workspace__sidebar" aria-label="Workspace navigation">
-            <div className="workspace__sidebar-header">
-              <h2>Workspace menu</h2>
-              <p>Jump between dashboards, invoice tools, and client records in one hub.</p>
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Recent invoices</h2>
+              <p>Monitor drafts, sent documents, and payments at a glance.</p>
             </div>
-            <nav className="workspace__nav">
-              {navItems.map((item) => (
-                <Link key={item.href} href={item.href} className={`workspace__nav-item${item.href === '#dashboard' ? ' workspace__nav-item--active' : ''}`} prefetch={false}>
-                  <span>{item.label}</span>
-                  <small>{item.hint}</small>
-                </Link>
+            <button type="button" className="button button--ghost" onClick={() => setActiveSection('invoices')}>
+              Create invoice
+            </button>
+          </header>
+          {loadingInvoices ? (
+            <div className="empty-state">Loading invoices…</div>
+          ) : recentInvoices.length ? (
+            <div className="table">
+              <div className="table__row table__row--head">
+                <span>Client</span>
+                <span>Status</span>
+                <span>Issued</span>
+                <span>Due</span>
+                <span>Total</span>
+              </div>
+              {recentInvoices.map((invoice) => (
+                <div key={invoice.id} className="table__row">
+                  <span>
+                    <strong>{invoice.clientName || 'Client'}</strong>
+                    <small>{invoice.clientEmail || '—'}</small>
+                  </span>
+                  <span>
+                    <span className={`status-pill status-pill--${invoice.status}`}>{statusLookup.get(invoice.status)}</span>
+                  </span>
+                  <span>{formatFriendlyDate(invoice.issueDate)}</span>
+                  <span>{formatFriendlyDate(invoice.dueDate)}</span>
+                  <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+                </div>
               ))}
-            </nav>
-            <div className="workspace__summary-card">
-              <strong>Billing health</strong>
+            </div>
+          ) : (
+            <div className="empty-state">Save your first invoice to populate the dashboard.</div>
+          )}
+        </div>
+
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Template spotlight</h2>
+              <p>Highlighting the most popular template with clients this week.</p>
+            </div>
+            <button type="button" className="button button--ghost" onClick={() => setActiveSection('templates')}>
+              Browse gallery
+            </button>
+          </header>
+          <div className="template-spotlight">
+            <div className="template-spotlight__preview" style={{ background: templateCatalog[0].accent }}>
+              <span>{templateCatalog[0].name}</span>
+            </div>
+            <div className="template-spotlight__body">
+              <strong>{templateCatalog[0].name}</strong>
+              <p>{templateCatalog[0].description}</p>
               <ul>
-                <li>
-                  <span>Total outstanding</span>
-                  <strong>{formatCurrency(outstandingTotal, draft.currency)}</strong>
-                </li>
-                <li>
-                  <span>Saved invoices</span>
-                  <strong>{recentInvoices.length}</strong>
-                </li>
-                <li>
-                  <span>Reminder emails</span>
-                  <strong>Enabled</strong>
-                </li>
+                {templateCatalog[0].highlights.map((highlight) => (
+                  <li key={highlight}>{highlight}</li>
+                ))}
               </ul>
             </div>
-            <div className="workspace__sidebar-footer">
-              <p>
-                Need a hand? Visit the <Link href="/privacy-policy" prefetch={false}>help center</Link> or chat with finance.
-              </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderInvoiceEditor() {
+    return (
+      <div className="workspace-section workspace-section--two-column">
+        <section className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Invoice details</h2>
+              <p>Fill out the draft form and keep an eye on the preview.</p>
             </div>
-          </aside>
+            <span className="status-pill status-pill--outline">{statusLookup.get(draft.status)}</span>
+          </header>
+          <form className="form-grid" onSubmit={handleSave}>
+            <div className="form-grid__group">
+              <label htmlFor="businessName">Business name</label>
+              <input
+                id="businessName"
+                type="text"
+                value={draft.businessName}
+                placeholder="Atlas Studio"
+                onChange={(event) => updateDraftField('businessName', event.target.value)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="businessAddress">Business address</label>
+              <input
+                id="businessAddress"
+                type="text"
+                value={draft.businessAddress}
+                placeholder="88 Harbor Lane, Portland, OR"
+                onChange={(event) => updateDraftField('businessAddress', event.target.value)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="clientName">Client name</label>
+              <input
+                id="clientName"
+                type="text"
+                value={draft.clientName}
+                placeholder="Northwind Co."
+                onChange={(event) => updateDraftField('clientName', event.target.value)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="clientEmail">Client email</label>
+              <input
+                id="clientEmail"
+                type="email"
+                value={draft.clientEmail}
+                placeholder="billing@client.com"
+                onChange={(event) => updateDraftField('clientEmail', event.target.value)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="issueDate">Issue date</label>
+              <input
+                id="issueDate"
+                type="date"
+                value={draft.issueDate}
+                onChange={(event) => updateDraftField('issueDate', event.target.value)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="dueDate">Due date</label>
+              <input
+                id="dueDate"
+                type="date"
+                value={draft.dueDate}
+                onChange={(event) => updateDraftField('dueDate', event.target.value)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="currency">Currency</label>
+              <select
+                id="currency"
+                value={draft.currency}
+                onChange={(event) => updateDraftField('currency', event.target.value)}
+              >
+                {currencyOptions.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="taxRate">Tax rate (%)</label>
+              <input
+                id="taxRate"
+                type="number"
+                min={0}
+                step={0.1}
+                value={(draft.taxRate * 100).toFixed(1)}
+                onChange={(event) => updateDraftField('taxRate', Number(event.target.value) / 100)}
+              />
+            </div>
+            <div className="form-grid__group">
+              <label htmlFor="status">Status</label>
+              <select
+                id="status"
+                value={draft.status}
+                onChange={(event) => updateDraftField('status', event.target.value as InvoiceStatus)}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-grid__group form-grid__group--full">
+              <label htmlFor="notes">Notes</label>
+              <textarea
+                id="notes"
+                rows={3}
+                value={draft.notes}
+                placeholder="Add payment instructions or a thank-you note."
+                onChange={(event) => updateDraftField('notes', event.target.value)}
+              />
+            </div>
 
-          <div className="workspace__content">
-            <div className="workspace__grid" id="invoice-editor">
-              <section className="editor-card">
-                <header className="editor-card__header">
-                  <div>
-                    <h2>Create an invoice</h2>
-                    <p>Fill in the details, add line items, and track totals without leaving the browser.</p>
-                  </div>
-                  <div className="editor-card__status">
-                    <label htmlFor="status">Status</label>
-                    <select id="status" value={draft.status} onChange={(event) => updateDraftField('status', event.target.value as InvoiceStatus)}>
-                      {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </header>
-
-                <form className="editor-card__form" onSubmit={handleSave}>
-                  <div className="editor-card__grid">
-                    <div>
-                      <label htmlFor="businessName">Your business</label>
-                      <input
-                        id="businessName"
-                        type="text"
-                        value={draft.businessName}
-                        placeholder="Atlas Studio"
-                        onChange={(event) => updateDraftField('businessName', event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="businessAddress">Business address</label>
-                      <input
-                        id="businessAddress"
-                        type="text"
-                        value={draft.businessAddress}
-                        placeholder="88 Harbor Lane, Portland, OR"
-                        onChange={(event) => updateDraftField('businessAddress', event.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="editor-card__grid">
-                    <div>
-                      <label htmlFor="clientName">Client name</label>
-                      <input
-                        id="clientName"
-                        type="text"
-                        value={draft.clientName}
-                        placeholder="Northwind Co."
-                        onChange={(event) => updateDraftField('clientName', event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="clientEmail">Client email</label>
-                      <input
-                        id="clientEmail"
-                        type="email"
-                        value={draft.clientEmail}
-                        placeholder="billing@client.com"
-                        onChange={(event) => updateDraftField('clientEmail', event.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="editor-card__grid editor-card__grid--compact">
-                    <div>
-                      <label htmlFor="issueDate">Issue date</label>
-                      <input id="issueDate" type="date" value={draft.issueDate} onChange={(event) => updateDraftField('issueDate', event.target.value)} />
-                    </div>
-                    <div>
-                      <label htmlFor="dueDate">Due date</label>
-                      <input id="dueDate" type="date" value={draft.dueDate} onChange={(event) => updateDraftField('dueDate', event.target.value)} />
-                    </div>
-                    <div>
-                      <label htmlFor="currency">Currency</label>
-                      <select id="currency" value={draft.currency} onChange={(event) => updateDraftField('currency', event.target.value)}>
-                        {currencyOptions.map((currency) => (
-                          <option key={currency} value={currency}>
-                            {currency}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="taxRate">Tax rate (%)</label>
-                      <input
-                        id="taxRate"
-                        type="number"
-                        min={0}
-                        step={0.1}
-                        value={(draft.taxRate * 100).toFixed(1)}
-                        onChange={(event) => updateDraftField('taxRate', Number(event.target.value) / 100)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="line-items">
-                    <div className="line-items__header">
-                      <h3>Line items</h3>
-                      <button type="button" onClick={addLine} className="button button--ghost">
-                        Add line
-                      </button>
-                    </div>
-                    <div className="line-items__table">
-                      <div className="line-items__row line-items__row--head">
-                        <span>Description</span>
-                        <span>Qty</span>
-                        <span>Rate</span>
-                        <span>Total</span>
-                        <span />
-                      </div>
-                      {draft.lines.map((line) => (
-                        <div key={line.id} className="line-items__row">
-                          <input
-                            type="text"
-                            value={line.description}
-                            placeholder="Design sprint"
-                            onChange={(event) => updateLine(line.id, 'description', event.target.value)}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            step={1}
-                            value={line.quantity}
-                            onChange={(event) => updateLine(line.id, 'quantity', event.target.value)}
-                          />
-                          <input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            value={line.rate}
-                            onChange={(event) => updateLine(line.id, 'rate', event.target.value)}
-                          />
-                          <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
-                          <button type="button" onClick={() => removeLine(line.id)} aria-label="Remove line item">
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="notes">Notes</label>
-                    <textarea
-                      id="notes"
-                      rows={3}
-                      value={draft.notes}
-                      placeholder="Add payment instructions or thank-you notes."
-                      onChange={(event) => updateDraftField('notes', event.target.value)}
+            <div className="line-items">
+              <div className="line-items__header">
+                <h3>Line items</h3>
+                <button type="button" className="button button--ghost" onClick={addLine}>
+                  Add line
+                </button>
+              </div>
+              <div className="line-items__table">
+                <div className="line-items__row line-items__row--head">
+                  <span>Description</span>
+                  <span>Qty</span>
+                  <span>Rate</span>
+                  <span>Total</span>
+                  <span />
+                </div>
+                {draft.lines.map((line) => (
+                  <div key={line.id} className="line-items__row">
+                    <input
+                      type="text"
+                      value={line.description}
+                      placeholder="Design sprint"
+                      onChange={(event) => updateLine(line.id, 'description', event.target.value)}
                     />
-                  </div>
-
-                  <footer className="editor-card__footer">
-                    <div>
-                      <strong>Subtotal:</strong>
-                      <span>{formatCurrency(totals.subtotal, draft.currency)}</span>
-                    </div>
-                    <div>
-                      <strong>Tax:</strong>
-                      <span>{formatCurrency(totals.taxAmount, draft.currency)}</span>
-                    </div>
-                    <div>
-                      <strong>Total:</strong>
-                      <span>{formatCurrency(totals.total, draft.currency)}</span>
-                    </div>
-                    <button type="submit" className="button button--primary" disabled={saveState === 'saving'}>
-                      {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={line.quantity}
+                      onChange={(event) => updateLine(line.id, 'quantity', event.target.value)}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={line.rate}
+                      onChange={(event) => updateLine(line.id, 'rate', event.target.value)}
+                    />
+                    <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
+                    <button type="button" onClick={() => removeLine(line.id)} aria-label="Remove line item">
+                      ×
                     </button>
-                  </footer>
-                </form>
-              </section>
-
-              <aside className="preview-card" id="invoice-preview">
-                <div className="preview-card__header">
-                  <span className={`status-pill status-pill--${draft.status}`}>{statusLookup.get(draft.status)?.label}</span>
-                  <div>
-                    <strong>{draft.businessName || 'Your business'}</strong>
-                    <span>{draft.businessAddress}</span>
                   </div>
-                </div>
-                <div className="preview-card__meta">
-                  <div>
-                    <span>Bill to</span>
-                    <strong>{draft.clientName || 'Client name'}</strong>
-                    <span>{draft.clientEmail}</span>
-                  </div>
-                  <div>
-                    <span>Issued</span>
-                    <strong>{formatFriendlyDate(draft.issueDate)}</strong>
-                    <span>Due {formatFriendlyDate(draft.dueDate)}</span>
-                  </div>
-                </div>
-                <div className="preview-card__table">
-                  <div className="preview-card__table-head">
-                    <span>Description</span>
-                    <span>Qty</span>
-                    <span>Rate</span>
-                    <span>Total</span>
-                  </div>
-                  <div className="preview-card__table-body">
-                    {draft.lines.map((line) => (
-                      <div key={line.id} className="preview-card__row">
-                        <span>{line.description || 'Line item'}</span>
-                        <span>{line.quantity}</span>
-                        <span>{formatCurrency(line.rate, draft.currency)}</span>
-                        <span>{formatCurrency(line.rate * line.quantity, draft.currency)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="preview-card__totals">
-                  <div>
-                    <span>Subtotal</span>
-                    <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
-                  </div>
-                  <div>
-                    <span>Tax</span>
-                    <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
-                  </div>
-                  <div>
-                    <span>Total due</span>
-                    <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-                  </div>
-                </div>
-                {draft.notes && <p className="preview-card__notes">{draft.notes}</p>}
-                <div className="preview-card__actions">
-                  <button type="button" className="button button--ghost" onClick={handleDownload}>
-                    Download preview
-                  </button>
-                  <Link href="#recent" className="button button--primary">
-                    View recent invoices
-                  </Link>
-                </div>
-              </aside>
+                ))}
+              </div>
             </div>
 
-            <section className="workspace__recent" id="recent">
-              <header className="workspace__recent-header">
-                <div>
-                  <h2>Recent invoices</h2>
-                  <p>Monitor status changes, due dates, and totals at a glance.</p>
-                </div>
-                <Link href="/" className="button button--ghost" prefetch={false}>
-                  Back to marketing site
-                </Link>
-              </header>
+            <footer className="form-grid__footer">
+              <div>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
+              </div>
+              <div>
+                <span>Tax</span>
+                <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
+              </div>
+              <div>
+                <span>Total</span>
+                <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+              </div>
+              <div className="form-grid__actions">
+                <button type="submit" className="button button--primary" disabled={saveState === 'saving'}>
+                  {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
+                </button>
+                <button type="button" className="button button--ghost" onClick={handleDownload}>
+                  Download preview
+                </button>
+              </div>
+            </footer>
+          </form>
+        </section>
 
-              {loadingInvoices ? (
-                <div className="recent-grid recent-grid--loading">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div key={index} className="recent-card recent-card--placeholder" />
-                  ))}
+        <aside className="panel preview-panel">
+          <header className="panel__header">
+            <div>
+              <h2>Live preview</h2>
+              <p>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Invoice preview'}</p>
+            </div>
+            <button type="button" className="button button--ghost" onClick={() => setActiveSection('templates')}>
+              Change template
+            </button>
+          </header>
+          <div className="preview">
+            <div className="preview__header" style={{ background: templateCatalog.find((template) => template.id === selectedTemplate)?.accentSoft }}>
+              <div>
+                <strong>{draft.businessName || 'Your business name'}</strong>
+                <span>{draft.businessAddress || 'Add your business address'}</span>
+              </div>
+              <div className="preview__badge">
+                <span>{statusLookup.get(draft.status)}</span>
+                <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+              </div>
+            </div>
+            <div className="preview__meta">
+              <div>
+                <span>Bill to</span>
+                <strong>{draft.clientName || 'Client name'}</strong>
+                <span>{draft.clientEmail || 'client@email.com'}</span>
+              </div>
+              <div>
+                <span>Issued</span>
+                <strong>{formatFriendlyDate(draft.issueDate)}</strong>
+              </div>
+              <div>
+                <span>Due</span>
+                <strong>{formatFriendlyDate(draft.dueDate)}</strong>
+              </div>
+            </div>
+            <div className="preview__table">
+              <div className="preview__table-row preview__table-row--head">
+                <span>Description</span>
+                <span>Qty</span>
+                <span>Rate</span>
+                <span>Total</span>
+              </div>
+              {draft.lines.map((line) => (
+                <div key={line.id} className="preview__table-row">
+                  <span>{line.description || 'Line description'}</span>
+                  <span>{line.quantity}</span>
+                  <span>{formatCurrency(line.rate, draft.currency)}</span>
+                  <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
                 </div>
-              ) : (
-                <div className="recent-grid">
-                  {recentInvoices.map((invoice) => (
-                    <article key={invoice.id} className="recent-card">
-                      <div className="recent-card__row">
-                        <div>
-                          <h3>{invoice.clientName}</h3>
-                          <span>{invoice.clientEmail}</span>
-                        </div>
-                        <span className={`status-pill status-pill--${invoice.status}`}>
-                          {statusLookup.get(invoice.status)?.label}
-                        </span>
-                      </div>
-                      <div className="recent-card__row recent-card__row--meta">
-                        <div>
-                          <span>Issued</span>
-                          <strong>{formatFriendlyDate(invoice.issueDate)}</strong>
-                        </div>
-                        <div>
-                          <span>Due</span>
-                          <strong>{formatFriendlyDate(invoice.dueDate)}</strong>
-                        </div>
-                        <div>
-                          <span>Total</span>
-                          <strong>{formatCurrency(invoice.total, invoice.currency)}</strong>
-                        </div>
-                      </div>
-                      {invoice.notes && <p className="recent-card__notes">{invoice.notes}</p>}
-                    </article>
-                  ))}
-                </div>
-              )}
+              ))}
+            </div>
+            <div className="preview__totals">
+              <div>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
+              </div>
+              <div>
+                <span>Tax</span>
+                <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
+              </div>
+              <div>
+                <span>Total</span>
+                <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+              </div>
+            </div>
+            <div className="preview__notes">
+              <strong>Notes</strong>
+              <p>{draft.notes || 'Add payment instructions or a thank you message.'}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
+  function renderTemplateGallery() {
+    return (
+      <div className="workspace-section">
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Template gallery</h2>
+              <p>Select a template to update the preview instantly.</p>
+            </div>
+            <span className="badge">{templateCatalog.length} options</span>
+          </header>
+          <div className="template-grid">
+            {templateCatalog.map((template) => {
+              const isActive = template.id === selectedTemplate;
+              return (
+                <button
+                  type="button"
+                  key={template.id}
+                  onClick={() => setSelectedTemplate(template.id)}
+                  className={`template-card${isActive ? ' template-card--active' : ''}`}
+                >
+                  <div className="template-card__preview" style={{ background: template.accent }}>
+                    <span>{template.name}</span>
+                  </div>
+                  <div className="template-card__body">
+                    <strong>{template.name}</strong>
+                    <p>{template.description}</p>
+                    <ul>
+                      {template.highlights.map((highlight) => (
+                        <li key={highlight}>{highlight}</li>
+                      ))}
+                    </ul>
+                    <small>{template.bestFor}</small>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderClients() {
+    return (
+      <div className="workspace-section">
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Client insights</h2>
+              <p>Outstanding balances and recent invoice activity per client.</p>
+            </div>
+            <button type="button" className="button button--ghost">
+              Add client
+            </button>
+          </header>
+          {clientSummaries.length ? (
+            <div className="cards-grid">
+              {clientSummaries.map((client) => (
+                <article key={client.key} className="client-card">
+                  <header>
+                    <div>
+                      <strong>{client.name}</strong>
+                      {client.email && <span>{client.email}</span>}
+                    </div>
+                    <span className={`status-pill status-pill--${client.status}`}>
+                      {statusLookup.get(client.status)}
+                    </span>
+                  </header>
+                  <dl>
+                    <div>
+                      <dt>Outstanding</dt>
+                      <dd>{formatCurrency(client.outstanding, client.currency || draft.currency)}</dd>
+                    </div>
+                    <div>
+                      <dt>Invoices</dt>
+                      <dd>{client.invoices}</dd>
+                    </div>
+                    <div>
+                      <dt>Last invoice</dt>
+                      <dd>{formatFriendlyDate(client.lastInvoice)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">Save an invoice to build the client directory.</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderActivity() {
+    return (
+      <div className="workspace-section">
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Activity timeline</h2>
+              <p>Review invoice saves, reminders, and payments from newest to oldest.</p>
+            </div>
+            <button type="button" className="button button--ghost" onClick={() => setActiveSection('admin')}>
+              View admin log
+            </button>
+          </header>
+          {activityFeed.length ? (
+            <ul className="timeline">
+              {activityFeed.map((item) => (
+                <li key={item.id}>
+                  <div className="timeline__marker" />
+                  <div className="timeline__body">
+                    <div className="timeline__title">
+                      <strong>{item.title}</strong>
+                      <span className={`status-pill status-pill--${item.status}`}>{statusLookup.get(item.status)}</span>
+                    </div>
+                    <p>{item.amount}</p>
+                    <small>{formatFriendlyDate(item.timestamp)}</small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty-state">Activity will appear once invoices are saved.</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderSettings() {
+    return (
+      <div className="workspace-section">
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Workspace settings</h2>
+              <p>Default information used across every new invoice.</p>
+            </div>
+          </header>
+          <dl className="settings-grid">
+            <div>
+              <dt>Business name</dt>
+              <dd>{draft.businessName || 'Atlas Studio'}</dd>
+            </div>
+            <div>
+              <dt>Business address</dt>
+              <dd>{draft.businessAddress || '88 Harbor Lane, Portland, OR'}</dd>
+            </div>
+            <div>
+              <dt>Default currency</dt>
+              <dd>{draft.currency}</dd>
+            </div>
+            <div>
+              <dt>Tax rate</dt>
+              <dd>{(draft.taxRate * 100).toFixed(1)}%</dd>
+            </div>
+            <div>
+              <dt>Reminder emails</dt>
+              <dd>Enabled — 3 days before due date</dd>
+            </div>
+            <div>
+              <dt>Template</dt>
+              <dd>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Wave Blue'}</dd>
+            </div>
+          </dl>
+          <div className="settings-actions">
+            <button type="button" className="button button--primary">
+              Update profile
+            </button>
+            <button type="button" className="button button--ghost">
+              Manage automations
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderAdmin() {
+    return (
+      <div className="workspace-section">
+        <div className="panel">
+          <header className="panel__header">
+            <div>
+              <h2>Admin dashboard</h2>
+              <p>Monitor workspace health, audit activity, and review support status.</p>
+            </div>
+            <Link className="button button--ghost" href="/admin" prefetch={false}>
+              Admin landing
+            </Link>
+          </header>
+          <div className="workspace-metrics">
+            {adminVitals.map((metric) => (
+              <article key={metric.label} className="metric-card metric-card--compact">
+                <strong className="metric-value">{metric.value}</strong>
+                <span className="metric-label">{metric.label}</span>
+                <small>{metric.delta}</small>
+              </article>
+            ))}
+          </div>
+          <div className="admin-grid">
+            <section>
+              <h3>System health</h3>
+              <ul className="admin-health">
+                {healthChecks.map((check) => (
+                  <li key={check.name}>
+                    <div>
+                      <strong>{check.name}</strong>
+                      <span>{check.detail}</span>
+                    </div>
+                    <span className={`status-pill status-pill--${check.status === 'Operational' ? 'success' : 'warning'}`}>
+                      {check.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </section>
-
-            <section className="workspace__templates" id="templates">
-              <header className="workspace__section-header">
-                <div>
-                  <h2>Template gallery</h2>
-                  <p>Choose a visual language before sending the next invoice.</p>
+            <section>
+              <h3>Latest activity</h3>
+              <div className="table table--dense">
+                <div className="table__row table__row--head">
+                  <span>Invoice</span>
+                  <span>Client</span>
+                  <span>Status</span>
+                  <span>Total</span>
                 </div>
-                <button type="button" className="button button--ghost">Browse all</button>
-              </header>
-              <div className="template-grid">
-                {templateGallery.map((template) => (
-                  <article key={template.id} className="template-card">
-                    <div className="template-card__preview" style={{ background: template.accent }}>
-                      <span>{template.name}</span>
-                    </div>
-                    <div className="template-card__body">
-                      <strong>{template.name}</strong>
-                      <p>{template.description}</p>
-                      <button type="button" className="button button--primary">Use template</button>
-                    </div>
-                  </article>
+                {(recentInvoices.slice(0, 6)).map((invoice) => (
+                  <div key={invoice.id} className="table__row">
+                    <span>{invoice.id}</span>
+                    <span>{invoice.clientName || 'Client'}</span>
+                    <span>
+                      <span className={`status-pill status-pill--${invoice.status}`}>
+                        {statusLookup.get(invoice.status)}
+                      </span>
+                    </span>
+                    <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+                  </div>
                 ))}
               </div>
             </section>
-
-            <section className="workspace__clients" id="clients">
-              <header className="workspace__section-header">
-                <div>
-                  <h2>Clients</h2>
-                  <p>Track outstanding balances and follow-up dates for key accounts.</p>
-                </div>
-                <button type="button" className="button button--ghost">Add client</button>
-              </header>
-              {clientSummaries.length ? (
-                <div className="clients-grid">
-                  {clientSummaries.map((client) => (
-                    <article key={client.key} className="client-card">
-                      <div className="client-card__header">
-                        <div>
-                          <h3>{client.name}</h3>
-                          {client.email && <span>{client.email}</span>}
-                        </div>
-                        <span className={`status-pill status-pill--${client.status}`}>
-                          {statusLookup.get(client.status)?.label}
-                        </span>
-                      </div>
-                      <div className="client-card__meta">
-                        <div>
-                          <span>Outstanding</span>
-                          <strong>{formatCurrency(client.outstanding, client.currency || draft.currency)}</strong>
-                        </div>
-                        <div>
-                          <span>Invoices</span>
-                          <strong>{client.invoices}</strong>
-                        </div>
-                        <div>
-                          <span>Last invoice</span>
-                          <strong>{formatFriendlyDate(client.lastInvoice ?? '')}</strong>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="workspace__empty">Save an invoice to start building your client directory.</div>
-              )}
-            </section>
-
-            <section className="workspace__settings" id="settings">
-              <header className="workspace__section-header">
-                <div>
-                  <h2>Workspace settings</h2>
-                  <p>Update your default business profile, taxes, and automation rules.</p>
-                </div>
-              </header>
-              <div className="settings-card">
-                <dl className="settings-card__grid">
+            <section>
+              <h3>Support queue</h3>
+              <ul className="admin-support">
+                <li>
                   <div>
-                    <dt>Business name</dt>
-                    <dd>{draft.businessName || 'Atlas Studio'}</dd>
+                    <strong>billing@lumina.ai</strong>
+                    <span>Asked for bank transfer confirmation</span>
                   </div>
+                  <small>Updated 2h ago</small>
+                </li>
+                <li>
                   <div>
-                    <dt>Business address</dt>
-                    <dd>{draft.businessAddress || '88 Harbor Lane, Portland, OR'}</dd>
+                    <strong>ops@northwind.co</strong>
+                    <span>Automation rules review scheduled</span>
                   </div>
+                  <small>Due tomorrow</small>
+                </li>
+                <li>
                   <div>
-                    <dt>Default currency</dt>
-                    <dd>{draft.currency}</dd>
+                    <strong>finance@atlas.example</strong>
+                    <span>Monthly reconciliation export generated</span>
                   </div>
-                  <div>
-                    <dt>Tax rate</dt>
-                    <dd>{(draft.taxRate * 100).toFixed(1)}%</dd>
-                  </div>
-                  <div>
-                    <dt>Reminder emails</dt>
-                    <dd>Enabled — send 3 days before due date</dd>
-                  </div>
-                  <div>
-                    <dt>PDF language</dt>
-                    <dd>English + Japanese</dd>
-                  </div>
-                </dl>
-                <div className="settings-card__actions">
-                  <button type="button" className="button button--primary">Update profile</button>
-                  <button type="button" className="button button--ghost">Manage automations</button>
-                </div>
-              </div>
+                  <small>Completed 6h ago</small>
+                </li>
+              </ul>
             </section>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  function renderActiveSection() {
+    switch (activeSection) {
+      case 'dashboard':
+        return renderDashboard();
+      case 'invoices':
+        return renderInvoiceEditor();
+      case 'templates':
+        return renderTemplateGallery();
+      case 'clients':
+        return renderClients();
+      case 'activity':
+        return renderActivity();
+      case 'settings':
+        return renderSettings();
+      case 'admin':
+        return renderAdmin();
+      default:
+        return null;
+    }
+  }
+
+  const activeMeta = sections.find((section) => section.id === activeSection);
+
+  return (
+    <div className="workspace-shell">
+      <aside className="workspace-shell__sidebar">
+        <div className="workspace-shell__brand">
+          <span className="workspace-shell__logo">IA</span>
+          <div>
+            <strong>Invoice Atlas</strong>
+            <span>Browser workspace</span>
+          </div>
+        </div>
+        <nav className="workspace-shell__nav">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`workspace-shell__nav-item${activeSection === section.id ? ' workspace-shell__nav-item--active' : ''}`}
+              onClick={() => setActiveSection(section.id)}
+            >
+              <span className="workspace-shell__nav-icon" aria-hidden>{section.icon}</span>
+              <div>
+                <strong>{section.label}</strong>
+                <span>{section.description}</span>
+              </div>
+            </button>
+          ))}
+        </nav>
+        <div className="workspace-shell__summary">
+          <strong>Workspace summary</strong>
+          <ul>
+            <li>
+              <span>Outstanding</span>
+              <strong>{formatCurrency(outstandingTotal, draft.currency)}</strong>
+            </li>
+            <li>
+              <span>Invoices tracked</span>
+              <strong>{recentInvoices.length}</strong>
+            </li>
+            <li>
+              <span>Selected template</span>
+              <strong>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Wave Blue'}</strong>
+            </li>
+          </ul>
+          {!firebaseConfigured && (
+            <p className="workspace-shell__offline">Connect Firebase credentials to persist data for your workspace.</p>
+          )}
+        </div>
+        <div className="workspace-shell__footer">
+          <p>
+            Need help? Visit the{' '}
+            <Link href="/privacy-policy" prefetch={false}>
+              help center
+            </Link>{' '}
+            or email support.
+          </p>
+        </div>
+      </aside>
+
+      <div className="workspace-shell__main">
+        <header className="workspace-shell__header">
+          <div>
+            <span>{activeMeta?.icon}</span>
+            <div>
+              <h1>{activeMeta?.label}</h1>
+              <p>{activeMeta?.description}</p>
+            </div>
+          </div>
+          {activeSection !== 'invoices' ? (
+            <div className="workspace-shell__actions">
+              <button type="button" className="button button--ghost" onClick={() => setActiveSection('invoices')}>
+                Create invoice
+              </button>
+              <button type="button" className="button button--primary" onClick={() => setActiveSection('dashboard')}>
+                View dashboard
+              </button>
+            </div>
+          ) : (
+            <div className="workspace-shell__actions">
+              <button type="button" className="button button--ghost" onClick={handleDownload}>
+                Download preview
+              </button>
+              <button type="button" className="button button--primary" onClick={() => handleSave()} disabled={saveState === 'saving'}>
+                {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
+              </button>
+            </div>
+          )}
+        </header>
+
+        {alertMessage && (
+          <div
+            className={`workspace-shell__alert${saveState !== 'idle' ? ` workspace-shell__alert--${saveState}` : ''}`}
+            role="status"
+          >
+            {alertMessage}
+          </div>
+        )}
+
+        {renderActiveSection()}
       </div>
     </div>
   );
