@@ -11,11 +11,13 @@ import {
   cleanLines,
   createEmptyDraft,
   createEmptyLine,
-  describeStatus,
   formatCurrency,
 } from '../../lib/invoices';
 import { firebaseConfigured, fetchRecentInvoices, saveInvoice } from '../../lib/firebase';
 import { sampleInvoices } from '../../lib/sample-data';
+import { useTranslation } from '../../lib/i18n';
+import { generateInvoicePdf } from '../../lib/pdf';
+import LanguageSwitcher from '../components/language-switcher';
 
 type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings';
 
@@ -113,13 +115,13 @@ const templateCatalog: TemplateDefinition[] = [
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
 
-function formatFriendlyDate(value?: string): string {
+function formatFriendlyDate(value?: string, locale?: string): string {
   if (!value) return '—';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
-  return parsed.toLocaleDateString(undefined, {
+  return parsed.toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -148,6 +150,8 @@ export default function WorkspacePage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [alertMessage, setAlertMessage] = useState<string>('');
   const [invoiceView, setInvoiceView] = useState<'edit' | 'preview'>('edit');
+  const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
 
   useEffect(() => {
@@ -165,7 +169,7 @@ export default function WorkspacePage() {
       } catch (error) {
         console.error(error);
         if (!active) return;
-        setAlertMessage('Unable to reach Firestore. Displaying sample invoices.');
+        setAlertMessage(t('workspace.alert.offline', 'Unable to reach Firestore. Displaying sample invoices.'));
         setSaveState('error');
         setRecentInvoices(sampleInvoices);
       } finally {
@@ -180,13 +184,39 @@ export default function WorkspacePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
-  const statusLookup = useMemo(() => new Map(statusOptions.map((option) => [option.value, option.label])), []);
+  const localizedSections = useMemo(
+    () =>
+      sections.map((section) => ({
+        ...section,
+        label: t(`workspace.nav.${section.id}`, section.label),
+        description: t(`workspace.section.${section.id}.description`, section.description),
+      })),
+    [t],
+  );
+  const localizedTemplates = useMemo(
+    () =>
+      templateCatalog.map((template) => ({
+        ...template,
+        name: t(`workspace.template.${template.id}.name`, template.name),
+        description: t(`workspace.template.${template.id}.description`, template.description),
+        bestFor: t(`workspace.template.${template.id}.bestFor`, template.bestFor),
+        highlights: template.highlights.map((highlight, index) =>
+          t(`workspace.template.${template.id}.highlights.${index}`, highlight),
+        ),
+      })),
+    [t],
+  );
+  const localizedStatusOptions = useMemo(
+    () => statusOptions.map((option) => ({ ...option, label: t(`workspace.status.${option.value}`, option.label) })),
+    [t],
+  );
+  const statusLookup = useMemo(() => new Map(localizedStatusOptions.map((option) => [option.value, option.label])), [localizedStatusOptions]);
   const activeTemplate = useMemo(
-    () => templateCatalog.find((template) => template.id === selectedTemplate) ?? templateCatalog[0],
-    [selectedTemplate],
+    () => localizedTemplates.find((template) => template.id === selectedTemplate) ?? localizedTemplates[0],
+    [localizedTemplates, selectedTemplate],
   );
 
   const outstandingTotal = useMemo(
@@ -250,19 +280,24 @@ export default function WorkspacePage() {
 
   const activityFeed = useMemo(() => {
     return recentInvoices
-      .map((invoice) => ({
-        id: invoice.id,
-        title: `${invoice.clientName || 'Client'} — ${describeStatus(invoice.status)}`,
-        amount: formatCurrency(invoice.total, invoice.currency),
-        timestamp: invoice.createdAt || invoice.issueDate,
-        status: invoice.status,
-      }))
+      .map((invoice) => {
+        const statusLabel =
+          statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
+        const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
+        return {
+          id: invoice.id,
+          title: `${clientName} — ${statusLabel}`,
+          amount: formatCurrency(invoice.total, invoice.currency, locale),
+          timestamp: invoice.createdAt || invoice.issueDate,
+          status: invoice.status,
+        };
+      })
       .sort((a, b) => {
         const dateA = new Date(a.timestamp ?? '').getTime();
         const dateB = new Date(b.timestamp ?? '').getTime();
         return dateB - dateA;
       });
-  }, [recentInvoices]);
+  }, [locale, recentInvoices, statusLookup, t]);
 
   function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
     setDraft((prev) => ({ ...prev, [field]: value }));
@@ -326,7 +361,7 @@ export default function WorkspacePage() {
         };
 
         setRecentInvoices((prev) => [offlineRecord, ...prev].slice(0, 12));
-        setAlertMessage('Firebase is not configured. Stored invoice locally for this session.');
+        setAlertMessage(t('workspace.alert.offlineStored', 'Firebase is not configured. Stored invoice locally for this session.'));
         setSaveState('success');
         setLoadingInvoices(false);
         return;
@@ -337,29 +372,69 @@ export default function WorkspacePage() {
         const filtered = prev.filter((invoice) => invoice.id !== saved.id);
         return [saved, ...filtered].slice(0, 12);
       });
-      setAlertMessage('Invoice saved to Firestore.');
+      setAlertMessage(t('workspace.alert.success', 'Invoice saved to Firestore.'));
       setSaveState('success');
     } catch (error) {
       console.error(error);
-      setAlertMessage(error instanceof Error ? error.message : 'Unable to save invoice.');
+      setAlertMessage(error instanceof Error ? error.message : t('workspace.alert.error', 'Unable to save invoice.'));
       setSaveState('error');
     }
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     if (typeof window === 'undefined') {
       console.warn('Download is only available in the browser.');
       return;
     }
 
-    window.print();
+    try {
+      setDownloadingPdf(true);
+      const cleanedLines = cleanLines(draft.lines);
+      const pdfDraft: InvoiceDraft = { ...draft, lines: cleanedLines.length ? cleanedLines : draft.lines };
+      const pdfTotals = calculateTotals(pdfDraft.lines, pdfDraft.taxRate);
+      const pdfLabel = (key: string, fallback: string) => (language === 'ja' ? fallback : t(key, fallback));
+      const pdfLabels = {
+        invoiceTitle: pdfLabel('workspace.pdf.invoiceTitle', 'Invoice'),
+        billTo: pdfLabel('workspace.pdf.billTo', 'Bill to'),
+        issueDate: pdfLabel('workspace.pdf.issueDate', 'Issue date'),
+        dueDate: pdfLabel('workspace.pdf.dueDate', 'Due date'),
+        description: pdfLabel('workspace.pdf.description', 'Description'),
+        quantity: pdfLabel('workspace.pdf.quantity', 'Qty'),
+        rate: pdfLabel('workspace.pdf.rate', 'Rate'),
+        amount: pdfLabel('workspace.pdf.amount', 'Amount'),
+        subtotal: pdfLabel('workspace.pdf.subtotal', 'Subtotal'),
+        tax: pdfLabel('workspace.pdf.tax', 'Tax'),
+        total: pdfLabel('workspace.pdf.total', 'Total'),
+        notes: pdfLabel('workspace.pdf.notes', 'Notes'),
+      };
+
+      const blob = generateInvoicePdf({ draft: pdfDraft, totals: pdfTotals, locale, currency: draft.currency, labels: pdfLabels });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const safeClient = pdfDraft.clientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'invoice';
+      link.href = url;
+      link.download = `${safeClient}-${pdfDraft.issueDate || 'draft'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setAlertMessage(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'));
+      setSaveState('success');
+    } catch (error) {
+      console.error(error);
+      setAlertMessage(t('workspace.alert.error', 'Unable to save invoice.'));
+      setSaveState('error');
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   function renderTemplateThumbnails({ showDetails = false }: { showDetails?: boolean } = {}) {
     return (
       <div className={`template-thumbnail-grid${showDetails ? ' template-thumbnail-grid--detailed' : ''}`}>
-        {templateCatalog.map((template) => {
+        {localizedTemplates.map((template) => {
           const isActive = template.id === selectedTemplate;
+          const primaryHighlight = template.highlights[0] ?? template.description;
           return (
             <button
               key={template.id}
@@ -371,7 +446,7 @@ export default function WorkspacePage() {
               <span className="template-thumbnail__preview" style={{ background: template.accent }} aria-hidden="true">
                 <span className="template-thumbnail__preview-header">{template.name}</span>
                 <span className="template-thumbnail__preview-body" />
-                <span className="template-thumbnail__preview-footer">{template.highlights[0]}</span>
+                <span className="template-thumbnail__preview-footer">{primaryHighlight}</span>
               </span>
               <span className="template-thumbnail__label">
                 <strong>{template.name}</strong>
@@ -397,98 +472,102 @@ export default function WorkspacePage() {
         <div className="workspace-metrics">
           <article className="metric-card">
             <header>
-              <span className="metric-label">Outstanding balance</span>
+              <span className="metric-label">{t('workspace.dashboard.outstanding', 'Outstanding balance')}</span>
               <span className="metric-icon">💳</span>
             </header>
-            <strong className="metric-value">{formatCurrency(outstandingTotal, draft.currency)}</strong>
-            <p>{recentInvoices.length ? `${recentInvoices.length} invoices tracked` : 'No invoices yet'}</p>
+            <strong className="metric-value">{formatCurrency(outstandingTotal, draft.currency, locale)}</strong>
+            <p>
+              {recentInvoices.length
+                ? t('workspace.dashboard.trackCount', `${recentInvoices.length} invoices tracked`, { count: recentInvoices.length })
+                : t('workspace.dashboard.noInvoices', 'No invoices yet')}
+            </p>
           </article>
           <article className="metric-card">
             <header>
-              <span className="metric-label">Paid this month</span>
+              <span className="metric-label">{t('workspace.dashboard.paid', 'Paid this month')}</span>
               <span className="metric-icon">✅</span>
             </header>
-            <strong className="metric-value">{formatCurrency(paidThisMonth, draft.currency)}</strong>
-            <p>Auto-reconciled with client receipts</p>
+            <strong className="metric-value">{formatCurrency(paidThisMonth, draft.currency, locale)}</strong>
+            <p>{t('workspace.dashboard.reconciled', 'Auto-reconciled with client receipts')}</p>
           </article>
           <article className="metric-card">
             <header>
-              <span className="metric-label">Average payment time</span>
+              <span className="metric-label">{t('workspace.dashboard.paymentTime', 'Average payment time')}</span>
               <span className="metric-icon">⏱️</span>
             </header>
-            <strong className="metric-value">9.4 days</strong>
-            <p>Down 2.1 days vs last month</p>
+            <strong className="metric-value">{t('workspace.dashboard.paymentDuration', '9.4 days')}</strong>
+            <p>{t('workspace.dashboard.paymentDelta', 'Down 2.1 days vs last month')}</p>
           </article>
           <article className="metric-card">
             <header>
-              <span className="metric-label">Templates in use</span>
+              <span className="metric-label">{t('workspace.dashboard.templates', 'Templates in use')}</span>
               <span className="metric-icon">🖌️</span>
             </header>
-            <strong className="metric-value">{templateCatalog.length}</strong>
-            <p>Switch templates from the gallery</p>
+            <strong className="metric-value">{localizedTemplates.length}</strong>
+            <p>{t('workspace.dashboard.templatesHint', 'Switch templates from the gallery')}</p>
           </article>
         </div>
 
         <div className="panel">
           <header className="panel__header">
             <div>
-              <h2>Recent invoices</h2>
-              <p>Monitor drafts, sent documents, and payments at a glance.</p>
+              <h2>{t('workspace.recent.heading', 'Recent invoices')}</h2>
+              <p>{t('workspace.recent.description', 'Monitor drafts, sent documents, and payments at a glance.')}</p>
             </div>
             <button type="button" className="button button--ghost" onClick={() => setActiveSection('invoices')}>
-              Create invoice
+              {t('workspace.actions.createInvoice', 'Create invoice')}
             </button>
           </header>
           {loadingInvoices ? (
-            <div className="empty-state">Loading invoices…</div>
+            <div className="empty-state">{t('workspace.recent.loading', 'Loading invoices…')}</div>
           ) : recentInvoices.length ? (
             <div className="table">
               <div className="table__row table__row--head">
-                <span>Client</span>
-                <span>Status</span>
-                <span>Issued</span>
-                <span>Due</span>
-                <span>Total</span>
+                <span>{t('workspace.table.client', 'Client')}</span>
+                <span>{t('workspace.table.status', 'Status')}</span>
+                <span>{t('workspace.table.issued', 'Issued')}</span>
+                <span>{t('workspace.table.due', 'Due')}</span>
+                <span>{t('workspace.table.total', 'Total')}</span>
               </div>
               {recentInvoices.map((invoice) => (
                 <div key={invoice.id} className="table__row">
                   <span>
-                    <strong>{invoice.clientName || 'Client'}</strong>
+                    <strong>{invoice.clientName || t('workspace.table.clientPlaceholder', 'Client')}</strong>
                     <small>{invoice.clientEmail || '—'}</small>
                   </span>
                   <span>
                     <span className={`status-pill status-pill--${invoice.status}`}>{statusLookup.get(invoice.status)}</span>
                   </span>
-                  <span>{formatFriendlyDate(invoice.issueDate)}</span>
-                  <span>{formatFriendlyDate(invoice.dueDate)}</span>
-                  <span>{formatCurrency(invoice.total, invoice.currency)}</span>
+                  <span>{formatFriendlyDate(invoice.issueDate, locale)}</span>
+                  <span>{formatFriendlyDate(invoice.dueDate, locale)}</span>
+                  <span>{formatCurrency(invoice.total, invoice.currency, locale)}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-state">Save your first invoice to populate the dashboard.</div>
+            <div className="empty-state">{t('workspace.recent.empty', 'Save your first invoice to populate the dashboard.')}</div>
           )}
         </div>
 
         <div className="panel">
           <header className="panel__header">
             <div>
-              <h2>Template spotlight</h2>
-              <p>Highlighting the most popular template with clients this week.</p>
+              <h2>{t('workspace.templates.spotlight', 'Template spotlight')}</h2>
+              <p>{t('workspace.templates.spotlightDescription', 'Highlighting the most popular template with clients this week.')}</p>
             </div>
             <button type="button" className="button button--ghost" onClick={() => setActiveSection('templates')}>
-              Browse gallery
+              {t('workspace.templates.browse', 'Browse gallery')}
             </button>
           </header>
           <div className="template-spotlight">
-            <div className="template-spotlight__preview" style={{ background: templateCatalog[0].accent }}>
-              <span>{templateCatalog[0].name}</span>
+            <div className="template-spotlight__preview" style={{ background: localizedTemplates[0].accent }}>
+              <span>{localizedTemplates[0].name}</span>
             </div>
             <div className="template-spotlight__body">
-              <strong>{templateCatalog[0].name}</strong>
-              <p>{templateCatalog[0].description}</p>
+              <strong>{localizedTemplates[0].name}</strong>
+              <p>{localizedTemplates[0].description}</p>
               <ul>
-                {templateCatalog[0].highlights.map((highlight) => (
+                {localizedTemplates[0].highlights.map((highlight) => (
                   <li key={highlight}>{highlight}</li>
                 ))}
               </ul>
@@ -506,17 +585,17 @@ export default function WorkspacePage() {
         <section className="panel panel--stack">
           <header className="panel__header panel__header--stacked">
             <div>
-              <h2>Invoice workspace</h2>
-              <p>Toggle between editing your draft and reviewing the formatted preview.</p>
+              <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
+              <p>{t('workspace.invoice.description', 'Toggle between editing your draft and reviewing the formatted preview.')}</p>
             </div>
-            <div className="view-toggle" role="group" aria-label="Invoice workspace view">
+            <div className="view-toggle" role="group" aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}>
               <button
                 type="button"
                 className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
                 onClick={() => setInvoiceView('edit')}
                 aria-pressed={invoiceView === 'edit'}
               >
-                ✏️ Edit draft
+                ✏️ {t('workspace.view.edit', 'Edit draft')}
               </button>
               <button
                 type="button"
@@ -524,7 +603,7 @@ export default function WorkspacePage() {
                 onClick={() => setInvoiceView('preview')}
                 aria-pressed={invoiceView === 'preview'}
               >
-                👀 Preview
+                👀 {t('workspace.view.preview', 'Preview')}
               </button>
             </div>
           </header>
@@ -532,10 +611,14 @@ export default function WorkspacePage() {
           <div className="panel__section">
             <header className="panel__section-header">
               <div>
-                <h3>Templates</h3>
-                <p>Select a template thumbnail to style your invoice.</p>
+                <h3>{t('workspace.nav.templates', 'Templates')}</h3>
+                <p>{t('workspace.templates.instructions', 'Select a template thumbnail to style your invoice.')}</p>
               </div>
-              <span className="badge">{templateCatalog.length} options</span>
+              <span className="badge">
+                {t('workspace.templates.count', `${localizedTemplates.length} options`, {
+                  count: localizedTemplates.length,
+                })}
+              </span>
             </header>
             {renderTemplateThumbnails()}
           </div>
@@ -546,48 +629,48 @@ export default function WorkspacePage() {
                 <section className="editor-card invoice-form__card">
                   <header className="editor-card__header">
                     <div>
-                      <h2>Business & client</h2>
-                      <p>Details shown at the top of every invoice.</p>
+                      <h2>{t('workspace.section.business', 'Business & client')}</h2>
+                      <p>{t('workspace.section.businessDescription', 'Details shown at the top of every invoice.')}</p>
                     </div>
                   </header>
                   <div className="editor-card__grid">
                     <div>
-                      <label htmlFor="businessName">Business name</label>
+                      <label htmlFor="businessName">{t('workspace.field.businessName', 'Business name')}</label>
                       <input
                         id="businessName"
                         type="text"
                         value={draft.businessName}
-                        placeholder="Atlas Studio"
+                        placeholder={t('workspace.placeholder.businessName', 'Atlas Studio')}
                         onChange={(event) => updateDraftField('businessName', event.target.value)}
                       />
                     </div>
                     <div>
-                      <label htmlFor="businessAddress">Business address</label>
+                      <label htmlFor="businessAddress">{t('workspace.field.businessAddress', 'Business address')}</label>
                       <input
                         id="businessAddress"
                         type="text"
                         value={draft.businessAddress}
-                        placeholder="88 Harbor Lane, Portland, OR"
+                        placeholder={t('workspace.placeholder.businessAddress', '88 Harbor Lane, Portland, OR')}
                         onChange={(event) => updateDraftField('businessAddress', event.target.value)}
                       />
                     </div>
                     <div>
-                      <label htmlFor="clientName">Client name</label>
+                      <label htmlFor="clientName">{t('workspace.field.clientName', 'Client name')}</label>
                       <input
                         id="clientName"
                         type="text"
                         value={draft.clientName}
-                        placeholder="Northwind Co."
+                        placeholder={t('workspace.placeholder.clientName', 'Northwind Co.')}
                         onChange={(event) => updateDraftField('clientName', event.target.value)}
                       />
                     </div>
                     <div>
-                      <label htmlFor="clientEmail">Client email</label>
+                      <label htmlFor="clientEmail">{t('workspace.field.clientEmail', 'Client email')}</label>
                       <input
                         id="clientEmail"
                         type="email"
                         value={draft.clientEmail}
-                        placeholder="client@email.com"
+                        placeholder={t('workspace.placeholder.clientEmail', 'client@email.com')}
                         onChange={(event) => updateDraftField('clientEmail', event.target.value)}
                       />
                     </div>
@@ -596,13 +679,13 @@ export default function WorkspacePage() {
                 <section className="editor-card invoice-form__card">
                   <header className="editor-card__header">
                     <div>
-                      <h2>Invoice terms</h2>
-                      <p>Dates, currency, and tax rates applied to the totals.</p>
+                      <h2>{t('workspace.section.terms', 'Invoice terms')}</h2>
+                      <p>{t('workspace.section.termsDescription', 'Dates, currency, and tax rates applied to the totals.')}</p>
                     </div>
                   </header>
                   <div className="editor-card__grid editor-card__grid--compact">
                     <div>
-                      <label htmlFor="issueDate">Issue date</label>
+                      <label htmlFor="issueDate">{t('workspace.field.issueDate', 'Issue date')}</label>
                       <input
                         id="issueDate"
                         type="date"
@@ -611,7 +694,7 @@ export default function WorkspacePage() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="dueDate">Due date</label>
+                      <label htmlFor="dueDate">{t('workspace.field.dueDate', 'Due date')}</label>
                       <input
                         id="dueDate"
                         type="date"
@@ -620,7 +703,7 @@ export default function WorkspacePage() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="currency">Currency</label>
+                      <label htmlFor="currency">{t('workspace.field.currency', 'Currency')}</label>
                       <select
                         id="currency"
                         value={draft.currency}
@@ -634,13 +717,13 @@ export default function WorkspacePage() {
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="status">Status</label>
+                      <label htmlFor="status">{t('workspace.field.status', 'Status')}</label>
                       <select
                         id="status"
                         value={draft.status}
                         onChange={(event) => updateDraftField('status', event.target.value as InvoiceStatus)}
                       >
-                        {statusOptions.map((option) => (
+                        {localizedStatusOptions.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -648,7 +731,7 @@ export default function WorkspacePage() {
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="taxRate">Tax rate</label>
+                      <label htmlFor="taxRate">{t('workspace.field.tax', 'Tax rate')}</label>
                       <div className="input-with-addon">
                         <input
                           id="taxRate"
@@ -663,11 +746,11 @@ export default function WorkspacePage() {
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="notes">Notes</label>
+                    <label htmlFor="notes">{t('workspace.section.notes', 'Notes')}</label>
                     <textarea
                       id="notes"
                       value={draft.notes}
-                      placeholder="Share payment instructions or a thank you."
+                      placeholder={t('workspace.notes.placeholder', 'Share payment instructions or a thank you.')}
                       rows={3}
                       onChange={(event) => updateDraftField('notes', event.target.value)}
                     />
@@ -679,40 +762,40 @@ export default function WorkspacePage() {
                 <div className="line-items">
                   <div className="line-items__header">
                     <div>
-                      <h2>Line items</h2>
-                      <p>Outline the services, quantity, and rate for this invoice.</p>
+                      <h2>{t('workspace.section.lines', 'Line items')}</h2>
+                      <p>{t('workspace.section.linesDescription', 'Outline the services, quantity, and rate for this invoice.')}</p>
                     </div>
                     <button type="button" className="button button--ghost" onClick={addLine}>
-                      Add line
+                      {t('workspace.lines.add', 'Add line')}
                     </button>
                   </div>
                   <div className="line-items__table">
                     <div className="line-items__row line-items__row--head">
-                      <span>Description</span>
-                      <span>Qty</span>
-                      <span>Rate</span>
-                      <span>Amount</span>
-                      <span className="sr-only">Remove</span>
+                      <span>{t('workspace.lines.description', 'Description')}</span>
+                      <span>{t('workspace.lines.quantity', 'Qty')}</span>
+                      <span>{t('workspace.lines.rate', 'Rate')}</span>
+                      <span>{t('workspace.lines.amount', 'Amount')}</span>
+                      <span className="sr-only">{t('workspace.lines.remove', 'Remove')}</span>
                     </div>
                     {draft.lines.map((line, index) => {
-                      const lineTotal = formatCurrency(line.quantity * line.rate, draft.currency);
+                      const lineTotal = formatCurrency(line.quantity * line.rate, draft.currency, locale);
                       return (
                         <div key={line.id} className="line-items__row">
                           <div>
                             <label htmlFor={`description-${line.id}`} className="sr-only">
-                              Description {index + 1}
+                              {t('workspace.lines.description', 'Description')} {index + 1}
                             </label>
                             <input
                               id={`description-${line.id}`}
                               type="text"
                               value={line.description}
-                              placeholder="Service provided"
+                              placeholder={t('workspace.lines.descriptionPlaceholder', 'Service provided')}
                               onChange={(event) => updateLine(line.id, 'description', event.target.value)}
                             />
                           </div>
                           <div>
                             <label htmlFor={`quantity-${line.id}`} className="sr-only">
-                              Quantity {index + 1}
+                              {t('workspace.lines.quantity', 'Qty')} {index + 1}
                             </label>
                             <input
                               id={`quantity-${line.id}`}
@@ -724,7 +807,7 @@ export default function WorkspacePage() {
                           </div>
                           <div>
                             <label htmlFor={`rate-${line.id}`} className="sr-only">
-                              Rate {index + 1}
+                              {t('workspace.lines.rate', 'Rate')} {index + 1}
                             </label>
                             <input
                               id={`rate-${line.id}`}
@@ -741,7 +824,7 @@ export default function WorkspacePage() {
                           <button
                             type="button"
                             onClick={() => removeLine(line.id)}
-                            aria-label={`Remove line ${index + 1}`}
+                            aria-label={`${t('workspace.lines.remove', 'Remove')} ${index + 1}`}
                           >
                             ×
                           </button>
@@ -755,24 +838,26 @@ export default function WorkspacePage() {
               <section className="editor-card invoice-form__card invoice-form__summary">
                 <div className="invoice-form__summary-totals">
                   <div className="invoice-form__summary-row">
-                    <span>Subtotal</span>
-                    <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
+                    <span>{t('workspace.summary.subtotal', 'Subtotal')}</span>
+                    <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
                   </div>
                   <div className="invoice-form__summary-row">
-                    <span>Tax</span>
-                    <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
+                    <span>{t('workspace.summary.tax', 'Tax')}</span>
+                    <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
                   </div>
                   <div className="invoice-form__summary-row invoice-form__summary-row--emphasis">
-                    <span>Total due</span>
-                    <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+                    <span>{t('workspace.summary.total', 'Total')}</span>
+                    <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
                   </div>
                 </div>
                 <div className="invoice-form__actions">
                   <button type="button" className="button button--ghost" onClick={() => setInvoiceView('preview')}>
-                    Preview invoice
+                    {t('workspace.actions.preview', 'Preview invoice')}
                   </button>
                   <button type="submit" className="button button--primary" disabled={saveState === 'saving'}>
-                    {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
+                    {saveState === 'saving'
+                      ? t('workspace.actions.saving', 'Saving…')
+                      : t('workspace.actions.save', 'Save invoice')}
                   </button>
                 </div>
               </section>
@@ -782,103 +867,162 @@ export default function WorkspacePage() {
               <header className="preview__header" style={{ background: activeTemplate.accent }}>
                 <div className="preview__header-info">
                   <span className="preview__eyebrow">{activeTemplate.name}</span>
-                  <strong>{draft.businessName || 'Your business name'}</strong>
-                  <span>{draft.businessAddress || 'Add your business address'}</span>
+                  <strong>
+                    {draft.businessName || t('workspace.preview.businessPlaceholder', 'Your business name')}
+                  </strong>
+                  <span>{draft.businessAddress || t('workspace.preview.addressPlaceholder', 'Add your business address')}</span>
                   <span className="preview__tagline">{activeTemplate.description}</span>
                 </div>
                 <div className="preview__badge">
-                  <span>Total due</span>
-                  <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-                  <small>Status: {statusLookup.get(draft.status)}</small>
+                  <span>{t('workspace.preview.totalDue', 'Total due')}</span>
+                  <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
+                  <small>
+                    {t('workspace.preview.status', 'Status')}: {statusLookup.get(draft.status)}
+                  </small>
                 </div>
               </header>
 
               <div className="preview__body">
-                <div className="preview__meta">
-                  <div>
-                    <span className="preview__label">{activeTemplate.id === 'seikyu' ? '請求先 / Bill to' : 'Bill to'}</span>
-                    <strong>{draft.clientName || 'Client name'}</strong>
-                    <span>{draft.clientEmail || 'client@email.com'}</span>
-                  </div>
-                  <div>
-                    <span className="preview__label">{activeTemplate.id === 'seikyu' ? '発行日 / Issued' : 'Issued'}</span>
-                    <strong>{formatFriendlyDate(draft.issueDate)}</strong>
-                  </div>
-                  <div>
-                    <span className="preview__label">{activeTemplate.id === 'seikyu' ? '支払期日 / Due' : 'Due'}</span>
-                    <strong>{formatFriendlyDate(draft.dueDate)}</strong>
-                  </div>
-                </div>
+                {(() => {
+                  const isSeikyu = activeTemplate.id === 'seikyu';
+                  const billToLabel = isSeikyu
+                    ? t('workspace.preview.billToDual', '請求先 / Bill to')
+                    : t('workspace.preview.billTo', 'Bill to');
+                  const issuedLabel = isSeikyu
+                    ? t('workspace.preview.issuedDual', '発行日 / Issued')
+                    : t('workspace.preview.issued', 'Issued');
+                  const dueLabel = isSeikyu
+                    ? t('workspace.preview.dueDual', '支払期日 / Due')
+                    : t('workspace.preview.due', 'Due');
+                  const descriptionLabel = isSeikyu
+                    ? t('workspace.preview.descriptionDual', '品目 / Item')
+                    : t('workspace.preview.description', 'Description');
+                  const quantityLabel = isSeikyu
+                    ? t('workspace.preview.quantityDual', '数量 / Qty')
+                    : t('workspace.preview.quantity', 'Qty');
+                  const rateLabel = isSeikyu
+                    ? t('workspace.preview.rateDual', '単価 / Rate')
+                    : t('workspace.preview.rate', 'Rate');
+                  const amountLabel = isSeikyu
+                    ? t('workspace.preview.amountDual', '金額 / Total')
+                    : t('workspace.preview.amount', 'Amount');
+                  const subtotalLabel = isSeikyu
+                    ? t('workspace.preview.subtotalDual', '小計 / Subtotal')
+                    : t('workspace.summary.subtotal', 'Subtotal');
+                  const taxLabel = isSeikyu
+                    ? t('workspace.preview.taxDual', '税額 / Tax')
+                    : t('workspace.summary.tax', 'Tax');
+                  const totalLabel = isSeikyu
+                    ? t('workspace.preview.totalDual', '合計 / Total')
+                    : t('workspace.summary.total', 'Total');
 
-                <div className="preview__table">
-                  <div className="preview__table-row preview__table-row--head">
-                    <span>{activeTemplate.id === 'seikyu' ? '品目 / Item' : 'Description'}</span>
-                    <span>{activeTemplate.id === 'seikyu' ? '数量 / Qty' : 'Qty'}</span>
-                    <span>{activeTemplate.id === 'seikyu' ? '単価 / Rate' : 'Rate'}</span>
-                    <span>{activeTemplate.id === 'seikyu' ? '金額 / Total' : 'Amount'}</span>
-                  </div>
-                  {draft.lines.map((line) => (
-                    <div key={line.id} className="preview__table-row">
-                      <span>{line.description || (activeTemplate.id === 'seikyu' ? 'サービス' : 'Line description')}</span>
-                      <span>{line.quantity}</span>
-                      <span>{formatCurrency(line.rate, draft.currency)}</span>
-                      <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
-                    </div>
-                  ))}
-                </div>
+                  return (
+                    <>
+                      <div className="preview__meta">
+                        <div>
+                          <span className="preview__label">{billToLabel}</span>
+                          <strong>{draft.clientName || t('workspace.preview.clientPlaceholder', 'Client name')}</strong>
+                          <span>{draft.clientEmail || t('workspace.preview.emailPlaceholder', 'client@email.com')}</span>
+                        </div>
+                        <div>
+                          <span className="preview__label">{issuedLabel}</span>
+                          <strong>{formatFriendlyDate(draft.issueDate, locale)}</strong>
+                        </div>
+                        <div>
+                          <span className="preview__label">{dueLabel}</span>
+                          <strong>{formatFriendlyDate(draft.dueDate, locale)}</strong>
+                        </div>
+                      </div>
 
-                {activeTemplate.id === 'emerald-ledger' && (
-                  <div className="preview__summary-card">
-                    <header>
-                      <span>Payment summary</span>
-                      <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-                    </header>
-                    <ul>
-                      <li>
-                        <span>Subtotal</span>
-                        <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
-                      </li>
-                      <li>
-                        <span>Tax</span>
-                        <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
-                      </li>
-                      <li>
-                        <span>Status</span>
-                        <strong>{statusLookup.get(draft.status)}</strong>
-                      </li>
-                    </ul>
-                  </div>
-                )}
+                      <div className="preview__table">
+                        <div className="preview__table-row preview__table-row--head">
+                          <span>{descriptionLabel}</span>
+                          <span>{quantityLabel}</span>
+                          <span>{rateLabel}</span>
+                          <span>{amountLabel}</span>
+                        </div>
+                        {draft.lines.map((line) => (
+                          <div key={line.id} className="preview__table-row">
+                            <span>
+                              {line.description ||
+                                (isSeikyu
+                                  ? t('workspace.preview.linePlaceholderJa', 'Service item')
+                                  : t('workspace.preview.linePlaceholder', 'Line description'))}
+                            </span>
+                            <span>{line.quantity}</span>
+                            <span>{formatCurrency(line.rate, draft.currency, locale)}</span>
+                            <span>{formatCurrency(line.quantity * line.rate, draft.currency, locale)}</span>
+                          </div>
+                        ))}
+                      </div>
 
-                <div className="preview__totals">
-                  <div>
-                    <span>{activeTemplate.id === 'seikyu' ? '小計 / Subtotal' : 'Subtotal'}</span>
-                    <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
-                  </div>
-                  <div>
-                    <span>{activeTemplate.id === 'seikyu' ? '税額 / Tax' : 'Tax'}</span>
-                    <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
-                  </div>
-                  <div>
-                    <span>{activeTemplate.id === 'seikyu' ? '合計 / Total' : 'Total'}</span>
-                    <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-                  </div>
-                </div>
+                      {activeTemplate.id === 'emerald-ledger' && (
+                        <div className="preview__summary-card">
+                          <header>
+                            <span>{t('workspace.preview.paymentSummary', 'Payment summary')}</span>
+                            <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
+                          </header>
+                          <ul>
+                            <li>
+                              <span>{t('workspace.summary.subtotal', 'Subtotal')}</span>
+                              <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
+                            </li>
+                            <li>
+                              <span>{t('workspace.summary.tax', 'Tax')}</span>
+                              <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
+                            </li>
+                            <li>
+                              <span>{t('workspace.preview.status', 'Status')}</span>
+                              <strong>{statusLookup.get(draft.status)}</strong>
+                            </li>
+                          </ul>
+                        </div>
+                      )}
 
-                {activeTemplate.id === 'seikyu' && (
-                  <div className="preview__hanko">
-                    <span>印</span>
-                    <small>Authorised seal</small>
-                  </div>
-                )}
+                      <div className="preview__totals">
+                        <div>
+                          <span>{subtotalLabel}</span>
+                          <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
+                        </div>
+                        <div>
+                          <span>{taxLabel}</span>
+                          <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
+                        </div>
+                        <div>
+                          <span>{totalLabel}</span>
+                          <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
+                        </div>
+                      </div>
 
-                <div className="preview__notes">
-                  <strong>{activeTemplate.id === 'seikyu' ? '備考 / Notes' : 'Notes'}</strong>
-                  <p>{draft.notes || 'Add payment instructions or a thank you message.'}</p>
-                  {activeTemplate.id === 'seikyu' && (
-                    <small>お支払い期限までにお振り込みをお願いいたします。</small>
-                  )}
-                </div>
+                      {isSeikyu && (
+                        <div className="preview__hanko">
+                          <span>{t('workspace.preview.hankoLabel', '印')}</span>
+                          <small>{t('workspace.preview.hankoCaption', 'Authorised seal')}</small>
+                        </div>
+                      )}
+
+                      <div className="preview__notes">
+                        <strong>
+                          {isSeikyu
+                            ? t('workspace.preview.notesDual', '備考 / Notes')
+                            : t('workspace.preview.notes', 'Notes')}
+                        </strong>
+                        <p>
+                          {draft.notes ||
+                            t('workspace.preview.notesPlaceholder', 'Add payment instructions or a thank you message.')}
+                        </p>
+                        {isSeikyu && (
+                          <small>
+                            {t(
+                              'workspace.preview.notesHint',
+                              'Please remit payment before the due date.',
+                            )}
+                          </small>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -893,10 +1037,16 @@ export default function WorkspacePage() {
         <div className="panel">
           <header className="panel__header">
             <div>
-              <h2>Template gallery</h2>
-              <p>Explore each template's layout before applying it to your invoice.</p>
+              <h2>{t('workspace.templates.galleryHeading', 'Template gallery')}</h2>
+              <p>
+                {t('workspace.templates.galleryDescription', 'Explore each template layout before applying it to your invoice.')}
+              </p>
             </div>
-            <span className="badge">{templateCatalog.length} options</span>
+            <span className="badge">
+              {t('workspace.templates.count', `${localizedTemplates.length} options`, {
+                count: localizedTemplates.length,
+              })}
+            </span>
           </header>
           {renderTemplateThumbnails({ showDetails: true })}
         </div>
@@ -910,11 +1060,11 @@ export default function WorkspacePage() {
         <div className="panel">
           <header className="panel__header">
             <div>
-              <h2>Client insights</h2>
-              <p>Outstanding balances and recent invoice activity per client.</p>
+              <h2>{t('workspace.clients.heading', 'Client insights')}</h2>
+              <p>{t('workspace.clients.description', 'Outstanding balances and recent invoice activity per client.')}</p>
             </div>
             <button type="button" className="button button--ghost">
-              Add client
+              {t('workspace.clients.add', 'Add client')}
             </button>
           </header>
           {clientSummaries.length ? (
@@ -932,23 +1082,25 @@ export default function WorkspacePage() {
                   </header>
                   <dl>
                     <div>
-                      <dt>Outstanding</dt>
-                      <dd>{formatCurrency(client.outstanding, client.currency || draft.currency)}</dd>
+                      <dt>{t('workspace.clients.outstanding', 'Outstanding')}</dt>
+                      <dd>{formatCurrency(client.outstanding, client.currency || draft.currency, locale)}</dd>
                     </div>
                     <div>
-                      <dt>Invoices</dt>
+                      <dt>{t('workspace.clients.invoices', 'Invoices')}</dt>
                       <dd>{client.invoices}</dd>
                     </div>
                     <div>
-                      <dt>Last invoice</dt>
-                      <dd>{formatFriendlyDate(client.lastInvoice)}</dd>
+                      <dt>{t('workspace.clients.lastInvoice', 'Last invoice')}</dt>
+                      <dd>{formatFriendlyDate(client.lastInvoice, locale)}</dd>
                     </div>
                   </dl>
                 </article>
               ))}
             </div>
           ) : (
-            <div className="empty-state">Save an invoice to build the client directory.</div>
+            <div className="empty-state">
+              {t('workspace.clients.empty', 'Save an invoice to build the client directory.')}
+            </div>
           )}
         </div>
       </div>
@@ -961,11 +1113,11 @@ export default function WorkspacePage() {
         <div className="panel">
           <header className="panel__header">
             <div>
-              <h2>Activity timeline</h2>
-              <p>Review invoice saves, reminders, and payments from newest to oldest.</p>
+              <h2>{t('workspace.activity.heading', 'Activity timeline')}</h2>
+              <p>{t('workspace.activity.description', 'Review invoice saves, reminders, and payments from newest to oldest.')}</p>
             </div>
             <Link className="button button--ghost" href="/admin/console" prefetch={false}>
-              View admin console
+              {t('workspace.activity.viewAdmin', 'View admin console')}
             </Link>
           </header>
           {activityFeed.length ? (
@@ -979,13 +1131,15 @@ export default function WorkspacePage() {
                       <span className={`status-pill status-pill--${item.status}`}>{statusLookup.get(item.status)}</span>
                     </div>
                     <p>{item.amount}</p>
-                    <small>{formatFriendlyDate(item.timestamp)}</small>
+                    <small>{formatFriendlyDate(item.timestamp, locale)}</small>
                   </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="empty-state">Activity will appear once invoices are saved.</div>
+            <div className="empty-state">
+              {t('workspace.activity.empty', 'Activity will appear once invoices are saved.')}
+            </div>
           )}
         </div>
       </div>
@@ -998,42 +1152,44 @@ export default function WorkspacePage() {
         <div className="panel">
           <header className="panel__header">
             <div>
-              <h2>Workspace settings</h2>
-              <p>Default information used across every new invoice.</p>
+              <h2>{t('workspace.settings.heading', 'Workspace settings')}</h2>
+              <p>{t('workspace.settings.description', 'Default information used across every new invoice.')}</p>
             </div>
           </header>
           <dl className="settings-grid">
             <div>
-              <dt>Business name</dt>
-              <dd>{draft.businessName || 'Atlas Studio'}</dd>
+              <dt>{t('workspace.settings.businessName', 'Business name')}</dt>
+              <dd>{draft.businessName || t('workspace.placeholder.businessName', 'Atlas Studio')}</dd>
             </div>
             <div>
-              <dt>Business address</dt>
-              <dd>{draft.businessAddress || '88 Harbor Lane, Portland, OR'}</dd>
+              <dt>{t('workspace.settings.businessAddress', 'Business address')}</dt>
+              <dd>{draft.businessAddress || t('workspace.placeholder.businessAddress', '88 Harbor Lane, Portland, OR')}</dd>
             </div>
             <div>
-              <dt>Default currency</dt>
+              <dt>{t('workspace.settings.currencyDefault', 'Default currency')}</dt>
               <dd>{draft.currency}</dd>
             </div>
             <div>
-              <dt>Tax rate</dt>
+              <dt>{t('workspace.settings.taxDefault', 'Default tax rate')}</dt>
               <dd>{(draft.taxRate * 100).toFixed(1)}%</dd>
             </div>
             <div>
-              <dt>Reminder emails</dt>
-              <dd>Enabled — 3 days before due date</dd>
+              <dt>{t('workspace.settings.reminders', 'Reminder emails')}</dt>
+              <dd>{t('workspace.settings.reminderDetails', 'Enabled — 3 days before due date')}</dd>
             </div>
             <div>
-              <dt>Template</dt>
-              <dd>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Wave Blue'}</dd>
+              <dt>{t('workspace.settings.template', 'Template')}</dt>
+              <dd>
+                {localizedTemplates.find((template) => template.id === selectedTemplate)?.name || localizedTemplates[0].name}
+              </dd>
             </div>
           </dl>
           <div className="settings-actions">
             <button type="button" className="button button--primary">
-              Update profile
+              {t('workspace.settings.updateProfile', 'Update profile')}
             </button>
             <button type="button" className="button button--ghost">
-              Manage automations
+              {t('workspace.settings.manageAutomations', 'Manage automations')}
             </button>
           </div>
         </div>
@@ -1060,7 +1216,7 @@ export default function WorkspacePage() {
     }
   }
 
-  const activeMeta = sections.find((section) => section.id === activeSection);
+  const activeMeta = localizedSections.find((section) => section.id === activeSection);
 
   return (
     <div className="workspace-shell workspace-shell--topnav">
@@ -1075,11 +1231,14 @@ export default function WorkspacePage() {
           />
           <div>
             <strong>Easy Invoice GM7</strong>
-            <span>Billing workspace</span>
+            <span>{t('workspace.shell.brandSubtitle', 'Billing workspace')}</span>
           </div>
         </div>
-        <nav className="workspace-topbar__nav" aria-label="Workspace sections">
-          {sections.map((section) => (
+        <nav
+          className="workspace-topbar__nav"
+          aria-label={t('workspace.nav.label', 'Workspace sections')}
+        >
+          {localizedSections.map((section) => (
             <button
               key={section.id}
               type="button"
@@ -1097,6 +1256,9 @@ export default function WorkspacePage() {
             </button>
           ))}
         </nav>
+        <div className="workspace-topbar__controls">
+          <LanguageSwitcher variant="compact" />
+        </div>
       </div>
 
       <div className="workspace-shell__main">
@@ -1107,25 +1269,25 @@ export default function WorkspacePage() {
               <h1>{activeMeta?.label}</h1>
               <p>{activeMeta?.description}</p>
               {!firebaseConfigured && (
-                <span className="workspace-shell__hint">
-                  Connected to demo data until Firebase credentials are added.
-                </span>
+                <span className="workspace-shell__hint">{t('workspace.hint', 'Connected to demo data until Firebase credentials are added.')}</span>
               )}
             </div>
           </div>
           {activeSection !== 'invoices' ? (
             <div className="workspace-shell__actions">
               <button type="button" className="button button--ghost" onClick={() => setActiveSection('invoices')}>
-                Create invoice
+                {t('workspace.actions.createInvoice', 'Create invoice')}
               </button>
               <button type="button" className="button button--primary" onClick={() => setActiveSection('dashboard')}>
-                View dashboard
+                {t('workspace.actions.viewDashboard', 'View dashboard')}
               </button>
             </div>
           ) : (
             <div className="workspace-shell__actions">
-              <button type="button" className="button button--ghost" onClick={handleDownload}>
-                Download preview
+              <button type="button" className="button button--ghost" onClick={handleDownload} disabled={downloadingPdf}>
+                {downloadingPdf
+                  ? t('workspace.actions.downloading', 'Generating…')
+                  : t('workspace.actions.download', 'Download PDF')}
               </button>
               <button
                 type="submit"
@@ -1133,7 +1295,7 @@ export default function WorkspacePage() {
                 className="button button--primary"
                 disabled={saveState === 'saving'}
               >
-                {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
+                {saveState === 'saving' ? t('workspace.actions.saving', 'Saving…') : t('workspace.actions.save', 'Save invoice')}
               </button>
             </div>
           )}

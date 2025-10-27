@@ -13,32 +13,22 @@ import {
 import { InvoiceRecord, describeStatus, formatCurrency, type InvoiceStatus } from '../../../lib/invoices';
 import { firebaseConfigured, fetchRecentInvoices } from '../../../lib/firebase';
 import { sampleInvoices } from '../../../lib/sample-data';
+import { useTranslation } from '../../../lib/i18n';
 
 type TimelineEntry = {
   id: string;
   label: string;
   total: string;
   status: InvoiceStatus;
+  statusLabel: string;
   when: string;
 };
-
-function buildTimeline(invoices: InvoiceRecord[]): TimelineEntry[] {
-  return invoices
-    .map((invoice) => ({
-      id: invoice.id,
-      label: `${invoice.clientName || 'Client'} — ${describeStatus(invoice.status)}`,
-      total: formatCurrency(invoice.total, invoice.currency),
-      status: invoice.status,
-      when: invoice.createdAt || invoice.issueDate,
-    }))
-    .sort((a, b) => new Date(b.when ?? '').getTime() - new Date(a.when ?? '').getTime())
-    .slice(0, 8);
-}
 
 export default function AdminConsolePage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(sampleInvoices);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { locale, t } = useTranslation();
 
   useEffect(() => {
     let active = true;
@@ -56,7 +46,7 @@ export default function AdminConsolePage() {
       } catch (err) {
         console.error(err);
         if (!active) return;
-        setError('Live data unavailable. Displaying sample invoices.');
+        setError(t('admin.console.errorSample', 'Live data unavailable. Displaying sample invoices.'));
         setInvoices(sampleInvoices);
       } finally {
         if (active) {
@@ -70,7 +60,7 @@ export default function AdminConsolePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const outstanding = useMemo(
     () => invoices.filter((invoice) => invoice.status !== 'paid').reduce((sum, invoice) => sum + invoice.total, 0),
@@ -88,31 +78,47 @@ export default function AdminConsolePage() {
       .reduce((sum, invoice) => sum + invoice.total, 0);
   }, [invoices]);
 
-  const timeline = useMemo(() => buildTimeline(invoices), [invoices]);
+  const timeline = useMemo<TimelineEntry[]>(() => {
+    return invoices
+      .map((invoice) => {
+        const statusLabel = t(`workspace.status.${invoice.status}`, describeStatus(invoice.status));
+        const clientLabel = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
+        return {
+          id: invoice.id,
+          label: `${clientLabel} — ${statusLabel}`,
+          total: formatCurrency(invoice.total, invoice.currency || 'USD', locale),
+          status: invoice.status,
+          statusLabel,
+          when: invoice.createdAt || invoice.issueDate,
+        };
+      })
+      .sort((a, b) => new Date(b.when ?? '').getTime() - new Date(a.when ?? '').getTime())
+      .slice(0, 8);
+  }, [invoices, locale, t]);
+
+  const primaryCurrency = invoices[0]?.currency || 'USD';
+  const updatedLabel = t('admin.console.metrics.updated', 'Updated {time}', {
+    time: new Date().toLocaleTimeString(locale),
+  });
 
   return (
     <div className="admin-console">
       <div className="admin-console__masthead">
         <div className="container">
-          <span className="badge">Administrator area</span>
-          <h1>Easy Invoice GM7 admin console</h1>
-          <p>
-            Audit activity, monitor system health, and keep the support desk flowing smoothly. Workspace users cannot access
-            this page.
-          </p>
+          <span className="badge">{t('admin.console.badge', 'Administrator area')}</span>
+          <h1>{t('admin.console.title', 'Easy Invoice GM7 admin console')}</h1>
+          <p>{t('admin.console.description', 'Audit activity, monitor system health, and keep the support desk flowing smoothly. Workspace users cannot access this page.')}</p>
           <div className="admin-console__actions">
             <Link className="button button--primary" href="/login" prefetch={false}>
-              Switch to member login
+              {t('admin.console.switchMember', 'Switch to member login')}
             </Link>
             <Link className="button button--ghost" href="/app" prefetch={false}>
-              Open billing workspace
+              {t('admin.console.openWorkspace', 'Open billing workspace')}
             </Link>
           </div>
           {error && <div className="alert alert--warning">{error}</div>}
           {!firebaseConfigured && (
-            <div className="alert alert--muted">
-              Connect Firebase credentials to populate the console with live workspace data.
-            </div>
+            <div className="alert alert--muted">{t('admin.console.missingFirebase', 'Connect Firebase credentials to populate the console with live workspace data.')}</div>
           )}
         </div>
       </div>
@@ -121,28 +127,28 @@ export default function AdminConsolePage() {
         <section className="panel">
           <header className="panel__header">
             <div>
-              <h2>Key metrics</h2>
-              <p>Track usage pulses and pipeline volume for your workspace fleet.</p>
+              <h2>{t('admin.console.metrics.heading', 'Key metrics')}</h2>
+              <p>{t('admin.console.metrics.description', 'Track usage pulses and pipeline volume for your workspace fleet.')}</p>
             </div>
-            <span className="panel__meta">{loading ? 'Loading…' : `Updated ${new Date().toLocaleTimeString()}`}</span>
+            <span className="panel__meta">{loading ? t('admin.console.metrics.loading', 'Loading…') : updatedLabel}</span>
           </header>
           <div className="workspace-metrics">
             {adminVitals.map((metric: AdminVital) => (
-              <article key={metric.label} className="metric-card metric-card--compact">
+              <article key={metric.key} className="metric-card metric-card--compact">
                 <strong className="metric-value">{metric.value}</strong>
-                <span className="metric-label">{metric.label}</span>
-                <small>{metric.delta}</small>
+                <span className="metric-label">{t(`admin.metrics.${metric.key}`, metric.label)}</span>
+                <small>{t(`admin.metrics.${metric.key}Delta`, metric.delta)}</small>
               </article>
             ))}
             <article className="metric-card metric-card--compact">
-              <strong className="metric-value">{formatCurrency(outstanding, invoices[0]?.currency || 'USD')}</strong>
-              <span className="metric-label">Outstanding receivables</span>
-              <small>Across unpaid invoices</small>
+              <strong className="metric-value">{formatCurrency(outstanding, primaryCurrency, locale)}</strong>
+              <span className="metric-label">{t('admin.metrics.outstanding', 'Outstanding receivables')}</span>
+              <small>{t('admin.metrics.outstandingHint', 'Across unpaid invoices')}</small>
             </article>
             <article className="metric-card metric-card--compact">
-              <strong className="metric-value">{formatCurrency(paidThisMonth, invoices[0]?.currency || 'USD')}</strong>
-              <span className="metric-label">Collected this month</span>
-              <small>Paid invoices only</small>
+              <strong className="metric-value">{formatCurrency(paidThisMonth, primaryCurrency, locale)}</strong>
+              <span className="metric-label">{t('admin.metrics.paid', 'Collected this month')}</span>
+              <small>{t('admin.metrics.paidHint', 'Paid invoices only')}</small>
             </article>
           </div>
         </section>
@@ -150,19 +156,21 @@ export default function AdminConsolePage() {
         <section className="panel">
           <header className="panel__header">
             <div>
-              <h2>System health</h2>
-              <p>Service-level snapshots for integrations that power invoice delivery.</p>
+              <h2>{t('admin.console.health.heading', 'System health')}</h2>
+              <p>{t('admin.console.health.description', 'Service-level snapshots for integrations that power invoice delivery.')}</p>
             </div>
           </header>
           <ul className="admin-health">
             {adminHealthChecks.map((check: AdminHealthCheck) => (
-              <li key={check.name}>
+              <li key={check.key}>
                 <div>
-                  <strong>{check.name}</strong>
-                  <span>{check.detail}</span>
+                  <strong>{t(`admin.health.${check.key}.name`, check.name)}</strong>
+                  <span>{t(`admin.health.${check.key}.detail`, check.detail)}</span>
                 </div>
-                <span className={`status-pill status-pill--${check.status === 'Operational' ? 'success' : 'warning'}`}>
-                  {check.status}
+                <span
+                  className={`status-pill status-pill--${check.status === 'Operational' ? 'success' : check.status === 'Degraded' ? 'warning' : 'info'}`}
+                >
+                  {t(`admin.health.status.${check.status.toLowerCase()}`, check.status)}
                 </span>
               </li>
             ))}
@@ -172,11 +180,11 @@ export default function AdminConsolePage() {
         <section className="panel">
           <header className="panel__header">
             <div>
-              <h2>Recent activity</h2>
-              <p>Newest invoice updates from all connected workspaces.</p>
+              <h2>{t('admin.console.activity.heading', 'Recent activity')}</h2>
+              <p>{t('admin.console.activity.description', 'Newest invoice updates from all connected workspaces.')}</p>
             </div>
             <Link className="panel__meta" href="/app" prefetch={false}>
-              View workspace timeline
+              {t('admin.console.activity.viewWorkspace', 'View workspace timeline')}
             </Link>
           </header>
           {timeline.length ? (
@@ -187,24 +195,30 @@ export default function AdminConsolePage() {
                   <div className="timeline__body">
                     <div className="timeline__title">
                       <strong>{entry.label}</strong>
-                      <span className={`status-pill status-pill--${entry.status}`}>{describeStatus(entry.status)}</span>
+                      <span className={`status-pill status-pill--${entry.status}`}>{entry.statusLabel}</span>
                     </div>
                     <p>{entry.total}</p>
-                    <small>{entry.when ? new Date(entry.when).toLocaleString() : 'Unknown'}</small>
+                    <small>
+                      {entry.when
+                        ? new Date(entry.when).toLocaleString(locale)
+                        : t('admin.console.activity.unknown', 'Unknown')}
+                    </small>
                   </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="empty-state">No invoice activity yet. Create invoices to populate the feed.</div>
+            <div className="empty-state">
+              {t('admin.console.activity.empty', 'No invoice activity yet. Create invoices to populate the feed.')}
+            </div>
           )}
         </section>
 
         <section className="panel">
           <header className="panel__header">
             <div>
-              <h2>Support queue</h2>
-              <p>Requests flagged by billing teams that need a response.</p>
+              <h2>{t('admin.console.support.heading', 'Support queue')}</h2>
+              <p>{t('admin.console.support.description', 'Requests flagged by billing teams that need a response.')}</p>
             </div>
           </header>
           <ul className="admin-support">

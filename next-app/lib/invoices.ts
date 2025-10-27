@@ -93,13 +93,12 @@ export function calculateTotals(lines: InvoiceLine[], taxRate: number): {
   };
 }
 
-export function formatCurrency(value: number, currency: string): string {
+export function formatCurrency(value: number, currency: string, locale = 'en-US'): string {
   try {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       currencyDisplay: 'narrowSymbol',
-      minimumFractionDigits: 2,
     }).format(value);
   } catch (error) {
     return `${currency} ${value.toFixed(2)}`;

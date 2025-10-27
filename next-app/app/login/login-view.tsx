@@ -3,46 +3,43 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { ReadonlyURLSearchParams } from 'next/navigation';
 import { firebaseConfigured } from '../../lib/firebase';
 import { clearSession, persistSession, signInWithEmailPassword } from '../../lib/auth';
+import { useTranslation } from '../../lib/i18n';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
-
-function extractErrorFromParams(params: ReadonlyURLSearchParams | null): string | null {
-  if (!params) {
-    return null;
-  }
-
-  const reason = params.get('error');
-  if (!reason) {
-    return null;
-  }
-
-  switch (reason) {
-    case 'session-expired':
-      return 'Your session expired. Please sign in again to continue.';
-    case 'access-denied':
-      return 'Please sign in with an administrator account to open the console.';
-    default:
-      return params.get('message') ?? 'Please sign in to continue.';
-  }
-}
 
 export default function LoginView(): JSX.Element {
   const router = useRouter();
   const params = useSearchParams();
+  const { t } = useTranslation();
 
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string>('');
 
   useEffect(() => {
-    const initialError = extractErrorFromParams(params);
-    if (initialError) {
-      setStatus('error');
-      setMessage(initialError);
+    if (!params) return;
+    const reason = params.get('error');
+    const customMessage = params.get('message');
+    if (!reason && !customMessage) {
+      return;
     }
-  }, [params]);
+
+    setStatus('error');
+    if (reason === 'session-expired') {
+      setMessage(t('login.error.sessionExpired', 'Your session expired. Please sign in again to continue.'));
+      return;
+    }
+    if (reason === 'access-denied') {
+      setMessage(t('login.error.accessDenied', 'Please sign in with an administrator account to open the console.'));
+      return;
+    }
+    if (customMessage) {
+      setMessage(customMessage);
+      return;
+    }
+    setMessage(t('login.error.default', 'Please sign in to continue.'));
+  }, [params, t]);
 
   useEffect(() => {
     clearSession();
@@ -58,27 +55,33 @@ export default function LoginView(): JSX.Element {
 
     if (!email || !password) {
       setStatus('error');
-      setMessage('Enter both your email and password to continue.');
+      setMessage(t('login.error.credentials', 'Enter both your email and password to continue.'));
       return;
     }
 
     if (!firebaseConfigured) {
       setStatus('error');
-      setMessage('Firebase environment variables are missing. Copy next-app/.env.example to .env.local and update it with your Firebase project.');
+      setMessage(
+        t(
+          'login.error.missingFirebase',
+          'Firebase environment variables are missing. Copy next-app/.env.example to .env.local and update it with your Firebase project.',
+        ),
+      );
       return;
     }
 
     setStatus('loading');
-    setMessage('Signing you in…');
+    setMessage(t('login.status.signingIn', 'Signing you in…'));
 
     try {
       const session = await signInWithEmailPassword(email, password);
       persistSession(session, { remember });
       setStatus('success');
-      setMessage('Signed in successfully. Redirecting…');
+      setMessage(t('login.status.success', 'Signed in successfully. Redirecting…'));
       router.replace('/app');
     } catch (error) {
-      const friendlyMessage = error instanceof Error ? error.message : 'Unable to sign in. Please try again later.';
+      const fallback = t('login.error.generic', 'Unable to sign in. Please try again later.');
+      const friendlyMessage = error instanceof Error && error.message ? error.message : fallback;
       setStatus('error');
       setMessage(friendlyMessage);
     }
@@ -92,9 +95,9 @@ export default function LoginView(): JSX.Element {
     <div className="auth-page">
       <div className="auth-hero">
         <div className="container">
-          <span className="badge">Welcome back</span>
-          <h1>Sign in to Easy Invoice GM7</h1>
-          <p>Enter your workspace email address to continue where you left off.</p>
+          <span className="badge">{t('login.badge', 'Welcome back')}</span>
+          <h1>{t('login.title', 'Sign in to Easy Invoice GM7')}</h1>
+          <p>{t('login.subtitle', 'Enter your workspace email address to continue where you left off.')}</p>
         </div>
       </div>
 
@@ -103,12 +106,12 @@ export default function LoginView(): JSX.Element {
           <section className="auth-card">
             <form className="auth-form" aria-label="Member sign in" onSubmit={handleSubmit} noValidate suppressHydrationWarning>
               <div className="auth-form__field">
-                <label htmlFor="email">Email</label>
+                <label htmlFor="email">{t('login.email', 'Email')}</label>
                 <input
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="you@company.com"
+                  placeholder={t('login.placeholder.email', 'you@company.com')}
                   autoComplete="email"
                   inputMode="email"
                   required
@@ -117,12 +120,12 @@ export default function LoginView(): JSX.Element {
               </div>
               <div className="auth-form__field auth-form__field--split">
                 <div>
-                  <label htmlFor="password">Password</label>
+                  <label htmlFor="password">{t('login.password', 'Password')}</label>
                   <input
                     id="password"
                     name="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder={t('login.placeholder.password', '••••••••')}
                     autoComplete="current-password"
                     required
                     suppressHydrationWarning
@@ -130,7 +133,7 @@ export default function LoginView(): JSX.Element {
                 </div>
                 <div className="auth-form__inline">
                   <input id="remember" name="remember" type="checkbox" defaultChecked suppressHydrationWarning />
-                  <label htmlFor="remember">Stay signed in</label>
+                  <label htmlFor="remember">{t('login.remember', 'Stay signed in')}</label>
                 </div>
               </div>
 
@@ -142,7 +145,11 @@ export default function LoginView(): JSX.Element {
 
               {!firebaseConfigured && (
                 <div className="auth-callout" role="note">
-                  <strong>Configuration required:</strong> Copy <code>.env.example</code> to <code>.env.local</code> and keep the Firebase keys provided in this repository (or replace them with your own credentials).
+                  <strong>{t('login.callout.heading', 'Configuration required:')}</strong>{' '}
+                  {t(
+                    'login.callout.config',
+                    'Copy .env.example to .env.local and keep the Firebase keys provided in this repository (or replace them with your own credentials).',
+                  )}
                 </div>
               )}
 
@@ -153,20 +160,20 @@ export default function LoginView(): JSX.Element {
                 aria-busy={isLoading}
                 suppressHydrationWarning
               >
-                {isLoading ? 'Signing in…' : 'Continue'}
+                {isLoading ? t('login.status.signingIn', 'Signing you in…') : t('login.submit', 'Continue')}
               </button>
               <div className="auth-form__links">
                 <Link href="/reset" prefetch={false}>
-                  Forgot password?
+                  {t('login.link.forgot', 'Forgot password?')}
                 </Link>
                 <Link href="/signup" prefetch={false}>
-                  Create an account
+                  {t('login.link.signup', 'Create an account')}
                 </Link>
               </div>
               <p className="auth-form__hint">
-                Administrators manage workspace access inside the{' '}
+                {t('login.note.adminPrefix', 'Administrators manage workspace access inside the')}{' '}
                 <Link href="/admin/console" prefetch={false}>
-                  admin console
+                  {t('login.note.adminLink', 'admin console')}
                 </Link>
                 .
               </p>
@@ -175,14 +182,14 @@ export default function LoginView(): JSX.Element {
 
           <aside className="auth-aside">
             <article className="auth-insight">
-              <h2>Everything from the dashboard, now in the browser</h2>
+              <h2>{t('login.aside.title', 'Everything from the dashboard, now in the browser')}</h2>
               <ul>
-                <li>Create invoices with a template gallery that mirrors the Flutter experience.</li>
-                <li>Track payment status, reminders, and outstanding balances in one place.</li>
-                <li>Switch between dashboard, invoice editor, templates, and client directories from the top navigation bar.</li>
+                <li>{t('login.aside.point1', 'Create invoices with a template gallery that mirrors the Flutter experience.')}</li>
+                <li>{t('login.aside.point2', 'Track payment status, reminders, and outstanding balances in one place.')}</li>
+                <li>{t('login.aside.point3', 'Switch between dashboard, invoice editor, templates, and client directories from the top navigation bar.')}</li>
               </ul>
               <Link className="button button--ghost" href="/app" prefetch={false}>
-                Explore the workspace
+                {t('login.aside.cta', 'Explore the workspace')}
               </Link>
             </article>
           </aside>

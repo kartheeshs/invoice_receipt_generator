@@ -203,6 +203,34 @@ svg {
   color: var(--text-body);
 }
 
+.language-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.language-switcher__select {
+  appearance: none;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  padding: 0.4rem 1.6rem 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--text-body);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.language-switcher__select:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.language-switcher--compact .language-switcher__select {
+  padding: 0.3rem 1.2rem 0.3rem 0.8rem;
+  font-size: 0.85rem;
+}
+
 .badge--muted {
   background: rgba(37, 99, 235, 0.08);
   color: var(--accent-strong);
@@ -1356,6 +1384,21 @@ svg {
   color: #b91c1c;
 }
 
+.status-pill--success {
+  background: rgba(34, 197, 94, 0.16);
+  color: #15803d;
+}
+
+.status-pill--warning {
+  background: rgba(251, 191, 36, 0.18);
+  color: #b45309;
+}
+
+.status-pill--info {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+}
+
 .workspace__recent {
   display: grid;
   gap: 1.8rem;
@@ -1676,6 +1719,17 @@ svg {
   gap: 0.65rem;
   flex: 1 1 auto;
   flex-wrap: wrap;
+}
+
+.workspace-topbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.workspace-topbar__controls .language-switcher--compact {
+  min-width: auto;
 }
 
 .workspace-topbar__nav-item {
