@@ -173,6 +173,10 @@ export default function WorkspacePage() {
 
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
   const statusLookup = useMemo(() => new Map(statusOptions.map((option) => [option.value, option.label])), []);
+  const activeTemplate = useMemo(
+    () => templateCatalog.find((template) => template.id === selectedTemplate) ?? templateCatalog[0],
+    [selectedTemplate],
+  );
 
   const outstandingTotal = useMemo(
     () =>
@@ -448,6 +452,7 @@ export default function WorkspacePage() {
     );
   }
 
+
   function renderInvoiceEditor() {
     return (
       <div className="workspace-section workspace-section--two-column">
@@ -459,6 +464,28 @@ export default function WorkspacePage() {
             </div>
             <span className="status-pill status-pill--outline">{statusLookup.get(draft.status)}</span>
           </header>
+
+          <div className="template-switch" role="group" aria-label="Select invoice template">
+            {templateCatalog.map((template) => {
+              const isActive = template.id === selectedTemplate;
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  className={`template-switch__button${isActive ? ' template-switch__button--active' : ''}`}
+                  onClick={() => setSelectedTemplate(template.id)}
+                  aria-pressed={isActive}
+                >
+                  <span className="template-switch__swatch" style={{ background: template.accent }} aria-hidden="true" />
+                  <div>
+                    <strong>{template.name}</strong>
+                    <small>{template.bestFor}</small>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
           <form className="form-grid" onSubmit={handleSave}>
             <div className="form-grid__group">
               <label htmlFor="businessName">Business name</label>
@@ -643,15 +670,16 @@ export default function WorkspacePage() {
           <header className="panel__header">
             <div>
               <h2>Live preview</h2>
-              <p>{templateCatalog.find((template) => template.id === selectedTemplate)?.name ?? 'Invoice preview'}</p>
+              <p>{activeTemplate.name}</p>
             </div>
             <button type="button" className="button button--ghost" onClick={() => setActiveSection('templates')}>
               Change template
             </button>
           </header>
-          <div className="preview">
-            <div className="preview__header" style={{ background: templateCatalog.find((template) => template.id === selectedTemplate)?.accentSoft }}>
-              <div>
+          <div className="preview" data-template={activeTemplate.id}>
+            <div className="preview__header" style={{ background: activeTemplate.accent }}>
+              <div className="preview__header-info">
+                <span className="preview__header-subtitle">{activeTemplate.description}</span>
                 <strong>{draft.businessName || 'Your business name'}</strong>
                 <span>{draft.businessAddress || 'Add your business address'}</span>
               </div>
@@ -660,61 +688,97 @@ export default function WorkspacePage() {
                 <strong>{formatCurrency(totals.total, draft.currency)}</strong>
               </div>
             </div>
+
             <div className="preview__meta">
               <div>
-                <span>Bill to</span>
+                <span>{activeTemplate.id === 'seikyu' ? '請求先 / Bill to' : 'Bill to'}</span>
                 <strong>{draft.clientName || 'Client name'}</strong>
                 <span>{draft.clientEmail || 'client@email.com'}</span>
               </div>
               <div>
-                <span>Issued</span>
+                <span>{activeTemplate.id === 'seikyu' ? '発行日 / Issued' : 'Issued'}</span>
                 <strong>{formatFriendlyDate(draft.issueDate)}</strong>
               </div>
               <div>
-                <span>Due</span>
+                <span>{activeTemplate.id === 'seikyu' ? '支払期日 / Due' : 'Due'}</span>
                 <strong>{formatFriendlyDate(draft.dueDate)}</strong>
               </div>
             </div>
+
+            {activeTemplate.id === 'emerald-ledger' && (
+              <div className="preview__summary-card">
+                <header>
+                  <span>Payment summary</span>
+                  <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+                </header>
+                <ul>
+                  <li>
+                    <span>Subtotal</span>
+                    <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
+                  </li>
+                  <li>
+                    <span>Tax</span>
+                    <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
+                  </li>
+                  <li>
+                    <span>Status</span>
+                    <strong>{statusLookup.get(draft.status)}</strong>
+                  </li>
+                </ul>
+              </div>
+            )}
+
             <div className="preview__table">
               <div className="preview__table-row preview__table-row--head">
-                <span>Description</span>
-                <span>Qty</span>
-                <span>Rate</span>
-                <span>Total</span>
+                <span>{activeTemplate.id === 'seikyu' ? '品目 / Item' : 'Description'}</span>
+                <span>{activeTemplate.id === 'seikyu' ? '数量 / Qty' : 'Qty'}</span>
+                <span>{activeTemplate.id === 'seikyu' ? '単価 / Rate' : 'Rate'}</span>
+                <span>{activeTemplate.id === 'seikyu' ? '金額 / Total' : 'Total'}</span>
               </div>
               {draft.lines.map((line) => (
                 <div key={line.id} className="preview__table-row">
-                  <span>{line.description || 'Line description'}</span>
+                  <span>{line.description || (activeTemplate.id === 'seikyu' ? 'サービス' : 'Line description')}</span>
                   <span>{line.quantity}</span>
                   <span>{formatCurrency(line.rate, draft.currency)}</span>
                   <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
                 </div>
               ))}
             </div>
+
             <div className="preview__totals">
               <div>
-                <span>Subtotal</span>
+                <span>{activeTemplate.id === 'seikyu' ? '小計 / Subtotal' : 'Subtotal'}</span>
                 <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
               </div>
               <div>
-                <span>Tax</span>
+                <span>{activeTemplate.id === 'seikyu' ? '税額 / Tax' : 'Tax'}</span>
                 <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
               </div>
               <div>
-                <span>Total</span>
+                <span>{activeTemplate.id === 'seikyu' ? '合計 / Total' : 'Total'}</span>
                 <strong>{formatCurrency(totals.total, draft.currency)}</strong>
               </div>
             </div>
+
+            {activeTemplate.id === 'seikyu' && (
+              <div className="preview__hanko">
+                <span>印</span>
+                <small>Authorised seal</small>
+              </div>
+            )}
+
             <div className="preview__notes">
-              <strong>Notes</strong>
+              <strong>{activeTemplate.id === 'seikyu' ? '備考 / Notes' : 'Notes'}</strong>
               <p>{draft.notes || 'Add payment instructions or a thank you message.'}</p>
+              {activeTemplate.id === 'seikyu' && (
+                <small>お支払い期限までにお振り込みをお願いいたします。</small>
+              )}
             </div>
           </div>
         </aside>
       </div>
     );
   }
-
   function renderTemplateGallery() {
     return (
       <div className="workspace-section">

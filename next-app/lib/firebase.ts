@@ -1,13 +1,34 @@
 import { InvoiceDraft, InvoiceLine, InvoiceRecord, calculateTotals, cleanLines } from './invoices';
 
+const fallbackConfig = {
+  apiKey: 'AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ',
+  authDomain: 'invoice-receipt-generator-g7.firebaseapp.com',
+  projectId: 'invoice-receipt-generator-g7',
+  storageBucket: 'invoice-receipt-generator-g7.firebasestorage.app',
+  messagingSenderId: '798489264335',
+  appId: '1:798489264335:web:b1bc7f6fe8dc5e68de37ba',
+  measurementId: 'G-TKYV2VSPMZ',
+};
+
+function resolveFirebaseValue<K extends keyof typeof fallbackConfig>(
+  key: K,
+  envValue: string | undefined,
+): string {
+  const trimmed = envValue?.trim();
+  if (trimmed && trimmed.length > 0) {
+    return trimmed;
+  }
+  return fallbackConfig[key];
+}
+
 const config = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() ?? '',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim() ?? '',
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? '',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ?? '',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim() ?? '',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim() ?? '',
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.trim() ?? '',
+  apiKey: resolveFirebaseValue('apiKey', process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
+  authDomain: resolveFirebaseValue('authDomain', process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN),
+  projectId: resolveFirebaseValue('projectId', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID),
+  storageBucket: resolveFirebaseValue('storageBucket', process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: resolveFirebaseValue('messagingSenderId', process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID),
+  appId: resolveFirebaseValue('appId', process.env.NEXT_PUBLIC_FIREBASE_APP_ID),
+  measurementId: resolveFirebaseValue('measurementId', process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID),
 };
 
 export const firebaseConfig = config;
