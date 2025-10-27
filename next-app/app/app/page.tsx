@@ -138,6 +138,7 @@ export default function WorkspacePage() {
   const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [alertMessage, setAlertMessage] = useState<string>('');
+  const [invoiceView, setInvoiceView] = useState<'edit' | 'preview'>('edit');
 
   useEffect(() => {
     let active = true;
@@ -344,6 +345,42 @@ export default function WorkspacePage() {
     window.print();
   }
 
+  function renderTemplateThumbnails({ showDetails = false }: { showDetails?: boolean } = {}) {
+    return (
+      <div className={`template-thumbnail-grid${showDetails ? ' template-thumbnail-grid--detailed' : ''}`}>
+        {templateCatalog.map((template) => {
+          const isActive = template.id === selectedTemplate;
+          return (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => setSelectedTemplate(template.id)}
+              className={`template-thumbnail${isActive ? ' template-thumbnail--active' : ''}`}
+              aria-pressed={isActive}
+            >
+              <span className="template-thumbnail__preview" style={{ background: template.accent }} aria-hidden="true">
+                <span className="template-thumbnail__preview-header">{template.name}</span>
+                <span className="template-thumbnail__preview-body" />
+                <span className="template-thumbnail__preview-footer">{template.highlights[0]}</span>
+              </span>
+              <span className="template-thumbnail__label">
+                <strong>{template.name}</strong>
+                <small>{template.bestFor}</small>
+              </span>
+              {showDetails && (
+                <ul className="template-thumbnail__highlights">
+                  {template.highlights.map((highlight) => (
+                    <li key={highlight}>{highlight}</li>
+                  ))}
+                </ul>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderDashboard() {
     return (
       <div className="workspace-section">
@@ -453,332 +490,309 @@ export default function WorkspacePage() {
   }
 
 
-  function renderInvoiceEditor() {
+  function renderInvoices() {
     return (
-      <div className="workspace-section workspace-section--two-column">
-        <section className="panel">
-          <header className="panel__header">
+      <div className="workspace-section">
+        <section className="panel panel--stack">
+          <header className="panel__header panel__header--stacked">
             <div>
-              <h2>Invoice details</h2>
-              <p>Fill out the draft form and keep an eye on the preview.</p>
+              <h2>Invoice workspace</h2>
+              <p>Toggle between editing your draft and reviewing the formatted preview.</p>
             </div>
-            <span className="status-pill status-pill--outline">{statusLookup.get(draft.status)}</span>
+            <div className="view-toggle" role="group" aria-label="Invoice workspace view">
+              <button
+                type="button"
+                className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
+                onClick={() => setInvoiceView('edit')}
+                aria-pressed={invoiceView === 'edit'}
+              >
+                ✏️ Edit draft
+              </button>
+              <button
+                type="button"
+                className={`view-toggle__button${invoiceView === 'preview' ? ' view-toggle__button--active' : ''}`}
+                onClick={() => setInvoiceView('preview')}
+                aria-pressed={invoiceView === 'preview'}
+              >
+                👀 Preview
+              </button>
+            </div>
           </header>
 
-          <div className="template-switch" role="group" aria-label="Select invoice template">
-            {templateCatalog.map((template) => {
-              const isActive = template.id === selectedTemplate;
-              return (
-                <button
-                  key={template.id}
-                  type="button"
-                  className={`template-switch__button${isActive ? ' template-switch__button--active' : ''}`}
-                  onClick={() => setSelectedTemplate(template.id)}
-                  aria-pressed={isActive}
-                >
-                  <span className="template-switch__swatch" style={{ background: template.accent }} aria-hidden="true" />
-                  <div>
-                    <strong>{template.name}</strong>
-                    <small>{template.bestFor}</small>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="panel__section">
+            <header className="panel__section-header">
+              <div>
+                <h3>Templates</h3>
+                <p>Select a template thumbnail to style your invoice.</p>
+              </div>
+              <span className="badge">{templateCatalog.length} options</span>
+            </header>
+            {renderTemplateThumbnails()}
           </div>
 
-          <form className="form-grid" onSubmit={handleSave}>
-            <div className="form-grid__group">
-              <label htmlFor="businessName">Business name</label>
-              <input
-                id="businessName"
-                type="text"
-                value={draft.businessName}
-                placeholder="Atlas Studio"
-                onChange={(event) => updateDraftField('businessName', event.target.value)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="businessAddress">Business address</label>
-              <input
-                id="businessAddress"
-                type="text"
-                value={draft.businessAddress}
-                placeholder="88 Harbor Lane, Portland, OR"
-                onChange={(event) => updateDraftField('businessAddress', event.target.value)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="clientName">Client name</label>
-              <input
-                id="clientName"
-                type="text"
-                value={draft.clientName}
-                placeholder="Northwind Co."
-                onChange={(event) => updateDraftField('clientName', event.target.value)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="clientEmail">Client email</label>
-              <input
-                id="clientEmail"
-                type="email"
-                value={draft.clientEmail}
-                placeholder="billing@client.com"
-                onChange={(event) => updateDraftField('clientEmail', event.target.value)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="issueDate">Issue date</label>
-              <input
-                id="issueDate"
-                type="date"
-                value={draft.issueDate}
-                onChange={(event) => updateDraftField('issueDate', event.target.value)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="dueDate">Due date</label>
-              <input
-                id="dueDate"
-                type="date"
-                value={draft.dueDate}
-                onChange={(event) => updateDraftField('dueDate', event.target.value)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="currency">Currency</label>
-              <select
-                id="currency"
-                value={draft.currency}
-                onChange={(event) => updateDraftField('currency', event.target.value)}
-              >
-                {currencyOptions.map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="taxRate">Tax rate (%)</label>
-              <input
-                id="taxRate"
-                type="number"
-                min={0}
-                step={0.1}
-                value={(draft.taxRate * 100).toFixed(1)}
-                onChange={(event) => updateDraftField('taxRate', Number(event.target.value) / 100)}
-              />
-            </div>
-            <div className="form-grid__group">
-              <label htmlFor="status">Status</label>
-              <select
-                id="status"
-                value={draft.status}
-                onChange={(event) => updateDraftField('status', event.target.value as InvoiceStatus)}
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-grid__group form-grid__group--full">
-              <label htmlFor="notes">Notes</label>
-              <textarea
-                id="notes"
-                rows={3}
-                value={draft.notes}
-                placeholder="Add payment instructions or a thank-you note."
-                onChange={(event) => updateDraftField('notes', event.target.value)}
-              />
-            </div>
-
-            <div className="line-items">
-              <div className="line-items__header">
-                <h3>Line items</h3>
-                <button type="button" className="button button--ghost" onClick={addLine}>
-                  Add line
-                </button>
+          {invoiceView === 'edit' ? (
+            <form className="form-grid form-grid--single" onSubmit={handleSave}>
+              <div className="form-grid__group">
+                <label htmlFor="businessName">Business name</label>
+                <input
+                  id="businessName"
+                  type="text"
+                  value={draft.businessName}
+                  placeholder="Atlas Studio"
+                  onChange={(event) => updateDraftField('businessName', event.target.value)}
+                />
               </div>
-              <div className="line-items__table">
-                <div className="line-items__row line-items__row--head">
-                  <span>Description</span>
-                  <span>Qty</span>
-                  <span>Rate</span>
-                  <span>Total</span>
-                  <span />
+              <div className="form-grid__group">
+                <label htmlFor="businessAddress">Business address</label>
+                <input
+                  id="businessAddress"
+                  type="text"
+                  value={draft.businessAddress}
+                  placeholder="88 Harbor Lane, Portland, OR"
+                  onChange={(event) => updateDraftField('businessAddress', event.target.value)}
+                />
+              </div>
+              <div className="form-grid__group">
+                <label htmlFor="clientName">Client name</label>
+                <input
+                  id="clientName"
+                  type="text"
+                  value={draft.clientName}
+                  placeholder="Northwind Co."
+                  onChange={(event) => updateDraftField('clientName', event.target.value)}
+                />
+              </div>
+              <div className="form-grid__group">
+                <label htmlFor="clientEmail">Client email</label>
+                <input
+                  id="clientEmail"
+                  type="email"
+                  value={draft.clientEmail}
+                  placeholder="client@email.com"
+                  onChange={(event) => updateDraftField('clientEmail', event.target.value)}
+                />
+              </div>
+              <div className="form-grid__group">
+                <label htmlFor="issueDate">Issue date</label>
+                <input
+                  id="issueDate"
+                  type="date"
+                  value={draft.issueDate?.slice(0, 10) || ''}
+                  onChange={(event) => updateDraftField('issueDate', event.target.value)}
+                />
+              </div>
+              <div className="form-grid__group">
+                <label htmlFor="dueDate">Due date</label>
+                <input
+                  id="dueDate"
+                  type="date"
+                  value={draft.dueDate?.slice(0, 10) || ''}
+                  onChange={(event) => updateDraftField('dueDate', event.target.value)}
+                />
+              </div>
+              <div className="form-grid__group">
+                <label htmlFor="currency">Currency</label>
+                <select
+                  id="currency"
+                  value={draft.currency}
+                  onChange={(event) => updateDraftField('currency', event.target.value)}
+                >
+                  {currencyOptions.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-grid__group">
+                <label htmlFor="status">Status</label>
+                <select id="status" value={draft.status} onChange={(event) => updateDraftField('status', event.target.value as InvoiceStatus)}>
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-grid__group form-grid__group--wide">
+                <label htmlFor="notes">Notes</label>
+                <textarea
+                  id="notes"
+                  value={draft.notes}
+                  placeholder="Share payment instructions or a thank you."
+                  rows={3}
+                  onChange={(event) => updateDraftField('notes', event.target.value)}
+                />
+              </div>
+              <div className="form-grid__group form-grid__group--wide">
+                <label htmlFor="taxRate">Tax rate</label>
+                <div className="input-with-addon">
+                  <input
+                    id="taxRate"
+                    type="number"
+                    value={draft.taxRate}
+                    min="0"
+                    step="0.1"
+                    onChange={(event) => updateDraftField('taxRate', Number(event.target.value))}
+                  />
+                  <span className="input-addon">%</span>
+                </div>
+              </div>
+              <div className="form-grid__group form-grid__group--wide">
+                <header className="form-grid__header">
+                  <h3>Line items</h3>
+                  <button type="button" className="button button--ghost" onClick={addLine}>
+                    Add line
+                  </button>
+                </header>
+                <div className="line-items">
+                  {draft.lines.map((line) => (
+                    <div key={line.id} className="line-item">
+                      <div className="line-item__description">
+                        <label htmlFor={`description-${line.id}`}>Description</label>
+                        <input
+                          id={`description-${line.id}`}
+                          type="text"
+                          value={line.description}
+                          placeholder="Service provided"
+                          onChange={(event) => updateLine(line.id, 'description', event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`quantity-${line.id}`}>Qty</label>
+                        <input
+                          id={`quantity-${line.id}`}
+                          type="number"
+                          min="1"
+                          value={line.quantity}
+                          onChange={(event) => updateLine(line.id, 'quantity', event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`rate-${line.id}`}>Rate</label>
+                        <input
+                          id={`rate-${line.id}`}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={line.rate}
+                          onChange={(event) => updateLine(line.id, 'rate', event.target.value)}
+                        />
+                      </div>
+                      <button type="button" className="line-item__remove" onClick={() => removeLine(line.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="preview" data-template={activeTemplate.id}>
+              <div className="preview__header" style={{ background: activeTemplate.accent }}>
+                <div className="preview__header-info">
+                  <span className="preview__header-subtitle">{activeTemplate.description}</span>
+                  <strong>{draft.businessName || 'Your business name'}</strong>
+                  <span>{draft.businessAddress || 'Add your business address'}</span>
+                </div>
+                <div className="preview__badge">
+                  <span>{statusLookup.get(draft.status)}</span>
+                  <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+                </div>
+              </div>
+
+              <div className="preview__meta">
+                <div>
+                  <span>{activeTemplate.id === 'seikyu' ? '請求先 / Bill to' : 'Bill to'}</span>
+                  <strong>{draft.clientName || 'Client name'}</strong>
+                  <span>{draft.clientEmail || 'client@email.com'}</span>
+                </div>
+                <div>
+                  <span>{activeTemplate.id === 'seikyu' ? '発行日 / Issued' : 'Issued'}</span>
+                  <strong>{formatFriendlyDate(draft.issueDate)}</strong>
+                </div>
+                <div>
+                  <span>{activeTemplate.id === 'seikyu' ? '支払期日 / Due' : 'Due'}</span>
+                  <strong>{formatFriendlyDate(draft.dueDate)}</strong>
+                </div>
+              </div>
+
+              {activeTemplate.id === 'emerald-ledger' && (
+                <div className="preview__summary-card">
+                  <header>
+                    <span>Payment summary</span>
+                    <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+                  </header>
+                  <ul>
+                    <li>
+                      <span>Subtotal</span>
+                      <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
+                    </li>
+                    <li>
+                      <span>Tax</span>
+                      <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
+                    </li>
+                    <li>
+                      <span>Status</span>
+                      <strong>{statusLookup.get(draft.status)}</strong>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              <div className="preview__table">
+                <div className="preview__table-row preview__table-row--head">
+                  <span>{activeTemplate.id === 'seikyu' ? '品目 / Item' : 'Description'}</span>
+                  <span>{activeTemplate.id === 'seikyu' ? '数量 / Qty' : 'Qty'}</span>
+                  <span>{activeTemplate.id === 'seikyu' ? '単価 / Rate' : 'Rate'}</span>
+                  <span>{activeTemplate.id === 'seikyu' ? '金額 / Total' : 'Total'}</span>
                 </div>
                 {draft.lines.map((line) => (
-                  <div key={line.id} className="line-items__row">
-                    <input
-                      type="text"
-                      value={line.description}
-                      placeholder="Design sprint"
-                      onChange={(event) => updateLine(line.id, 'description', event.target.value)}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={line.quantity}
-                      onChange={(event) => updateLine(line.id, 'quantity', event.target.value)}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={line.rate}
-                      onChange={(event) => updateLine(line.id, 'rate', event.target.value)}
-                    />
+                  <div key={line.id} className="preview__table-row">
+                    <span>{line.description || (activeTemplate.id === 'seikyu' ? 'サービス' : 'Line description')}</span>
+                    <span>{line.quantity}</span>
+                    <span>{formatCurrency(line.rate, draft.currency)}</span>
                     <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
-                    <button type="button" onClick={() => removeLine(line.id)} aria-label="Remove line item">
-                      ×
-                    </button>
                   </div>
                 ))}
               </div>
-            </div>
 
-            <footer className="form-grid__footer">
-              <div>
-                <span>Subtotal</span>
-                <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
-              </div>
-              <div>
-                <span>Tax</span>
-                <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
-              </div>
-              <div>
-                <span>Total</span>
-                <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-              </div>
-              <div className="form-grid__actions">
-                <button type="submit" className="button button--primary" disabled={saveState === 'saving'}>
-                  {saveState === 'saving' ? 'Saving…' : 'Save invoice'}
-                </button>
-                <button type="button" className="button button--ghost" onClick={handleDownload}>
-                  Download preview
-                </button>
-              </div>
-            </footer>
-          </form>
-        </section>
-
-        <aside className="panel preview-panel">
-          <header className="panel__header">
-            <div>
-              <h2>Live preview</h2>
-              <p>{activeTemplate.name}</p>
-            </div>
-            <button type="button" className="button button--ghost" onClick={() => setActiveSection('templates')}>
-              Change template
-            </button>
-          </header>
-          <div className="preview" data-template={activeTemplate.id}>
-            <div className="preview__header" style={{ background: activeTemplate.accent }}>
-              <div className="preview__header-info">
-                <span className="preview__header-subtitle">{activeTemplate.description}</span>
-                <strong>{draft.businessName || 'Your business name'}</strong>
-                <span>{draft.businessAddress || 'Add your business address'}</span>
-              </div>
-              <div className="preview__badge">
-                <span>{statusLookup.get(draft.status)}</span>
-                <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-              </div>
-            </div>
-
-            <div className="preview__meta">
-              <div>
-                <span>{activeTemplate.id === 'seikyu' ? '請求先 / Bill to' : 'Bill to'}</span>
-                <strong>{draft.clientName || 'Client name'}</strong>
-                <span>{draft.clientEmail || 'client@email.com'}</span>
-              </div>
-              <div>
-                <span>{activeTemplate.id === 'seikyu' ? '発行日 / Issued' : 'Issued'}</span>
-                <strong>{formatFriendlyDate(draft.issueDate)}</strong>
-              </div>
-              <div>
-                <span>{activeTemplate.id === 'seikyu' ? '支払期日 / Due' : 'Due'}</span>
-                <strong>{formatFriendlyDate(draft.dueDate)}</strong>
-              </div>
-            </div>
-
-            {activeTemplate.id === 'emerald-ledger' && (
-              <div className="preview__summary-card">
-                <header>
-                  <span>Payment summary</span>
-                  <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-                </header>
-                <ul>
-                  <li>
-                    <span>Subtotal</span>
-                    <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
-                  </li>
-                  <li>
-                    <span>Tax</span>
-                    <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
-                  </li>
-                  <li>
-                    <span>Status</span>
-                    <strong>{statusLookup.get(draft.status)}</strong>
-                  </li>
-                </ul>
-              </div>
-            )}
-
-            <div className="preview__table">
-              <div className="preview__table-row preview__table-row--head">
-                <span>{activeTemplate.id === 'seikyu' ? '品目 / Item' : 'Description'}</span>
-                <span>{activeTemplate.id === 'seikyu' ? '数量 / Qty' : 'Qty'}</span>
-                <span>{activeTemplate.id === 'seikyu' ? '単価 / Rate' : 'Rate'}</span>
-                <span>{activeTemplate.id === 'seikyu' ? '金額 / Total' : 'Total'}</span>
-              </div>
-              {draft.lines.map((line) => (
-                <div key={line.id} className="preview__table-row">
-                  <span>{line.description || (activeTemplate.id === 'seikyu' ? 'サービス' : 'Line description')}</span>
-                  <span>{line.quantity}</span>
-                  <span>{formatCurrency(line.rate, draft.currency)}</span>
-                  <span>{formatCurrency(line.quantity * line.rate, draft.currency)}</span>
+              <div className="preview__totals">
+                <div>
+                  <span>{activeTemplate.id === 'seikyu' ? '小計 / Subtotal' : 'Subtotal'}</span>
+                  <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <span>{activeTemplate.id === 'seikyu' ? '税額 / Tax' : 'Tax'}</span>
+                  <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
+                </div>
+                <div>
+                  <span>{activeTemplate.id === 'seikyu' ? '合計 / Total' : 'Total'}</span>
+                  <strong>{formatCurrency(totals.total, draft.currency)}</strong>
+                </div>
+              </div>
 
-            <div className="preview__totals">
-              <div>
-                <span>{activeTemplate.id === 'seikyu' ? '小計 / Subtotal' : 'Subtotal'}</span>
-                <strong>{formatCurrency(totals.subtotal, draft.currency)}</strong>
-              </div>
-              <div>
-                <span>{activeTemplate.id === 'seikyu' ? '税額 / Tax' : 'Tax'}</span>
-                <strong>{formatCurrency(totals.taxAmount, draft.currency)}</strong>
-              </div>
-              <div>
-                <span>{activeTemplate.id === 'seikyu' ? '合計 / Total' : 'Total'}</span>
-                <strong>{formatCurrency(totals.total, draft.currency)}</strong>
-              </div>
-            </div>
-
-            {activeTemplate.id === 'seikyu' && (
-              <div className="preview__hanko">
-                <span>印</span>
-                <small>Authorised seal</small>
-              </div>
-            )}
-
-            <div className="preview__notes">
-              <strong>{activeTemplate.id === 'seikyu' ? '備考 / Notes' : 'Notes'}</strong>
-              <p>{draft.notes || 'Add payment instructions or a thank you message.'}</p>
               {activeTemplate.id === 'seikyu' && (
-                <small>お支払い期限までにお振り込みをお願いいたします。</small>
+                <div className="preview__hanko">
+                  <span>印</span>
+                  <small>Authorised seal</small>
+                </div>
               )}
+
+              <div className="preview__notes">
+                <strong>{activeTemplate.id === 'seikyu' ? '備考 / Notes' : 'Notes'}</strong>
+                <p>{draft.notes || 'Add payment instructions or a thank you message.'}</p>
+                {activeTemplate.id === 'seikyu' && (
+                  <small>お支払い期限までにお振り込みをお願いいたします。</small>
+                )}
+              </div>
             </div>
-          </div>
-        </aside>
+          )}
+        </section>
       </div>
     );
   }
+
   function renderTemplateGallery() {
     return (
       <div className="workspace-section">
@@ -786,37 +800,11 @@ export default function WorkspacePage() {
           <header className="panel__header">
             <div>
               <h2>Template gallery</h2>
-              <p>Select a template to update the preview instantly.</p>
+              <p>Explore each template's layout before applying it to your invoice.</p>
             </div>
             <span className="badge">{templateCatalog.length} options</span>
           </header>
-          <div className="template-grid">
-            {templateCatalog.map((template) => {
-              const isActive = template.id === selectedTemplate;
-              return (
-                <button
-                  type="button"
-                  key={template.id}
-                  onClick={() => setSelectedTemplate(template.id)}
-                  className={`template-card${isActive ? ' template-card--active' : ''}`}
-                >
-                  <div className="template-card__preview" style={{ background: template.accent }}>
-                    <span>{template.name}</span>
-                  </div>
-                  <div className="template-card__body">
-                    <strong>{template.name}</strong>
-                    <p>{template.description}</p>
-                    <ul>
-                      {template.highlights.map((highlight) => (
-                        <li key={highlight}>{highlight}</li>
-                      ))}
-                    </ul>
-                    <small>{template.bestFor}</small>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          {renderTemplateThumbnails({ showDetails: true })}
         </div>
       </div>
     );
@@ -964,7 +952,7 @@ export default function WorkspacePage() {
       case 'dashboard':
         return renderDashboard();
       case 'invoices':
-        return renderInvoiceEditor();
+        return renderInvoices();
       case 'templates':
         return renderTemplateGallery();
       case 'clients':
