@@ -4,6 +4,7 @@ const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? '';
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_WEB_API_KEY?.trim() ?? '';
 
 export const firebaseConfigured = Boolean(projectId && apiKey);
+export const firebaseApiKey = apiKey;
 
 const baseUrl = firebaseConfigured
   ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`

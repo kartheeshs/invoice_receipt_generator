@@ -2363,6 +2363,45 @@ svg {
   accent-color: var(--accent-strong);
 }
 
+.auth-form__status {
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  border: 1px solid transparent;
+}
+
+.auth-form__status--error {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #b91c1c;
+}
+
+.auth-form__status--success {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(5, 150, 105, 0.26);
+  color: #047857;
+}
+
+.auth-form__status--info {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: var(--text-body);
+}
+
+.auth-callout {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px dashed rgba(59, 130, 246, 0.32);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.auth-callout strong {
+  color: var(--accent-strong);
+}
+
 .auth-form__submit {
   width: 100%;
   margin-top: 0.5rem;
