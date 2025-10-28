@@ -47,6 +47,36 @@ function escapePdfText(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
+function encodePdfString(value: string): string {
+  let isAscii = true;
+  for (const char of value) {
+    if (char.charCodeAt(0) > 0x7f) {
+      isAscii = false;
+      break;
+    }
+  }
+
+  if (isAscii) {
+    return `(${escapePdfText(value)})`;
+  }
+
+  const bytes: number[] = [0xfe, 0xff];
+  for (const char of value) {
+    const codePoint = char.codePointAt(0);
+    if (codePoint === undefined) continue;
+    if (codePoint <= 0xffff) {
+      bytes.push((codePoint >> 8) & 0xff, codePoint & 0xff);
+    } else {
+      let remaining = codePoint - 0x10000;
+      const high = 0xd800 + ((remaining >> 10) & 0x3ff);
+      const low = 0xdc00 + (remaining & 0x3ff);
+      bytes.push((high >> 8) & 0xff, high & 0xff, (low >> 8) & 0xff, low & 0xff);
+    }
+  }
+
+  return `<${bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase()}>`;
+}
+
 function formatDisplayDate(value: string | undefined, locale: string): string {
   if (!value) return '—';
   const parsed = new Date(value);
@@ -131,7 +161,7 @@ function writeText(
   }
   ops.push(`/${font} ${size} Tf`);
   ops.push(`1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm`);
-  ops.push(`(${escapePdfText(text)}) Tj`);
+  ops.push(`${encodePdfString(text)} Tj`);
   ops.push('ET');
 }
 
