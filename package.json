@@ -1,0 +1,16 @@
+{
+  "name": "invoice_receipt_generator",
+  "private": true,
+  "workspaces": [
+    "next-app"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=next-app",
+    "build": "npm run build --workspace=next-app",
+    "build:static": "npm run build:static --workspace=next-app",
+    "start": "npm run start --workspace=next-app",
+    "lint": "npm run lint --workspace=next-app",
+    "test": "npm run test --workspace=next-app || true",
+    "install:all": "npm install --workspace=next-app"
+  }
+}

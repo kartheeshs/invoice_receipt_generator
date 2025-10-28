@@ -1173,9 +1173,6 @@ export default function WorkspacePage() {
               <h2>{t('workspace.activity.heading', 'Activity timeline')}</h2>
               <p>{t('workspace.activity.description', 'Review invoice saves, reminders, and payments from newest to oldest.')}</p>
             </div>
-            <Link className="button button--ghost" href="/admin/console" prefetch={false}>
-              {t('workspace.activity.viewAdmin', 'View admin console')}
-            </Link>
           </header>
           {activityFeed.length ? (
             <ul className="timeline">

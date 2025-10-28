@@ -25,9 +25,10 @@ Easy Invoice GM7 は Next.js と Firebase を組み合わせて構築した請�
 
 ### 1. フロントエンド (`next-app`)
 
+> 💡 ルートディレクトリで `npm install` や `npm run dev` を実行すると、自動的に `next-app` ワークスペースに委譲されます。手動で `cd next-app` する必要はありません。
+
 1. 依存関係をインストール
    ```bash
-   cd next-app
    npm install
    ```
 2. Firebase プロジェクトを利用する場合は `.env.local` を作成（または `next-app/.env.example` をコピー）し、以下の環境変数を設定します。
