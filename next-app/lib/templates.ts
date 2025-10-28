@@ -15,6 +15,155 @@ export type TemplatePdfPalette = {
   accentBar?: RGB;
 };
 
+export type TemplateStructure = {
+  headerLayout: 'standard' | 'japanese' | 'compact';
+  totalsStyle: 'table' | 'underline' | 'side-panel' | 'badge' | 'stacked' | 'japanese';
+  infoLayout: 'standard' | 'split' | 'japanese';
+  lineItemStyle:
+    | 'default'
+    | 'striped'
+    | 'striped-light'
+    | 'outlined'
+    | 'ledger'
+    | 'separated'
+    | 'japanese';
+  columnLabels: {
+    description: string;
+    descriptionSecondary?: string;
+    quantity: string;
+    rate: string;
+    amount: string;
+  };
+  showPaymentDetails: boolean;
+  paymentDetailsLabel?: string;
+  paymentDetailsValue?: string;
+  showThankYou: boolean;
+  thankYouLabel?: string;
+};
+
+const defaultTemplateStructure: TemplateStructure = {
+  headerLayout: 'standard',
+  totalsStyle: 'side-panel',
+  infoLayout: 'standard',
+  lineItemStyle: 'striped',
+  columnLabels: {
+    description: 'Description',
+    quantity: 'Quantity',
+    rate: 'Rate',
+    amount: 'Amount',
+  },
+  showPaymentDetails: false,
+  showThankYou: false,
+};
+
+const templateStructures: Record<string, TemplateStructure> = {
+  'villa-coastal': {
+    headerLayout: 'standard',
+    totalsStyle: 'side-panel',
+    infoLayout: 'split',
+    lineItemStyle: 'striped-light',
+    columnLabels: {
+      description: 'Description',
+      quantity: 'Nights',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: false,
+    showThankYou: true,
+    thankYouLabel: 'We appreciate your stay with us.',
+  },
+  'atelier-minimal': {
+    headerLayout: 'standard',
+    totalsStyle: 'underline',
+    infoLayout: 'split',
+    lineItemStyle: 'outlined',
+    columnLabels: {
+      description: 'Description',
+      quantity: 'Qty',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: false,
+    showThankYou: false,
+  },
+  'royal-balance': {
+    headerLayout: 'standard',
+    totalsStyle: 'badge',
+    infoLayout: 'standard',
+    lineItemStyle: 'striped',
+    columnLabels: {
+      description: 'Description',
+      quantity: 'Qty',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: false,
+    showThankYou: true,
+    thankYouLabel: 'Thank you for your business.',
+  },
+  'harbour-slate': {
+    headerLayout: 'standard',
+    totalsStyle: 'table',
+    infoLayout: 'split',
+    lineItemStyle: 'separated',
+    columnLabels: {
+      description: 'Description',
+      quantity: 'Qty',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: false,
+    showThankYou: false,
+  },
+  seikyu: {
+    headerLayout: 'japanese',
+    totalsStyle: 'japanese',
+    infoLayout: 'japanese',
+    lineItemStyle: 'japanese',
+    columnLabels: {
+      description: 'Description',
+      descriptionSecondary: '品目',
+      quantity: 'Qty',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: true,
+    paymentDetailsLabel: 'Payment details',
+    paymentDetailsValue: 'Bank transfer — due on receipt',
+    showThankYou: true,
+    thankYouLabel: 'いつもありがとうございます。',
+  },
+  'aqua-ledger': {
+    headerLayout: 'standard',
+    totalsStyle: 'stacked',
+    infoLayout: 'standard',
+    lineItemStyle: 'striped',
+    columnLabels: {
+      description: 'Description',
+      quantity: 'Qty',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: false,
+    showThankYou: false,
+  },
+  'classic-ledger': {
+    headerLayout: 'standard',
+    totalsStyle: 'underline',
+    infoLayout: 'standard',
+    lineItemStyle: 'ledger',
+    columnLabels: {
+      description: 'Description',
+      quantity: 'Qty',
+      rate: 'Rate',
+      amount: 'Amount',
+    },
+    showPaymentDetails: false,
+    showThankYou: true,
+    thankYouLabel: 'Authorised signature',
+  },
+};
+
 export type InvoiceTemplate = {
   id: string;
   name: string;
@@ -24,6 +173,8 @@ export type InvoiceTemplate = {
   bestFor: string;
   highlights: string[];
   pdfPalette: TemplatePdfPalette;
+  tagline?: string;
+  structure?: TemplateStructure;
   supportsJapanese?: boolean;
 };
 
@@ -65,6 +216,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f2f8ff'),
       accentBar: rgb('#1d5fbf'),
     },
+    structure: templateStructures['villa-coastal'],
   },
   {
     id: 'atelier-minimal',
@@ -87,6 +239,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       border: rgb('#e2e8f0'),
       notesBackground: rgb('#f8fafc'),
     },
+    structure: templateStructures['atelier-minimal'],
   },
   {
     id: 'royal-balance',
@@ -110,6 +263,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#fdf2f8'),
       accentBar: rgb('#f472b6'),
     },
+    structure: templateStructures['royal-balance'],
   },
   {
     id: 'harbour-slate',
@@ -133,6 +287,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f1f5f9'),
       accentBar: rgb('#5fa8d3'),
     },
+    structure: templateStructures['harbour-slate'],
   },
   {
     id: 'seikyu',
@@ -156,6 +311,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#fff7ed'),
       accentBar: rgb('#f97316'),
     },
+    structure: templateStructures.seikyu,
     supportsJapanese: true,
   },
   {
@@ -180,6 +336,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#ecfdf5'),
       accentBar: rgb('#14b8a6'),
     },
+    structure: templateStructures['aqua-ledger'],
   },
   {
     id: 'classic-ledger',
@@ -202,9 +359,15 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       border: rgb('#d1d5db'),
       notesBackground: rgb('#f9fafb'),
     },
+    structure: templateStructures['classic-ledger'],
   },
 ];
 
-export function getInvoiceTemplate(id: string): InvoiceTemplate {
-  return invoiceTemplates.find((template) => template.id === id) ?? invoiceTemplates[0];
+export function getInvoiceTemplate(id: string): InvoiceTemplate & { structure: TemplateStructure } {
+  const template = invoiceTemplates.find((entry) => entry.id === id) ?? invoiceTemplates[0];
+  const structure = template.structure ?? templateStructures[template.id] ?? defaultTemplateStructure;
+  return {
+    ...template,
+    structure,
+  };
 }
