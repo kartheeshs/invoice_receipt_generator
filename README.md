@@ -1,133 +1,100 @@
-# 和式請求書ジェネレーター
+# Easy Invoice GM7（和式請求書ジェネレーター）
 
-日本のフリーランスや個人事業主がすぐに使える請求書・領収書作成アプリです。Google 認証でログインし、クラウドに請求書を保存・編集、ワンクリックで日本語スタイルのPDFを出力できます。無料プランでは月3件までPDFダウンロード可能、Stripeサブスクリプションでプレミアム（月額¥500）へアップグレードすると無制限で利用できます。
+Easy Invoice GM7 は Next.js と Firebase を組み合わせて構築した請求書・領収書ジェネレーターです。以前の Flutter 版で好評だったダッシュボード／インボイス編集／テンプレート選択 UI をそのままウェブアプリとして再現し、ブラウザだけで請求書の作成・プレビュー・PDF エクスポートまで完結できます。
 
 ## 主な機能
 
-- 🇯🇵 日本の商習慣に合わせたレイアウトの PDF を jsPDF で生成
-- 🔐 Firebase Authentication（Google）によるログイン
-- ☁️ Firestore への請求書データ保存と月次ダウンロード数トラッキング
-- 💳 Stripe Checkout / Billing Portal を使ったサブスクリプション課金
-- 🎨 Material UI を使ったプロフェッショナルな React ダッシュボード
-- 📱 レスポンシブ対応（PC / タブレット / スマートフォン）
+- 📊 トップナビゲーション付きダッシュボードで「ダッシュボード / 請求書 / テンプレート / クライアント / 設定」を素早く行き来
+- 🧾 請求書エディタとライブプレビューを同一画面に配置し、数値入力と同時に金額を再計算
+- 📄 ワンクリックで印刷用 HTML を生成し PDF としてダウンロード
+- ☁️ Firebase Firestore を利用した請求書の保存と最新履歴の取得（認証情報が未設定の場合はサンプルデータを表示）
+- 🌐 Next.js App Router を使った SEO 対応のマーケティングページとアプリ UI の共存
 
 ## リポジトリ構成
 
 ```
 .
-├── web/        # React + Vite フロントエンド
-└── server/     # Express + Stripe + Firebase Admin バックエンド
+├── next-app/        # Next.js (App Router) フロントエンド
+├── functions/       # Firebase Functions（サーバー拡張が必要な場合に使用）
+├── server/          # Stripe 連携などの Node/Express ユーティリティ
+├── firebase.json    # Firebase Hosting / Firestore / Functions の設定
+└── storage.rules    # Firebase Storage ルール
 ```
 
-## 必要要件
+## セットアップ
 
-- Node.js 18 以上
-- Firebase プロジェクト（Authentication + Firestore）
-- Stripe アカウント（定期課金用の Price ID と Webhook Secret）
+### 1. フロントエンド (`next-app`)
 
-## セットアップ手順
-
-### 1. フロントエンド (`web`)
+> 💡 ルートディレクトリで `npm install` や `npm run dev` を実行すると、自動的に `next-app` ワークスペースに委譲されます。手動で `cd next-app` する必要はありません。
 
 1. 依存関係をインストール
    ```bash
-   cd web
    npm install
    ```
-2. `.env` を作成（テンプレートは `.env.example`）
-   ```bash
-   cp .env.example .env
+2. Firebase プロジェクトを利用する場合は `.env.local` を作成（または `next-app/.env.example` をコピー）し、以下の環境変数を設定します。
+   ```env
+   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyC9yXs3QnOfRyLyN74QyilSfeKL-fVUxAQ
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=invoice-receipt-generator-g7.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=invoice-receipt-generator-g7
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=invoice-receipt-generator-g7.firebasestorage.app
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=798489264335
+   NEXT_PUBLIC_FIREBASE_APP_ID=1:798489264335:web:b1bc7f6fe8dc5e68de37ba
+   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-TKYV2VSPMZ
    ```
-   必要項目:
-   - `VITE_FIREBASE_*`: Firebase コンソールで取得
-   - `VITE_API_BASE_URL`: バックエンドの URL (ローカルの場合 `http://localhost:3001`)
-3. 開発サーバー起動
+3. 開発サーバーを起動
    ```bash
    npm run dev
    ```
-
-### 2. バックエンド (`server`)
-
-1. 依存関係をインストール
+   ブラウザで `http://localhost:3000` を開くとマーケティングページと `/app` ワークスペースが利用できます。
+4. Firebase Hosting へデプロイする静的ビルドを生成
    ```bash
-   cd server
-   npm install
+   npm run build:static
    ```
-2. `.env` を作成（テンプレートは `.env.example`）
-   ```bash
-   cp .env.example .env
-   ```
-   主な項目:
-   - `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` / `STRIPE_WEBHOOK_SECRET`
-   - `FIREBASE_SERVICE_ACCOUNT_JSON`: Firebase サービスアカウント JSON を base64 エンコードして設定
-   - `FRONTEND_URL`: フロントエンド URL（例: `http://localhost:5173`）
-3. 開発サーバー起動
-   ```bash
-   npm run dev
-   ```
-4. Stripe Webhook のローカル転送（任意）
-   ```bash
-   stripe listen --forward-to localhost:3001/billing/webhook
-   ```
+   出力先は `next-app/out/` です（`firebase.json` もこのパスを参照しています）。
 
-## Stripe 設定メモ
+### 2. Firebase Functions (`functions`)
 
-- 定期課金用の Price を Stripe ダッシュボードで作成し、`STRIPE_PRICE_ID` に設定します。
-- Webhook エンドポイント (`/billing/webhook`) に対して以下イベントの送信を有効化してください。
-  - `checkout.session.completed`
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
+必要に応じて以下を実行してください。
 
-## Firebase セキュリティルール例
-
-Firestore で `users/{userId}` 配下に請求書を保存します。最低限のルール例:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      match /invoices/{invoiceId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-  }
-}
+```bash
+cd functions
+npm install
+npm run lint
+npm run build
 ```
 
-## 利用している主な技術
+### 3. Node/Express サーバー (`server`)
+
+Stripe Webhook など追加のバックエンドが必要な場合に利用できます。
+
+```bash
+cd server
+npm install
+npm run dev
+```
+
+## Firebase Hosting へのデプロイ
+
+1. フロントエンドを静的ビルド
+   ```bash
+   npm run build:static
+   ```
+2. Firebase CLI からデプロイ
+   ```bash
+   firebase deploy --only hosting
+   ```
+   `next-app/out/` の内容がそのまま配信されます。
+
+## 利用技術
 
 | カテゴリ | 技術 |
 | --- | --- |
-| フロントエンド | React 18, Vite, TypeScript, Material UI, React Router |
-| 状態管理・認証 | Firebase Authentication, Firestore |
-| PDF 生成 | jsPDF + jspdf-autotable |
-| 課金 | Stripe Checkout / Billing Portal |
-| バックエンド | Express, Firebase Admin, Stripe SDK |
-
-## スクリプト一覧
-
-### フロントエンド (`web`)
-- `npm run dev` – 開発サーバー起動
-- `npm run build` – 本番ビルド
-- `npm run preview` – ビルド結果のプレビュー
-- `npm run lint` – ESLint による静的解析
-
-### バックエンド (`server`)
-- `npm run dev` – ts-node-dev でホットリロード開発
-- `npm run build` – TypeScript をコンパイル
-- `npm run start` – ビルド済みコードを実行
-
-## 今後の拡張アイデア
-
-- プレミアム向けにロゴアップロードやカスタムテンプレートを追加
-- 発行済み請求書のメール送信機能
-- 日本語フォントを埋め込んだ PDF の高品質化
-- 月次請求書の自動生成スケジューラ
+| フロントエンド | Next.js 15 (App Router), React 18, TypeScript |
+| UI / スタイリング | CSS Modules (グローバル), 自前デザインシステム |
+| 認証 / データ | Firebase Authentication, Firestore (REST API) |
+| PDF 生成 | ブラウザの `window.print()` を利用した HTML ベースのプレビュー |
+| その他 | Firebase Hosting, Firebase Functions, Stripe (server ディレクトリ) |
 
 ---
 
-プロダクション展開には HTTPS 対応、Stripe Webhook のシークレット管理、Firestore ルールの最適化などを行ってください。
+本番運用時は Firebase セキュリティルール、HTTPS、Stripe Webhook のシークレット管理などを適切に設定してください。

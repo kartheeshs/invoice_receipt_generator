@@ -1,4 +1,8 @@
+"use client";
+
 import Link from 'next/link';
+import { useMemo } from 'react';
+import { useTranslation } from '../lib/i18n';
 
 type TemplatePreview = {
   slug: string;
@@ -39,37 +43,48 @@ const features = [
 
 const templates: TemplatePreview[] = [
   {
-    slug: 'wave-blue',
-    name: 'Wave Blue',
-    tagline: 'Gradient masthead with balance badge and polished totals.',
-    accent: '#2563EB',
-    accentSoft: 'rgba(37, 99, 235, 0.14)',
-    header: ['#1D4ED8', '#60A5FA'],
-    border: 'rgba(37, 99, 235, 0.18)',
-    tableHeader: '#1D4ED8',
-    stripe: 'rgba(37, 99, 235, 0.08)',
+    slug: 'villa-coastal',
+    name: 'Villa Coastal',
+    tagline: 'Azure header with booking summary badge for hospitality teams.',
+    accent: '#1D5FBF',
+    accentSoft: 'rgba(29, 95, 191, 0.14)',
+    header: ['#0B366B', '#3CA1FF'],
+    border: 'rgba(29, 95, 191, 0.18)',
+    tableHeader: '#1D5FBF',
+    stripe: 'rgba(28, 123, 230, 0.08)',
   },
   {
-    slug: 'corporate-slate',
-    name: 'Corporate Slate',
-    tagline: 'Monochrome business template with modular sections.',
+    slug: 'classic-ledger',
+    name: 'Classic Ledger',
+    tagline: 'Sharp monochrome layout with crisp dividers for formal billing.',
     accent: '#111827',
-    accentSoft: 'rgba(15, 23, 42, 0.12)',
-    header: ['#F3F4F6', '#FFFFFF'],
+    accentSoft: 'rgba(15, 23, 42, 0.1)',
+    header: ['#F8FAFC', '#E2E8F0'],
     border: 'rgba(15, 23, 42, 0.16)',
     tableHeader: '#1F2937',
-    stripe: 'rgba(15, 23, 42, 0.06)',
+    stripe: 'rgba(15, 23, 42, 0.05)',
   },
   {
-    slug: 'emerald-stripe',
-    name: 'Emerald Stripe',
-    tagline: 'Fresh greens with card-style totals and signature block.',
-    accent: '#047857',
-    accentSoft: 'rgba(4, 120, 87, 0.16)',
-    header: ['#0F766E', '#22C55E'],
-    border: 'rgba(4, 120, 87, 0.22)',
+    slug: 'harbour-slate',
+    name: 'Harbour Slate',
+    tagline: 'Travel folio layout with grey-blue masthead and stay summary.',
+    accent: '#1D4E89',
+    accentSoft: 'rgba(29, 78, 137, 0.14)',
+    header: ['#012A4A', '#5FA8D3'],
+    border: 'rgba(29, 78, 137, 0.18)',
+    tableHeader: '#1D4E89',
+    stripe: 'rgba(148, 163, 184, 0.12)',
+  },
+  {
+    slug: 'aqua-ledger',
+    name: 'Aqua Ledger',
+    tagline: 'Teal balance capsule with alternating aqua striping.',
+    accent: '#14B8A6',
+    accentSoft: 'rgba(20, 184, 166, 0.16)',
+    header: ['#0F766E', '#22D3EE'],
+    border: 'rgba(20, 184, 166, 0.22)',
     tableHeader: '#0F766E',
-    stripe: 'rgba(4, 120, 87, 0.08)',
+    stripe: 'rgba(45, 212, 191, 0.12)',
   },
   {
     slug: 'seikyu',
@@ -123,6 +138,67 @@ const plans = [
     points: ['Dedicated CSM & migration', 'Custom domains & SSO', 'Bespoke template engineering'],
   },
 ];
+
+const statsJa = [
+  { value: '1.8k+', label: '毎月 Easy Invoice GM7 を利用するチーム数' },
+  { value: '3 分', label: '下書きからダウンロードまでの平均時間' },
+  { value: '28', label: '自動フォーマット対応通貨数' },
+];
+
+const featuresJa = [
+  {
+    title: '文脈を保つエディター',
+    body: '明細、支払い条件、ブランドカラーを更新すると、PDF プレビューがリアルタイムで反映します。',
+  },
+  {
+    title: '信頼されるテンプレート',
+    body: 'バランスサマリーやバイリンガルラベルを備えた金融監修済みのレイアウトを選択できます。',
+  },
+  {
+    title: 'コラボレーション機能',
+    body: 'チームを招待し、承認フローやコメントを追加しても、全ての履歴を公開する必要はありません。',
+  },
+  {
+    title: '自然な自動化',
+    body: 'フォローアップメールやリマインダーをスケジュールし、支払い状況をダッシュボードで確認できます。',
+  },
+];
+
+const workflowJa = [
+  { step: '01', title: 'キャンバスをパーソナライズ', body: 'ロゴをアップロードし、テンプレートを選び、サービスや税の文言を再利用可能なブロックとして保存します。' },
+  { step: '02', title: '一度入力すれば再利用', body: '顧客情報や支払い条件、振込先を保存しておけば、次の書類は完成に近い状態で開始できます。' },
+  { step: '03', title: 'すぐに共有', body: 'ベクター品質の PDF をエクスポートしたり、安全なリンクやブランドメールで送信できます。' },
+];
+
+const plansJa = [
+  {
+    tier: 'スターター',
+    price: '¥0',
+    description: 'プロ品質の請求書を素早く作成したい個人事業主向け。',
+    points: ['請求書と領収書を無制限に作成', '2 種類のプレミアムテンプレート', 'スマートリマインダーとステータス追跡'],
+  },
+  {
+    tier: 'グロース',
+    price: '¥999/月',
+    featured: true,
+    description: '共同編集、バージョン履歴、自動化をすべて解放するチーム向けプラン。',
+    points: ['スタータープランの全機能', '承認ワークフローと権限管理', 'テンプレートのバージョン履歴', '分析ワークスペース'],
+  },
+  {
+    tier: 'エンタープライズ',
+    price: 'ご相談ください',
+    description: 'カスタムテンプレート、SSO、専任サポートを備えたエンタープライズ導入。',
+    points: ['専任 CSM と移行支援', 'カスタムドメインと SSO', 'カスタムテンプレート開発'],
+  },
+];
+
+const templateTaglinesJa: Record<string, string> = {
+  'villa-coastal': 'リゾートの領収書を思わせるブルーのヘッダーと予約サマリーが特徴です。',
+  'classic-ledger': '正式な帳票に最適なモノクロレイアウト。',
+  'harbour-slate': '旅行明細に合わせたブルーグレーのヘッダーと予約サマリーが特徴です。',
+  'aqua-ledger': 'バランスカプセルと交互のティールストライプでモダンな印象に。',
+  seikyu: 'バイリンガル見出しと判子スペース付きの請求書。',
+};
 
 function TemplateThumbnail({ template }: { template: TemplatePreview }) {
   return (
@@ -198,27 +274,44 @@ function TemplateThumbnail({ template }: { template: TemplatePreview }) {
 }
 
 export default function LandingPage() {
+  const { language, t } = useTranslation();
+
+  const localizedStats = useMemo(() => (language === 'ja' ? statsJa : stats), [language]);
+  const localizedFeatures = useMemo(() => (language === 'ja' ? featuresJa : features), [language]);
+  const localizedWorkflow = useMemo(() => (language === 'ja' ? workflowJa : workflow), [language]);
+  const localizedPlans = useMemo(() => {
+    const base = language === 'ja' ? plansJa : plans;
+    return base.map((plan) => {
+      if ((language === 'ja' && plan.tier === 'グロース') || (language === 'en' && plan.tier === 'Growth')) {
+        return { ...plan, price: language === 'ja' ? '¥999/月' : '$10/mo' };
+      }
+      return plan;
+    });
+  }, [language]);
+
+  const priceNote = t(
+    'landing.pricing.currencyHint',
+    'Use Easy Invoice GM7 for ¥999/mo in Japan and $10/mo in other regions.',
+  );
+
   return (
     <>
       <section className="hero container" id="hero">
         <div className="hero__content">
-          <span className="badge">Invoice &amp; receipt workspace</span>
-          <h1 className="hero__title">Send polished invoices in minutes, not hours.</h1>
-          <p>
-            Build branded invoices and receipts with finance-approved templates, collaborate with teammates, and export
-            vector-perfect PDFs from one shared workspace.
-          </p>
+          <span className="badge">{t('landing.hero.badge', 'Invoice & receipt workspace')}</span>
+          <h1 className="hero__title">{t('landing.hero.title', 'Send polished invoices in minutes, not hours.')}</h1>
+          <p>{t('landing.hero.subtitle', 'Build branded invoices and receipts with finance-reviewed templates and export vector-perfect PDFs in minutes.')}</p>
           <div className="hero__actions">
             <Link href="/app" className="button button--primary" prefetch={false}>
-              Launch the app
+              {t('landing.hero.ctaPrimary', 'Launch the app')}
             </Link>
             <Link href="#templates" className="button button--ghost" prefetch={false}>
-              Browse templates
+              {t('landing.hero.ctaSecondary', 'Browse templates')}
             </Link>
           </div>
           <div className="hero__card-grid">
-            {stats.map((stat) => (
-              <div key={stat.value} className="hero__card-metric">
+            {localizedStats.map((stat) => (
+              <div key={`${stat.value}-${stat.label}`} className="hero__card-metric">
                 <strong style={{ fontSize: '1.4rem', color: 'var(--text-strong)' }}>{stat.value}</strong>
                 <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{stat.label}</span>
               </div>
@@ -228,20 +321,23 @@ export default function LandingPage() {
         <aside className="hero__card">
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <span className="badge" style={{ width: 'fit-content' }}>
-              Live preview
+              {t('landing.hero.cardBadge', 'Live preview')}
             </span>
-            <h3 style={{ margin: 0, color: 'var(--text-strong)' }}>Invoice Atlas Canvas</h3>
+            <h3 style={{ margin: 0, color: 'var(--text-strong)' }}>{t('landing.hero.cardTitle', 'Easy Invoice GM7 Canvas')}</h3>
             <p style={{ margin: 0 }}>
-              Every tweak you make—colours, copy, payments—updates the PDF instantly so you always know what clients will see.
+              {t(
+                'landing.hero.cardBody',
+                'Every tweak you make—colours, copy, payments—updates the PDF instantly so you always know what clients will see.',
+              )}
             </p>
           </div>
           <TemplateThumbnail template={templates[0]} />
           <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <strong style={{ color: 'var(--text-strong)' }}>Why teams switch</strong>
+            <strong style={{ color: 'var(--text-strong)' }}>{t('landing.hero.switchReasons', 'Why teams switch')}</strong>
             <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'grid', gap: '0.35rem', color: 'var(--text-body)' }}>
-              <li>No design tools required</li>
-              <li>Shared template library</li>
-              <li>PDFs that pass finance reviews</li>
+              <li>{t('landing.hero.reason1', 'No design tools required')}</li>
+              <li>{t('landing.hero.reason2', 'Shared template library')}</li>
+              <li>{t('landing.hero.reason3', 'PDFs that pass finance reviews')}</li>
             </ul>
           </div>
         </aside>
@@ -249,14 +345,16 @@ export default function LandingPage() {
 
       <section className="container" id="features">
         <div className="section-heading">
-          <h2>Everything you need to move from draft to paid</h2>
+          <h2>{t('landing.features.heading', 'Everything you need to move from draft to paid')}</h2>
           <p>
-            The workspace blends the speed of a form with the power of a layout designer. Start with a proven template, update
-            the details, and export with confidence.
+            {t(
+              'landing.features.subtitle',
+              'The workspace blends the speed of a form with the power of a layout designer. Start with a proven template, update the details, and export with confidence.',
+            )}
           </p>
         </div>
         <div className="feature-grid" style={{ marginTop: '2rem' }}>
-          {features.map((feature) => (
+          {localizedFeatures.map((feature) => (
             <article key={feature.title} className="feature-card">
               <h3>{feature.title}</h3>
               <p>{feature.body}</p>
@@ -267,33 +365,42 @@ export default function LandingPage() {
 
       <section className="container template-gallery" id="templates">
         <div className="section-heading">
-          <h2>Template gallery</h2>
+          <h2>{t('landing.templates.heading', 'Template gallery')}</h2>
           <p>
-            Swap layouts with a click. Each template adjusts typography, colour, and summary blocks without breaking your data.
+            {t(
+              'landing.templates.body',
+              'Swap layouts with a click. Each template adjusts typography, colour, and summary blocks without breaking your data.',
+            )}
           </p>
         </div>
         <div className="template-grid">
-          {templates.map((template) => (
-            <article key={template.slug} className="template-card">
-              <TemplateThumbnail template={template} />
-              <div style={{ display: 'grid', gap: '0.35rem' }}>
-                <h3>{template.name}</h3>
-                <p style={{ margin: 0 }}>{template.tagline}</p>
-              </div>
-            </article>
-          ))}
+          {templates.map((template) => {
+            const tagline = language === 'ja' ? templateTaglinesJa[template.slug] ?? template.tagline : template.tagline;
+            return (
+              <article key={template.slug} className="template-card">
+                <TemplateThumbnail template={template} />
+                <div style={{ display: 'grid', gap: '0.35rem' }}>
+                  <h3>{template.name}</h3>
+                  <p style={{ margin: 0 }}>{tagline}</p>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 
       <section className="container" id="workflow">
         <div className="section-heading">
-          <h2>Designed for the full billing workflow</h2>
+          <h2>{t('landing.workflow.heading', 'Designed for the full billing workflow')}</h2>
           <p>
-            From the first draft to the paid receipt, Invoice Atlas keeps teams aligned and clients confident.
+            {t(
+              'landing.workflow.subtitle',
+              'From the first draft to the paid receipt, Easy Invoice GM7 keeps teams aligned and clients confident.',
+            )}
           </p>
         </div>
         <div className="workflow-timeline" style={{ marginTop: '2rem' }}>
-          {workflow.map((item) => (
+          {localizedWorkflow.map((item) => (
             <article key={item.step} className="workflow-step">
               <strong>{item.step}</strong>
               <h3 style={{ margin: 0, color: 'var(--text-strong)' }}>{item.title}</h3>
@@ -305,13 +412,17 @@ export default function LandingPage() {
 
       <section className="container" id="pricing">
         <div className="section-heading">
-          <h2>Pricing that scales with your billing volume</h2>
+          <h2>{t('landing.pricing.heading', 'Pricing that scales with your billing volume')}</h2>
           <p>
-            Start free, upgrade when collaboration or automation becomes essential. No surprise fees—ever.
+            {t(
+              'landing.pricing.subtitle',
+              'Start free, upgrade when collaboration or automation becomes essential. No surprise fees—ever.',
+            )}
           </p>
         </div>
-        <div className="pricing-grid" style={{ marginTop: '2rem' }}>
-          {plans.map((plan) => (
+        <p className="pricing-note">{priceNote}</p>
+        <div className="pricing-grid" style={{ marginTop: '1.5rem' }}>
+          {localizedPlans.map((plan) => (
             <article key={plan.tier} className={`pricing-card${plan.featured ? ' is-featured' : ''}`}>
               <div>
                 <h3>{plan.tier}</h3>
@@ -324,7 +435,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link href="/app" className="button button--ghost" prefetch={false}>
-                Get started
+                {t('landing.pricing.cta', 'Get started')}
               </Link>
             </article>
           ))}
@@ -333,14 +444,14 @@ export default function LandingPage() {
 
       <section className="container">
         <div className="cta">
-          <h2>Ready to send your next invoice?</h2>
-          <p>Spin up a polished invoice in minutes and keep every client touchpoint on brand.</p>
+          <h2>{t('landing.cta.title', 'Ready to send your next invoice?')}</h2>
+          <p>{t('landing.cta.body', 'Spin up a polished invoice in minutes and keep every client touchpoint on brand.')}</p>
           <div className="hero__actions" style={{ justifyContent: 'center' }}>
             <Link href="/app" className="button button--primary" prefetch={false}>
-              Launch workspace
+              {t('landing.cta.primary', 'Launch workspace')}
             </Link>
             <Link href="/app" className="button button--ghost" prefetch={false}>
-              View dashboard
+              {t('landing.cta.secondary', 'View dashboard')}
             </Link>
           </div>
         </div>

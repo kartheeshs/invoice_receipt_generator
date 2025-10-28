@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
+import Providers from './providers';
+import SiteHeader from './site-header';
+import SiteFooter from './site-footer';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -9,17 +11,17 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Invoice Atlas — Professional Invoice & Receipt Generator',
+  title: 'Easy Invoice GM7 — Modern Invoice & Receipt Workspace',
   description:
-    'Design polished invoices and receipts in minutes. Preview finance-approved templates, collaborate with teammates, and export vector-perfect PDFs.',
+    'Create polished invoices, switch between branded templates, and sync with Firebase in a single browser-first workspace.',
   openGraph: {
-    title: 'Invoice Atlas',
+    title: 'Easy Invoice GM7',
     description:
-      'Design polished invoices and receipts in minutes. Preview finance-approved templates, collaborate with teammates, and export vector-perfect PDFs.',
-    url: 'https://invoice-atlas.example.com',
-    siteName: 'Invoice Atlas',
+      'Create polished invoices, switch between branded templates, and sync with Firebase in a single browser-first workspace.',
+    url: 'https://easy-invoice-gm7.example.com',
+    siteName: 'Easy Invoice GM7',
   },
-  metadataBase: new URL('https://invoice-atlas.example.com'),
+  metadataBase: new URL('https://easy-invoice-gm7.example.com'),
 };
 
 export default function RootLayout({
@@ -27,79 +29,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const year = new Date().getFullYear();
   return (
     <html lang="en" className={plusJakarta.variable}>
       <body>
-        <div className="site-shell">
-          <header className="site-header">
-            <div className="container site-header__inner">
-              <Link href="/" className="site-brand" prefetch={false}>
-                <span className="site-brand__mark">IA</span>
-                <span className="site-brand__meta">
-                  <strong>Invoice Atlas</strong>
-                  <span>Polished billing in minutes</span>
-                </span>
-              </Link>
-              <nav className="site-nav">
-                <a href="#features">Features</a>
-                <a href="#templates">Templates</a>
-                <a href="#workflow">Workflow</a>
-                <a href="#pricing">Pricing</a>
-                <Link href="/privacy-policy" prefetch={false}>
-                  Privacy
-                </Link>
-                <Link href="/app" className="button button--primary" prefetch={false}>
-                  Launch app
-                </Link>
-              </nav>
-            </div>
-          </header>
-          <main>{children}</main>
-          <footer className="site-footer">
-            <div className="container site-footer__grid">
-              <div>
-                <h3>Invoice Atlas</h3>
-                <p>
-                  Create invoice and receipt PDFs that feel bespoke without fighting a designer. The marketing site and the Flutter workspace share a single design system.
-                </p>
-              </div>
-              <div>
-                <h3>Explore</h3>
-                <ul>
-                  <li>
-                    <a href="#features">Feature tour</a>
-                  </li>
-                  <li>
-                    <a href="#templates">Template gallery</a>
-                  </li>
-                  <li>
-                    <a href="#pricing">Pricing</a>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h3>Company</h3>
-                <ul>
-                  <li>
-                    <Link href="/privacy-policy" prefetch={false}>
-                      Privacy policy
-                    </Link>
-                  </li>
-                  <li>
-                    <a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a>
-                  </li>
-                  <li>
-                    <Link href="/admin" prefetch={false}>
-                      Admin console
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div className="site-footer__meta">© {year} Invoice Atlas. All rights reserved.</div>
-          </footer>
-        </div>
+        <Providers>
+          <div className="site-shell">
+            <SiteHeader />
+            <main>{children}</main>
+            <SiteFooter />
+          </div>
+        </Providers>
       </body>
     </html>
   );
