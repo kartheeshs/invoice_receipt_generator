@@ -427,6 +427,7 @@ function buildContentStream(
 ): ContentResult {
   const palette: TemplatePdfPalette = template.pdfPalette;
   const structure = template.structure;
+  const resolvedLabels: PdfLabels = { ...labels, ...(structure.labelOverrides ?? {}) };
   const ops: string[] = [];
   const images: PdfImageResource[] = [];
   const pageWidth = 595.28;
@@ -450,7 +451,7 @@ function buildContentStream(
 
   const headerX = margin + headerPadding;
   let headerTextY = headerY + headerHeight - headerPadding;
-  const invoiceLabel = labels.invoiceTitle;
+  const invoiceLabel = resolvedLabels.invoiceTitle;
   writeText(ops, invoiceLabel, headerX, headerTextY, structure.headerLayout === 'standard' ? 22 : 20, 'F2', palette.headerText);
   headerTextY -= structure.headerLayout === 'standard' ? 26 : 22;
 
@@ -488,15 +489,15 @@ function buildContentStream(
   }
 
   drawRect(ops, badgeX, badgeY, badgeWidth, badgeHeight, palette.badgeBackground);
-  writeText(ops, labels.total, badgeX + 14, badgeY + badgeHeight - 20, 10, 'F1', palette.mutedText);
+  writeText(ops, resolvedLabels.total, badgeX + 14, badgeY + badgeHeight - 20, 10, 'F1', palette.mutedText);
   writeText(ops, formatCurrency(totals.total, currency, locale), badgeX + 14, badgeY + badgeHeight - 36, 16, 'F2', palette.badgeText);
-  const statusString = `${labels.statusLabel}: ${labels.statusValue}`;
+  const statusString = `${resolvedLabels.statusLabel}: ${resolvedLabels.statusValue}`;
   writeText(ops, statusString, badgeX + 14, badgeY + 16, 9, 'F1', palette.mutedText);
 
   const metaBoxY = badgeY - 34;
   writeText(
     ops,
-    `${labels.issueDate}: ${formatDisplayDate(draft.issueDate, locale)}`,
+    `${resolvedLabels.issueDate}: ${formatDisplayDate(draft.issueDate, locale)}`,
     badgeX,
     metaBoxY,
     9,
@@ -505,7 +506,7 @@ function buildContentStream(
   );
   writeText(
     ops,
-    `${labels.dueDate}: ${formatDisplayDate(draft.dueDate, locale)}`,
+    `${resolvedLabels.dueDate}: ${formatDisplayDate(draft.dueDate, locale)}`,
     badgeX,
     metaBoxY - 14,
     9,
@@ -517,7 +518,7 @@ function buildContentStream(
   const clientColumnX = margin;
   const businessColumnX = structure.infoLayout === 'split' ? margin + contentWidth / 2 : pageWidth - margin - 220;
 
-  writeText(ops, labels.billTo, clientColumnX, y, 11, 'F2', palette.bodyText);
+  writeText(ops, resolvedLabels.billTo, clientColumnX, y, 11, 'F2', palette.bodyText);
   y -= 16;
   writeText(ops, draft.clientName.trim() || '—', clientColumnX, y, 11, 'F1', palette.bodyText);
   if (draft.clientEmail.trim()) {
@@ -531,15 +532,15 @@ function buildContentStream(
 
   let businessInfoY = headerY - 28;
   if (structure.infoLayout === 'split') {
-    writeText(ops, labels.currency, businessColumnX, businessInfoY, 9, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.currency, businessColumnX, businessInfoY, 9, 'F1', palette.mutedText);
     businessInfoY -= 12;
     writeText(ops, draft.currency, businessColumnX, businessInfoY, 10, 'F1', palette.bodyText);
     businessInfoY -= 18;
-    writeText(ops, labels.issueDate, businessColumnX, businessInfoY, 9, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.issueDate, businessColumnX, businessInfoY, 9, 'F1', palette.mutedText);
     businessInfoY -= 12;
     writeText(ops, formatDisplayDate(draft.issueDate, locale), businessColumnX, businessInfoY, 10, 'F1', palette.bodyText);
     businessInfoY -= 18;
-    writeText(ops, labels.dueDate, businessColumnX, businessInfoY, 9, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.dueDate, businessColumnX, businessInfoY, 9, 'F1', palette.mutedText);
     businessInfoY -= 12;
     writeText(ops, formatDisplayDate(draft.dueDate, locale), businessColumnX, businessInfoY, 10, 'F1', palette.bodyText);
     businessInfoY -= 18;
@@ -559,25 +560,25 @@ function buildContentStream(
     }
   } else if (structure.infoLayout === 'japanese') {
     const issueBlockY = y - 12;
-    writeText(ops, labels.issueDate, businessColumnX, issueBlockY, 10, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.issueDate, businessColumnX, issueBlockY, 10, 'F1', palette.mutedText);
     writeText(ops, formatDisplayDate(draft.issueDate, locale), businessColumnX + 110, issueBlockY, 10, 'F1', palette.bodyText);
-    writeText(ops, labels.dueDate, businessColumnX, issueBlockY - 16, 10, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.dueDate, businessColumnX, issueBlockY - 16, 10, 'F1', palette.mutedText);
     writeText(ops, formatDisplayDate(draft.dueDate, locale), businessColumnX + 110, issueBlockY - 16, 10, 'F1', palette.bodyText);
-    writeText(ops, labels.currency, businessColumnX, issueBlockY - 32, 10, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.currency, businessColumnX, issueBlockY - 32, 10, 'F1', palette.mutedText);
     writeText(ops, draft.currency, businessColumnX + 110, issueBlockY - 32, 10, 'F1', palette.bodyText);
     businessInfoY = issueBlockY - 48;
     y = issueBlockY - 48;
   } else {
     let metaY = headerY - 28;
-    writeText(ops, labels.issueDate, businessColumnX, metaY, 9, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.issueDate, businessColumnX, metaY, 9, 'F1', palette.mutedText);
     metaY -= 12;
     writeText(ops, formatDisplayDate(draft.issueDate, locale), businessColumnX, metaY, 10, 'F1', palette.bodyText);
     metaY -= 16;
-    writeText(ops, labels.dueDate, businessColumnX, metaY, 9, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.dueDate, businessColumnX, metaY, 9, 'F1', palette.mutedText);
     metaY -= 12;
     writeText(ops, formatDisplayDate(draft.dueDate, locale), businessColumnX, metaY, 10, 'F1', palette.bodyText);
     metaY -= 16;
-    writeText(ops, labels.currency, businessColumnX, metaY, 9, 'F1', palette.mutedText);
+    writeText(ops, resolvedLabels.currency, businessColumnX, metaY, 9, 'F1', palette.mutedText);
     metaY -= 12;
     writeText(ops, draft.currency, businessColumnX, metaY, 10, 'F1', palette.bodyText);
   }
@@ -598,10 +599,10 @@ function buildContentStream(
     amount: string;
     descriptionSecondary?: string;
   } = {
-    description: labels.description,
-    quantity: labels.quantity,
-    rate: labels.rate,
-    amount: labels.amount,
+    description: resolvedLabels.description,
+    quantity: resolvedLabels.quantity,
+    rate: resolvedLabels.rate,
+    amount: resolvedLabels.amount,
     ...(structure.columnLabels ?? {}),
   };
   writeText(ops, columnLabels.description, descX, headerBaseline, 10, 'F2', palette.tableHeaderText);
@@ -654,7 +655,7 @@ function buildContentStream(
     structure,
     palette,
     totals,
-    labels,
+    resolvedLabels,
     currency,
     locale,
     margin,
@@ -668,7 +669,7 @@ function buildContentStream(
     const noteHeight = noteLines.length * 14 + 30;
     const notesBoxY = notesY - noteHeight + 10;
     drawRect(ops, margin, notesBoxY, contentWidth, noteHeight, palette.notesBackground);
-    writeText(ops, labels.notes, margin + 12, notesBoxY + noteHeight - 20, 10, 'F2', palette.mutedText);
+    writeText(ops, resolvedLabels.notes, margin + 12, notesBoxY + noteHeight - 20, 10, 'F2', palette.mutedText);
     writeMultiline(ops, noteLines, margin + 12, notesBoxY + noteHeight - 36, 10, 'F1', 14, palette.bodyText);
     notesY = notesBoxY - 18;
   }

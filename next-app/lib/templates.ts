@@ -23,6 +23,25 @@ export type TemplateColumnLabels = {
   amount?: string;
 };
 
+export type TemplateLabelKey =
+  | 'invoiceTitle'
+  | 'billTo'
+  | 'issueDate'
+  | 'dueDate'
+  | 'statusLabel'
+  | 'statusValue'
+  | 'currency'
+  | 'description'
+  | 'quantity'
+  | 'rate'
+  | 'amount'
+  | 'subtotal'
+  | 'tax'
+  | 'total'
+  | 'notes';
+
+export type TemplateLabelOverrides = Partial<Record<TemplateLabelKey, string>>;
+
 export type TemplateStructure = {
   headerLayout: 'standard' | 'japanese' | 'compact';
   totalsStyle: 'table' | 'underline' | 'side-panel' | 'badge' | 'stacked' | 'japanese';
@@ -36,6 +55,7 @@ export type TemplateStructure = {
     | 'separated'
     | 'japanese';
   columnLabels?: TemplateColumnLabels;
+  labelOverrides?: TemplateLabelOverrides;
   showPaymentDetails: boolean;
   paymentDetailsLabel?: string;
   paymentDetailsValue?: string;
@@ -100,6 +120,18 @@ const templateStructures: Record<string, TemplateStructure> = {
       quantity: '数量',
       rate: '単価',
       amount: '金額',
+    },
+    labelOverrides: {
+      invoiceTitle: '請求書 / Invoice',
+      billTo: '請求先 / Bill to',
+      issueDate: '発行日 / Issued',
+      dueDate: '支払期日 / Due',
+      statusLabel: 'ステータス / Status',
+      currency: '通貨 / Currency',
+      subtotal: '小計 / Subtotal',
+      tax: '税額 / Tax',
+      total: '合計 / Total',
+      notes: '備考 / Notes',
     },
     showPaymentDetails: true,
     paymentDetailsLabel: 'Payment details',
