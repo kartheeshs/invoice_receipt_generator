@@ -4,24 +4,13 @@ next-app/node_modules/
 next-app/.next/
 next-app/out/
 .env
-web/.env
 server/.env
 dist/
-web/dist/
 server/dist/
-.DS_Store
 stripe.log
-
 
 # Firebase
 .firebase/
-
-# Flutter build + metadata
-web/build/
-web/.dart_tool/
-web/.idea/
-web/.metadata
-web/pubspec.lock
 
 # Node dependencies (inside functions)
 functions/node_modules/
@@ -29,4 +18,3 @@ functions/node_modules/
 # OS files
 .DS_Store
 Thumbs.db
-

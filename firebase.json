@@ -23,7 +23,7 @@
     }
   ],
   "hosting": {
-    "public": "web/build/web",
+    "public": "next-app/out",
     "ignore": [
       "firebase.json",
       "**/.*",

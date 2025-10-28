@@ -1,24 +1,27 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
+import Providers from './providers';
+import SiteHeader from './site-header';
+import SiteFooter from './site-footer';
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  variable: '--font-plus-jakarta',
+  variable: '--font-sans',
 });
 
 export const metadata: Metadata = {
-  title: 'Invoice Atlas — Global Invoicing Reinvented',
+  title: 'Easy Invoice GM7 — Modern Invoice & Receipt Workspace',
   description:
-    'Generate polished invoices in minutes, collaborate with teams, and export high-fidelity PDFs that respect local business norms worldwide.',
+    'Create polished invoices, switch between branded templates, and sync with Firebase in a single browser-first workspace.',
   openGraph: {
-    title: 'Invoice Atlas',
+    title: 'Easy Invoice GM7',
     description:
-      'Generate polished invoices in minutes, collaborate with teams, and export high-fidelity PDFs that respect local business norms worldwide.',
-    url: 'https://invoice-atlas.example.com',
-    siteName: 'Invoice Atlas',
+      'Create polished invoices, switch between branded templates, and sync with Firebase in a single browser-first workspace.',
+    url: 'https://easy-invoice-gm7.example.com',
+    siteName: 'Easy Invoice GM7',
   },
-  metadataBase: new URL('https://invoice-atlas.example.com'),
+  metadataBase: new URL('https://easy-invoice-gm7.example.com'),
 };
 
 export default function RootLayout({
@@ -29,54 +32,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={plusJakarta.variable}>
       <body>
-        <div className="navbar">
-          <div className="navbar-inner">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div className="badge">Invoice Atlas</div>
-              <span style={{ color: '#475569', fontWeight: 500 }}>
-                Professional invoices without the heavy lift
-              </span>
-            </div>
-            <nav className="nav-links">
-              <a href="#features">Features</a>
-              <a href="#pricing">Pricing</a>
-              <a href="/privacy-policy">Privacy</a>
-              <a className="primary-button" href="/app">
-                Launch app
-              </a>
-            </nav>
+        <Providers>
+          <div className="site-shell">
+            <SiteHeader />
+            <main>{children}</main>
+            <SiteFooter />
           </div>
-        </div>
-        <main>{children}</main>
-        <footer className="footer">
-          <div className="footer-inner">
-            <div>
-              <h3>Invoice Atlas</h3>
-              <p>
-                A refined invoicing workspace with inline editing, premium templates, and admin oversight when you need it.
-              </p>
-            </div>
-            <div>
-              <h3>Explore</h3>
-              <ul className="list-reset" style={{ display: 'grid', gap: '0.5rem' }}>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#pricing">Pricing</a></li>
-                <li><a href="/privacy-policy">Privacy &amp; Policy</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3>Get help</h3>
-              <ul className="list-reset" style={{ display: 'grid', gap: '0.5rem' }}>
-                <li><a href="mailto:support@invoice-atlas.example.com">support@invoice-atlas.example.com</a></li>
-                <li><a href="/admin">Admin console</a></li>
-                <li><a href="/app">Launch the app</a></li>
-              </ul>
-            </div>
-          </div>
-          <div style={{ marginTop: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
-            © {new Date().getFullYear()} Invoice Atlas. All rights reserved.
-          </div>
-        </footer>
+        </Providers>
       </body>
     </html>
   );
