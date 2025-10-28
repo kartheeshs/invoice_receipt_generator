@@ -561,7 +561,19 @@ function buildContentStream(
   const rateX = margin + (isJapaneseLayout ? 330 : 360);
   const amountX = pageWidth - margin - (isJapaneseLayout ? 80 : 90);
   const headerBaseline = tableHeaderY + 16;
-  const columnLabels = structure.columnLabels;
+  const columnLabels: {
+    description: string;
+    quantity: string;
+    rate: string;
+    amount: string;
+    descriptionSecondary?: string;
+  } = {
+    description: labels.description,
+    quantity: labels.quantity,
+    rate: labels.rate,
+    amount: labels.amount,
+    ...(structure.columnLabels ?? {}),
+  };
   writeText(ops, columnLabels.description, descX, headerBaseline, 10, 'F2', palette.tableHeaderText);
   writeText(ops, columnLabels.quantity, qtyX, headerBaseline, 10, 'F2', palette.tableHeaderText);
   writeText(ops, columnLabels.rate, rateX, headerBaseline, 10, 'F2', palette.tableHeaderText);

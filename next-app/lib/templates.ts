@@ -15,6 +15,14 @@ export type TemplatePdfPalette = {
   accentBar?: RGB;
 };
 
+export type TemplateColumnLabels = {
+  description?: string;
+  descriptionSecondary?: string;
+  quantity?: string;
+  rate?: string;
+  amount?: string;
+};
+
 export type TemplateStructure = {
   headerLayout: 'standard' | 'japanese' | 'compact';
   totalsStyle: 'table' | 'underline' | 'side-panel' | 'badge' | 'stacked' | 'japanese';
@@ -27,13 +35,7 @@ export type TemplateStructure = {
     | 'ledger'
     | 'separated'
     | 'japanese';
-  columnLabels: {
-    description: string;
-    descriptionSecondary?: string;
-    quantity: string;
-    rate: string;
-    amount: string;
-  };
+  columnLabels?: TemplateColumnLabels;
   showPaymentDetails: boolean;
   paymentDetailsLabel?: string;
   paymentDetailsValue?: string;
@@ -46,12 +48,6 @@ const defaultTemplateStructure: TemplateStructure = {
   totalsStyle: 'side-panel',
   infoLayout: 'standard',
   lineItemStyle: 'striped',
-  columnLabels: {
-    description: 'Description',
-    quantity: 'Quantity',
-    rate: 'Rate',
-    amount: 'Amount',
-  },
   showPaymentDetails: false,
   showThankYou: false,
 };
@@ -63,10 +59,7 @@ const templateStructures: Record<string, TemplateStructure> = {
     infoLayout: 'split',
     lineItemStyle: 'striped-light',
     columnLabels: {
-      description: 'Description',
       quantity: 'Nights',
-      rate: 'Rate',
-      amount: 'Amount',
     },
     showPaymentDetails: false,
     showThankYou: true,
@@ -77,12 +70,6 @@ const templateStructures: Record<string, TemplateStructure> = {
     totalsStyle: 'underline',
     infoLayout: 'split',
     lineItemStyle: 'outlined',
-    columnLabels: {
-      description: 'Description',
-      quantity: 'Qty',
-      rate: 'Rate',
-      amount: 'Amount',
-    },
     showPaymentDetails: false,
     showThankYou: false,
   },
@@ -91,12 +78,6 @@ const templateStructures: Record<string, TemplateStructure> = {
     totalsStyle: 'badge',
     infoLayout: 'standard',
     lineItemStyle: 'striped',
-    columnLabels: {
-      description: 'Description',
-      quantity: 'Qty',
-      rate: 'Rate',
-      amount: 'Amount',
-    },
     showPaymentDetails: false,
     showThankYou: true,
     thankYouLabel: 'Thank you for your business.',
@@ -106,12 +87,6 @@ const templateStructures: Record<string, TemplateStructure> = {
     totalsStyle: 'table',
     infoLayout: 'split',
     lineItemStyle: 'separated',
-    columnLabels: {
-      description: 'Description',
-      quantity: 'Qty',
-      rate: 'Rate',
-      amount: 'Amount',
-    },
     showPaymentDetails: false,
     showThankYou: false,
   },
@@ -121,11 +96,10 @@ const templateStructures: Record<string, TemplateStructure> = {
     infoLayout: 'japanese',
     lineItemStyle: 'japanese',
     columnLabels: {
-      description: 'Description',
       descriptionSecondary: '品目',
-      quantity: 'Qty',
-      rate: 'Rate',
-      amount: 'Amount',
+      quantity: '数量',
+      rate: '単価',
+      amount: '金額',
     },
     showPaymentDetails: true,
     paymentDetailsLabel: 'Payment details',
@@ -138,12 +112,6 @@ const templateStructures: Record<string, TemplateStructure> = {
     totalsStyle: 'stacked',
     infoLayout: 'standard',
     lineItemStyle: 'striped',
-    columnLabels: {
-      description: 'Description',
-      quantity: 'Qty',
-      rate: 'Rate',
-      amount: 'Amount',
-    },
     showPaymentDetails: false,
     showThankYou: false,
   },
@@ -152,12 +120,6 @@ const templateStructures: Record<string, TemplateStructure> = {
     totalsStyle: 'underline',
     infoLayout: 'standard',
     lineItemStyle: 'ledger',
-    columnLabels: {
-      description: 'Description',
-      quantity: 'Qty',
-      rate: 'Rate',
-      amount: 'Amount',
-    },
     showPaymentDetails: false,
     showThankYou: true,
     thankYouLabel: 'Authorised signature',
