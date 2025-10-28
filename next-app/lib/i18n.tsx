@@ -237,7 +237,6 @@ const dictionaries: Record<Language, Record<string, string>> = {
     'workspace.clients.autofillHint': '保存済みの顧客を選ぶと詳細が自動入力されます。',
     'workspace.activity.heading': '最近のアクティビティ',
     'workspace.activity.description': '保存、リマインダー、支払い状況を最新順で表示します。',
-    'workspace.activity.viewAdmin': '管理コンソールを見る',
     'workspace.activity.empty': '請求書を保存するとアクティビティが表示されます。',
     'workspace.settings.heading': '設定',
     'workspace.settings.description': '新しい請求書で使用する既定の情報です。',
