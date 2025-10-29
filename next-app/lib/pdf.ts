@@ -52,6 +52,102 @@ function cloneWithInlineStyles(element: HTMLElement, width: number, height: numb
   return clone;
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert blob to data URL.'));
+      }
+    };
+    reader.onerror = (event) => {
+      reject(event);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  if (typeof fetch !== 'function') {
+    return null;
+  }
+  try {
+    const response = await fetch(url, {
+      mode: 'cors',
+      credentials: 'omit',
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const blob = await response.blob();
+    return await blobToDataUrl(blob);
+  } catch (error) {
+    console.warn('Unable to inline resource for PDF export.', error);
+    return null;
+  }
+}
+
+async function inlineExternalImages(root: HTMLElement): Promise<void> {
+  const images = Array.from(root.querySelectorAll('img'));
+  await Promise.all(
+    images.map(async (image) => {
+      const source = image.getAttribute('src');
+      if (!source || source.startsWith('data:')) {
+        return;
+      }
+      const dataUrl = await fetchAsDataUrl(source);
+      if (dataUrl) {
+        image.setAttribute('src', dataUrl);
+      } else {
+        image.removeAttribute('src');
+      }
+    }),
+  );
+}
+
+async function inlineBackgroundImages(root: HTMLElement): Promise<void> {
+  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+  await Promise.all(
+    elements.map(async (element) => {
+      const { style } = element;
+      const backgroundImage = style.backgroundImage;
+      const background = style.background;
+
+      async function replaceUrls(value: string, setter: (next: string) => void) {
+        if (!value || !value.includes('url(')) {
+          return;
+        }
+        let nextValue = value;
+        const urlPattern = /url\((['"]?)([^'"\)]+)\1\)/gi;
+        const matches = Array.from(value.matchAll(urlPattern));
+        for (const match of matches) {
+          const [, , url] = match;
+          if (!url || url.startsWith('data:')) {
+            continue;
+          }
+          const dataUrl = await fetchAsDataUrl(url);
+          if (dataUrl) {
+            nextValue = nextValue.replace(match[0], `url("${dataUrl}")`);
+          } else {
+            nextValue = nextValue.replace(match[0], 'none');
+          }
+        }
+        setter(nextValue);
+      }
+
+      await replaceUrls(backgroundImage, (next) => {
+        style.backgroundImage = next;
+      });
+
+      await replaceUrls(background, (next) => {
+        style.background = next;
+      });
+    }),
+  );
+}
+
 function loadSvgImage(svg: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
@@ -75,6 +171,8 @@ async function renderElementToCanvas(element: HTMLElement, scale: number): Promi
   const width = Math.max(1, Math.ceil(rect.width));
   const height = Math.max(1, Math.ceil(rect.height));
   const clone = cloneWithInlineStyles(element, width, height);
+  await inlineExternalImages(clone);
+  await inlineBackgroundImages(clone);
   const serialized = new XMLSerializer().serializeToString(clone);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${serialized}</foreignObject></svg>`;
   const image = await loadSvgImage(svg);
