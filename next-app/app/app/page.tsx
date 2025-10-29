@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   InvoiceDraft,
@@ -16,11 +16,13 @@ import {
 import { firebaseConfigured, fetchRecentInvoices, saveInvoice } from '../../lib/firebase';
 import { sampleInvoices } from '../../lib/sample-data';
 import { useTranslation } from '../../lib/i18n';
+import { formatFriendlyDate } from '../../lib/format';
 import { generateInvoicePdf } from '../../lib/pdf';
 import { invoiceTemplates } from '../../lib/templates';
 import { matchClients, type ClientDirectoryEntry } from '../../lib/clients';
 import { clearSession, loadSession, SESSION_STORAGE_KEY, type StoredSession } from '../../lib/auth';
 import LanguageSwitcher from '../components/language-switcher';
+import InvoicePreview from '../components/invoice-preview';
 
 type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings';
 
@@ -59,19 +61,6 @@ const statusOptions: { value: InvoiceStatus; label: string }[] = [
 ];
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
-
-function formatFriendlyDate(value?: string, locale?: string): string {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-  return parsed.toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 function normaliseHttpUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -119,6 +108,7 @@ export default function WorkspacePage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [clientMatches, setClientMatches] = useState<ClientDirectoryEntry[]>([]);
   const [showClientMatches, setShowClientMatches] = useState<boolean>(false);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
   const isSignedIn = Boolean(session);
@@ -174,6 +164,21 @@ export default function WorkspacePage() {
   }, [t]);
 
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
+  const printableLines = useMemo(() => {
+    const sanitized = cleanLines(draft.lines);
+    return sanitized.length ? sanitized : draft.lines;
+  }, [draft.lines]);
+  const previewDraft = useMemo(
+    () => ({
+      ...draft,
+      lines: printableLines,
+    }),
+    [draft, printableLines],
+  );
+  const previewTotals = useMemo(
+    () => calculateTotals(printableLines, draft.taxRate),
+    [printableLines, draft.taxRate],
+  );
   const localizedSections = useMemo(
     () =>
       sections.map((section) => ({
@@ -416,42 +421,22 @@ export default function WorkspacePage() {
 
     try {
       setDownloadingPdf(true);
-      const cleanedLines = cleanLines(draft.lines);
-      const pdfDraft: InvoiceDraft = { ...draft, lines: cleanedLines.length ? cleanedLines : draft.lines };
-      const pdfTotals = calculateTotals(pdfDraft.lines, pdfDraft.taxRate);
-      const pdfLabel = (key: string, fallback: string) => t(key, fallback);
-      const statusValue = statusLookup.get(draft.status) ?? draft.status;
-      const pdfLabels = {
-        invoiceTitle: pdfLabel('workspace.pdf.invoiceTitle', 'Invoice'),
-        billTo: pdfLabel('workspace.pdf.billTo', 'Bill to'),
-        issueDate: pdfLabel('workspace.pdf.issueDate', 'Issue date'),
-        dueDate: pdfLabel('workspace.pdf.dueDate', 'Due date'),
-        statusLabel: pdfLabel('workspace.pdf.status', 'Status'),
-        statusValue,
-        currency: pdfLabel('workspace.pdf.currency', 'Currency'),
-        description: pdfLabel('workspace.pdf.description', 'Description'),
-        quantity: pdfLabel('workspace.pdf.quantity', 'Qty'),
-        rate: pdfLabel('workspace.pdf.rate', 'Rate'),
-        amount: pdfLabel('workspace.pdf.amount', 'Amount'),
-        subtotal: pdfLabel('workspace.pdf.subtotal', 'Subtotal'),
-        tax: pdfLabel('workspace.pdf.tax', 'Tax'),
-        total: pdfLabel('workspace.pdf.total', 'Total'),
-        notes: pdfLabel('workspace.pdf.notes', 'Notes'),
-      };
-
-      const blob = generateInvoicePdf({
-        draft: pdfDraft,
-        totals: pdfTotals,
-        locale,
-        currency: draft.currency,
-        labels: pdfLabels,
-        templateId: selectedTemplateId,
+      const previewElement = previewRef.current;
+      if (!previewElement) {
+        throw new Error('Preview is not ready to export.');
+      }
+      const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
+      const blob = await generateInvoicePdf({
+        element: previewElement,
+        margin: 32,
+        scale,
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const safeClient = pdfDraft.clientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'invoice';
+      const safeClient =
+        previewDraft.clientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'invoice';
       link.href = url;
-      link.download = `${safeClient}-${pdfDraft.issueDate || 'draft'}.pdf`;
+      link.download = `${safeClient}-${previewDraft.issueDate || 'draft'}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -624,6 +609,32 @@ export default function WorkspacePage() {
   function renderInvoices() {
     return (
       <div className="workspace-section">
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            pointerEvents: 'none',
+            visibility: 'hidden',
+            width: 'auto',
+            height: 'auto',
+            zIndex: -1,
+          }}
+        >
+          <InvoicePreview
+            ref={previewRef}
+            draft={previewDraft}
+            totals={previewTotals}
+            template={activeTemplate}
+            locale={locale}
+            currency={previewDraft.currency}
+            statusLookup={statusLookup}
+            t={t}
+            paymentLinkUrl={paymentLinkUrl}
+            paymentLinkDisplay={paymentLinkDisplay}
+          />
+        </div>
         <section className="panel panel--stack">
           <header className="panel__header panel__header--stacked">
             <div>
@@ -964,186 +975,17 @@ export default function WorkspacePage() {
               </section>
             </form>
           ) : (
-            <div className="preview" data-template={activeTemplate.id}>
-              <header className="preview__header" style={{ background: activeTemplate.accent }}>
-                <div className="preview__header-info">
-                  <span className="preview__eyebrow">{activeTemplate.name}</span>
-                  <strong>
-                    {draft.businessName || t('workspace.preview.businessPlaceholder', 'Your business name')}
-                  </strong>
-                  <span>{draft.businessAddress || t('workspace.preview.addressPlaceholder', 'Add your business address')}</span>
-                  <span className="preview__tagline">{activeTemplate.description}</span>
-                </div>
-                <div className="preview__badge">
-                  <span>{t('workspace.preview.totalDue', 'Total due')}</span>
-                  <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
-                  <small>
-                    {t('workspace.preview.status', 'Status')}: {statusLookup.get(draft.status)}
-                  </small>
-                </div>
-              </header>
-
-              <div className="preview__body">
-                {(() => {
-                  const isSeikyu = activeTemplate.id === 'seikyu';
-                  const billToLabel = isSeikyu
-                    ? t('workspace.preview.billToDual', '請求先 / Bill to')
-                    : t('workspace.preview.billTo', 'Bill to');
-                  const issuedLabel = isSeikyu
-                    ? t('workspace.preview.issuedDual', '発行日 / Issued')
-                    : t('workspace.preview.issued', 'Issued');
-                  const dueLabel = isSeikyu
-                    ? t('workspace.preview.dueDual', '支払期日 / Due')
-                    : t('workspace.preview.due', 'Due');
-                  const descriptionLabel = isSeikyu
-                    ? t('workspace.preview.descriptionDual', '品目 / Item')
-                    : t('workspace.preview.description', 'Description');
-                  const quantityLabel = isSeikyu
-                    ? t('workspace.preview.quantityDual', '数量 / Qty')
-                    : t('workspace.preview.quantity', 'Qty');
-                  const rateLabel = isSeikyu
-                    ? t('workspace.preview.rateDual', '単価 / Rate')
-                    : t('workspace.preview.rate', 'Rate');
-                  const amountLabel = isSeikyu
-                    ? t('workspace.preview.amountDual', '金額 / Total')
-                    : t('workspace.preview.amount', 'Amount');
-                  const subtotalLabel = isSeikyu
-                    ? t('workspace.preview.subtotalDual', '小計 / Subtotal')
-                    : t('workspace.summary.subtotal', 'Subtotal');
-                  const taxLabel = isSeikyu
-                    ? t('workspace.preview.taxDual', '税額 / Tax')
-                    : t('workspace.summary.tax', 'Tax');
-                  const totalLabel = isSeikyu
-                    ? t('workspace.preview.totalDual', '合計 / Total')
-                    : t('workspace.summary.total', 'Total');
-
-                  return (
-                    <>
-                      <div className="preview__meta">
-                        <div>
-                          <span className="preview__label">{billToLabel}</span>
-                          <strong>{draft.clientName || t('workspace.preview.clientPlaceholder', 'Client name')}</strong>
-                          <span>{draft.clientEmail || t('workspace.preview.emailPlaceholder', 'client@email.com')}</span>
-                          {draft.clientAddress && <span className="preview__address">{draft.clientAddress}</span>}
-                        </div>
-                        <div>
-                          <span className="preview__label">{issuedLabel}</span>
-                          <strong>{formatFriendlyDate(draft.issueDate, locale)}</strong>
-                        </div>
-                        <div>
-                          <span className="preview__label">{dueLabel}</span>
-                          <strong>{formatFriendlyDate(draft.dueDate, locale)}</strong>
-                        </div>
-                      </div>
-
-                      <div className="preview__table">
-                        <div className="preview__table-row preview__table-row--head">
-                          <span>{descriptionLabel}</span>
-                          <span>{quantityLabel}</span>
-                          <span>{rateLabel}</span>
-                          <span>{amountLabel}</span>
-                        </div>
-                        {draft.lines.map((line) => (
-                          <div key={line.id} className="preview__table-row">
-                            <span>
-                              {line.description ||
-                                (isSeikyu
-                                  ? t('workspace.preview.linePlaceholderJa', 'Service item')
-                                  : t('workspace.preview.linePlaceholder', 'Line description'))}
-                            </span>
-                            <span>{line.quantity}</span>
-                            <span>{formatCurrency(line.rate, draft.currency, locale)}</span>
-                            <span>{formatCurrency(line.quantity * line.rate, draft.currency, locale)}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {activeTemplate.id === 'aqua-ledger' && (
-                        <div className="preview__summary-card">
-                          <header>
-                            <span>{t('workspace.preview.paymentSummary', 'Payment summary')}</span>
-                            <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
-                          </header>
-                          <ul>
-                            <li>
-                              <span>{t('workspace.summary.subtotal', 'Subtotal')}</span>
-                              <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
-                            </li>
-                            <li>
-                              <span>{t('workspace.summary.tax', 'Tax')}</span>
-                              <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
-                            </li>
-                            <li>
-                              <span>{t('workspace.preview.status', 'Status')}</span>
-                              <strong>{statusLookup.get(draft.status)}</strong>
-                            </li>
-                          </ul>
-                        </div>
-                      )}
-
-                      <div className="preview__totals">
-                        <div>
-                          <span>{subtotalLabel}</span>
-                          <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
-                        </div>
-                        <div>
-                          <span>{taxLabel}</span>
-                          <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
-                        </div>
-                        <div>
-                          <span>{totalLabel}</span>
-                          <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
-                        </div>
-                      </div>
-
-                        {isSeikyu && (
-                          <div className="preview__hanko">
-                            <span>{t('workspace.preview.hankoLabel', '印')}</span>
-                            <small>{t('workspace.preview.hankoCaption', 'Authorised seal')}</small>
-                          </div>
-                        )}
-
-                        <div className="preview__notes">
-                          <strong>
-                            {isSeikyu
-                              ? t('workspace.preview.notesDual', '備考 / Notes')
-                              : t('workspace.preview.notes', 'Notes')}
-                          </strong>
-                          <p>
-                            {draft.notes ||
-                              t('workspace.preview.notesPlaceholder', 'Add payment instructions or a thank you message.')}
-                          </p>
-                          {isSeikyu && (
-                            <small>
-                              {t(
-                                'workspace.preview.notesHint',
-                                'Please remit payment before the due date.',
-                              )}
-                            </small>
-                          )}
-                        </div>
-
-                        {paymentLinkUrl && (
-                          <div className="preview__payment-link">
-                            <a
-                              href={paymentLinkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="preview__payment-link-button"
-                            >
-                              <span>{t('workspace.preview.paymentLinkCta', 'Open Stripe checkout')}</span>
-                              <small>{t('workspace.preview.paymentLinkMode', 'Test mode')}</small>
-                            </a>
-                            {paymentLinkDisplay && (
-                              <span className="preview__payment-link-url">{paymentLinkDisplay}</span>
-                            )}
-                          </div>
-                        )}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
+            <InvoicePreview
+              draft={previewDraft}
+              totals={previewTotals}
+              template={activeTemplate}
+              locale={locale}
+              currency={previewDraft.currency}
+              statusLookup={statusLookup}
+              t={t}
+              paymentLinkUrl={paymentLinkUrl}
+              paymentLinkDisplay={paymentLinkDisplay}
+            />
           )}
         </section>
       </div>
