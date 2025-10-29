@@ -2057,6 +2057,12 @@ svg {
   align-items: center;
 }
 
+.panel__header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .panel__header h2 {
   margin: 0;
   font-size: 1.3rem;
@@ -2290,6 +2296,28 @@ svg {
   cursor: pointer;
   text-align: left;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  position: relative;
+}
+
+.template-thumbnail--locked {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.template-thumbnail__lock {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.9rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .template-thumbnail__preview {
@@ -2354,6 +2382,74 @@ svg {
   border-color: rgba(59, 130, 246, 0.85);
   box-shadow: var(--shadow-md);
   background: rgba(59, 130, 246, 0.12);
+}
+
+.subscription-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.2rem;
+  align-items: center;
+  padding: 1.1rem 1.25rem;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.subscription-banner--premium {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(20, 184, 166, 0.28));
+  border-color: rgba(13, 148, 136, 0.35);
+  color: #0f766e;
+}
+
+.subscription-banner__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.subscription-banner__copy strong {
+  font-size: 1rem;
+  color: var(--text-strong);
+}
+
+.subscription-banner--premium .subscription-banner__copy strong {
+  color: #0f172a;
+}
+
+.subscription-banner__copy p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.subscription-banner--premium .subscription-banner__copy p {
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.subscription-banner__meta {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.subscription-banner--premium .subscription-banner__meta {
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.download-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px dashed rgba(15, 23, 42, 0.1);
+}
+
+.download-hint--warning {
+  color: #9a3412;
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(217, 119, 6, 0.35);
 }
 
 .form-grid__group--full {

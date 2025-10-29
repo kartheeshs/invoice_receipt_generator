@@ -42,6 +42,8 @@ export type TemplateLabelKey =
 
 export type TemplateLabelOverrides = Partial<Record<TemplateLabelKey, string>>;
 
+export const DEFAULT_TEMPLATE_ID = 'villa-coastal';
+
 export type TemplateStructure = {
   headerLayout: 'standard' | 'japanese' | 'compact';
   totalsStyle: 'table' | 'underline' | 'side-panel' | 'badge' | 'stacked' | 'japanese';
@@ -160,6 +162,8 @@ const templateStructures: Record<string, TemplateStructure> = {
   },
 };
 
+export type TemplateTier = 'free' | 'premium';
+
 export type InvoiceTemplate = {
   id: string;
   name: string;
@@ -172,6 +176,7 @@ export type InvoiceTemplate = {
   tagline?: string;
   structure?: TemplateStructure;
   supportsJapanese?: boolean;
+  tier: TemplateTier;
 };
 
 function rgb(hex: string): RGB {
@@ -186,7 +191,7 @@ function rgb(hex: string): RGB {
 
 export const invoiceTemplates: InvoiceTemplate[] = [
   {
-    id: 'villa-coastal',
+    id: DEFAULT_TEMPLATE_ID,
     name: 'Villa Coastal',
     description:
       'Deep azure header, booking summary capsule, and anchored totals designed after boutique resort receipts.',
@@ -212,7 +217,8 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f2f8ff'),
       accentBar: rgb('#1d5fbf'),
     },
-    structure: templateStructures['villa-coastal'],
+    structure: templateStructures[DEFAULT_TEMPLATE_ID],
+    tier: 'free',
   },
   {
     id: 'atelier-minimal',
@@ -236,6 +242,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f8fafc'),
     },
     structure: templateStructures['atelier-minimal'],
+    tier: 'premium',
   },
   {
     id: 'royal-balance',
@@ -260,6 +267,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       accentBar: rgb('#f472b6'),
     },
     structure: templateStructures['royal-balance'],
+    tier: 'premium',
   },
   {
     id: 'harbour-slate',
@@ -284,6 +292,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       accentBar: rgb('#5fa8d3'),
     },
     structure: templateStructures['harbour-slate'],
+    tier: 'premium',
   },
   {
     id: 'seikyu',
@@ -309,6 +318,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
     },
     structure: templateStructures.seikyu,
     supportsJapanese: true,
+    tier: 'premium',
   },
   {
     id: 'aqua-ledger',
@@ -333,6 +343,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       accentBar: rgb('#14b8a6'),
     },
     structure: templateStructures['aqua-ledger'],
+    tier: 'premium',
   },
   {
     id: 'classic-ledger',
@@ -356,6 +367,7 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f9fafb'),
     },
     structure: templateStructures['classic-ledger'],
+    tier: 'premium',
   },
 ];
 

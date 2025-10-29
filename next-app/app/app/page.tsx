@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   InvoiceDraft,
@@ -18,11 +18,22 @@ import { sampleInvoices } from '../../lib/sample-data';
 import { useTranslation } from '../../lib/i18n';
 import { formatFriendlyDate } from '../../lib/format';
 import { generateInvoicePdf } from '../../lib/pdf';
-import { invoiceTemplates } from '../../lib/templates';
+import { DEFAULT_TEMPLATE_ID, invoiceTemplates } from '../../lib/templates';
 import { matchClients, type ClientDirectoryEntry } from '../../lib/clients';
 import { clearSession, loadSession, SESSION_STORAGE_KEY, type StoredSession } from '../../lib/auth';
 import LanguageSwitcher from '../components/language-switcher';
 import InvoicePreview from '../components/invoice-preview';
+import {
+  FREE_PLAN_DOWNLOAD_LIMIT,
+  SubscriptionState,
+  downloadsRemaining,
+  downloadWindowReset,
+  ensureSubscriptionWindow,
+  incrementDownloadCount,
+  loadSubscriptionState,
+  markSubscriptionPlan,
+  persistSubscriptionState,
+} from '../../lib/subscription';
 
 type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings';
 
@@ -61,6 +72,49 @@ const statusOptions: { value: InvoiceStatus; label: string }[] = [
 ];
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
+
+const stripePublishableKey =
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_51SMrPSRuLo7evHJI5TuYsmpqHAtIOGahp0NCsder674sXQ7wDrgNomfKKmZWyB6fFgREw88cprnFjJmcfIXu628L00o5NvgAzJ';
+
+type StripeClient = {
+  redirectToCheckout: (options: { sessionId: string }) => Promise<{ error?: { message?: string } }>;
+};
+
+declare global {
+  interface Window {
+    Stripe?: (publishableKey: string) => StripeClient | null;
+  }
+}
+
+let stripeClientPromise: Promise<StripeClient | null> | null = null;
+
+function loadStripeClient(): Promise<StripeClient | null> {
+  if (!stripePublishableKey) {
+    return Promise.resolve(null);
+  }
+  if (stripeClientPromise) {
+    return stripeClientPromise;
+  }
+  stripeClientPromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      resolve(null);
+      return;
+    }
+    if (typeof window.Stripe === 'function') {
+      resolve(window.Stripe(stripePublishableKey) ?? null);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.stripe.com/v3/';
+    script.async = true;
+    script.onload = () => {
+      resolve(typeof window.Stripe === 'function' ? window.Stripe(stripePublishableKey) ?? null : null);
+    };
+    script.onerror = () => reject(new Error('Stripe.js failed to load.'));
+    document.head.appendChild(script);
+  });
+  return stripeClientPromise;
+}
 
 function normaliseHttpUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -105,6 +159,8 @@ export default function WorkspacePage() {
   const [alertMessage, setAlertMessage] = useState<string>('');
   const [invoiceView, setInvoiceView] = useState<'edit' | 'preview'>('edit');
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => loadSubscriptionState());
+  const [subscribing, setSubscribing] = useState<boolean>(false);
   const [session, setSession] = useState<StoredSession | null>(null);
   const [clientMatches, setClientMatches] = useState<ClientDirectoryEntry[]>([]);
   const [showClientMatches, setShowClientMatches] = useState<boolean>(false);
@@ -114,6 +170,61 @@ export default function WorkspacePage() {
   const isSignedIn = Boolean(session);
   const isAdmin = session?.role === 'admin';
   const sessionDisplayName = session?.displayName ?? session?.email ?? '';
+
+  const syncSubscription = useCallback(
+    (updater: SubscriptionState | ((current: SubscriptionState) => SubscriptionState)) => {
+      setSubscription((current) => {
+        const next = typeof updater === 'function' ? (updater as (state: SubscriptionState) => SubscriptionState)(current) : updater;
+        persistSubscriptionState(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const initial = loadSubscriptionState();
+    syncSubscription(initial);
+  }, [syncSubscription]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const url = new URL(window.location.href);
+    const status = url.searchParams.get('subscription');
+    if (!status) {
+      return;
+    }
+    url.searchParams.delete('subscription');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setSubscribing(false);
+
+    if (status === 'success') {
+      syncSubscription((current) => markSubscriptionPlan(current, 'premium'));
+      setAlertMessage(
+        t('workspace.subscription.success', 'Premium plan activated. Unlimited templates and downloads unlocked.'),
+      );
+      setSaveState('success');
+    } else if (status === 'canceled') {
+      setAlertMessage(t('workspace.subscription.canceled', 'Subscription checkout was canceled.'));
+      setSaveState('idle');
+    }
+  }, [syncSubscription, t]);
+
+  useEffect(() => {
+    const ensured = ensureSubscriptionWindow(subscription);
+    if (
+      ensured.downloadCount !== subscription.downloadCount ||
+      ensured.windowStart !== subscription.windowStart ||
+      ensured.plan !== subscription.plan
+    ) {
+      syncSubscription(ensured);
+    }
+  }, [subscription, syncSubscription]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -206,11 +317,30 @@ export default function WorkspacePage() {
     [t],
   );
   const statusLookup = useMemo(() => new Map(localizedStatusOptions.map((option) => [option.value, option.label])), [localizedStatusOptions]);
-  const selectedTemplateId = draft.templateId || invoiceTemplates[0]?.id || 'villa-coastal';
+  const selectedTemplateId = useMemo(() => {
+    const candidate = draft.templateId || DEFAULT_TEMPLATE_ID;
+    const template = invoiceTemplates.find((entry) => entry.id === candidate);
+    if (subscription.plan !== 'premium' && template && template.tier === 'premium') {
+      return DEFAULT_TEMPLATE_ID;
+    }
+    return candidate;
+  }, [draft.templateId, subscription.plan]);
   const activeTemplate = useMemo(
     () => localizedTemplates.find((template) => template.id === selectedTemplateId) ?? localizedTemplates[0],
     [localizedTemplates, selectedTemplateId],
   );
+
+  useEffect(() => {
+    if (draft.templateId !== selectedTemplateId) {
+      setDraft((prev) => ({ ...prev, templateId: selectedTemplateId }));
+    }
+  }, [draft.templateId, selectedTemplateId]);
+
+  const remainingDownloads = downloadsRemaining(subscription);
+  const downloadResetsAt = downloadWindowReset(subscription);
+  const downloadResetLabel = formatFriendlyDate(new Date(downloadResetsAt).toISOString(), locale);
+  const freePlanLimitReached =
+    subscription.plan !== 'premium' && Number.isFinite(remainingDownloads) && remainingDownloads <= 0;
 
   const outstandingTotal = useMemo(
     () =>
@@ -419,6 +549,30 @@ export default function WorkspacePage() {
       return;
     }
 
+    const now = Date.now();
+    const normalisedState = ensureSubscriptionWindow(subscription, now);
+    if (
+      normalisedState.downloadCount !== subscription.downloadCount ||
+      normalisedState.windowStart !== subscription.windowStart ||
+      normalisedState.plan !== subscription.plan
+    ) {
+      syncSubscription(normalisedState);
+    }
+
+    if (normalisedState.plan !== 'premium' && normalisedState.downloadCount >= FREE_PLAN_DOWNLOAD_LIMIT) {
+      const resetDateIso = new Date(downloadWindowReset(normalisedState)).toISOString();
+      const resetLabel = formatFriendlyDate(resetDateIso, locale);
+      setAlertMessage(
+        t(
+          'workspace.subscription.limitReached',
+          'Free plan limit reached for this 15-day window. Refreshes on {resetDate}. Upgrade for unlimited exports.',
+          { resetDate: resetLabel },
+        ),
+      );
+      setSaveState('error');
+      return;
+    }
+
     try {
       setDownloadingPdf(true);
       const previewElement = previewRef.current;
@@ -441,7 +595,29 @@ export default function WorkspacePage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setAlertMessage(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'));
+      if (normalisedState.plan !== 'premium') {
+        const updatedState = incrementDownloadCount(normalisedState, now);
+        syncSubscription(updatedState);
+        const remaining = downloadsRemaining(updatedState);
+        const resetDateIso = new Date(downloadWindowReset(updatedState)).toISOString();
+        const resetLabel = formatFriendlyDate(resetDateIso, locale);
+        const baseMessage = t('workspace.alert.downloaded', 'Invoice PDF downloaded.');
+        const detailMessage =
+          remaining > 0 && Number.isFinite(remaining)
+            ? t(
+                'workspace.subscription.remaining',
+                '{remaining} downloads left in this 15-day window (resets on {resetDate}).',
+                { remaining, resetDate: resetLabel },
+              )
+            : t(
+                'workspace.subscription.noneRemaining',
+                'No free downloads left until {resetDate}. Limits reset every 15 days.',
+                { resetDate: resetLabel },
+              );
+        setAlertMessage(`${baseMessage} ${detailMessage}`);
+      } else {
+        setAlertMessage(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'));
+      }
       setSaveState('success');
     } catch (error) {
       console.error(error);
@@ -453,7 +629,59 @@ export default function WorkspacePage() {
   }
 
   function handleSelectTemplate(templateId: string) {
+    const template = invoiceTemplates.find((entry) => entry.id === templateId);
+    if (!template) {
+      return;
+    }
+    if (subscription.plan !== 'premium' && template.tier === 'premium') {
+      setAlertMessage(
+        t(
+          'workspace.subscription.templateLocked',
+          'Upgrade to the Premium plan to use this template and unlock unlimited downloads.',
+        ),
+      );
+      setSaveState('error');
+      return;
+    }
     setDraft((prev) => ({ ...prev, templateId }));
+  }
+
+  async function handleStartSubscription() {
+    try {
+      setAlertMessage('');
+      setSubscribing(true);
+      const stripe = await loadStripeClient();
+      if (!stripe) {
+        throw new Error(t('workspace.subscription.missingStripe', 'Stripe failed to initialise.'));
+      }
+      const response = await fetch('/api/subscription/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(t('workspace.subscription.checkoutError', 'Unable to start Stripe checkout right now.'));
+      }
+      const payload = (await response.json()) as { sessionId?: string; url?: string };
+      if (payload.sessionId) {
+        const { error } = await stripe.redirectToCheckout({ sessionId: payload.sessionId });
+        if (error) {
+          throw new Error(error.message ?? 'Stripe redirect failed.');
+        }
+      } else if (payload.url) {
+        window.location.assign(payload.url);
+      } else {
+        throw new Error('Stripe session could not be created.');
+      }
+    } catch (error) {
+      console.error(error);
+      setSubscribing(false);
+      setAlertMessage(
+        error instanceof Error
+          ? error.message
+          : t('workspace.subscription.checkoutError', 'Unable to start Stripe checkout right now.'),
+      );
+      setSaveState('error');
+    }
   }
 
   function renderTemplateThumbnails({ showDetails = false }: { showDetails?: boolean } = {}) {
@@ -461,15 +689,29 @@ export default function WorkspacePage() {
       <div className={`template-thumbnail-grid${showDetails ? ' template-thumbnail-grid--detailed' : ''}`}>
         {localizedTemplates.map((template) => {
           const isActive = template.id === selectedTemplateId;
+          const isLocked = subscription.plan !== 'premium' && template.tier === 'premium';
           const primaryHighlight = template.highlights[0] ?? template.description;
           return (
             <button
               key={template.id}
               type="button"
               onClick={() => handleSelectTemplate(template.id)}
-              className={`template-thumbnail${isActive ? ' template-thumbnail--active' : ''}`}
+              className={`template-thumbnail${isActive ? ' template-thumbnail--active' : ''}${
+                isLocked ? ' template-thumbnail--locked' : ''
+              }`}
               aria-pressed={isActive}
+              aria-disabled={isLocked}
+              title={
+                isLocked
+                  ? t('workspace.subscription.templateLockedTitle', 'Premium template — upgrade to apply')
+                  : undefined
+              }
             >
+              {isLocked && (
+                <span className="template-thumbnail__lock" aria-hidden="true">
+                  🔒 {t('workspace.subscription.premiumBadge', 'Premium')}
+                </span>
+              )}
               <span className="template-thumbnail__preview" style={{ background: template.accent }} aria-hidden="true">
                 <span className="template-thumbnail__preview-header">{template.name}</span>
                 <span className="template-thumbnail__preview-body" />
@@ -674,6 +916,24 @@ export default function WorkspacePage() {
               </span>
             </header>
             {renderTemplateThumbnails()}
+            {subscription.plan !== 'premium' && (
+              <p className={`download-hint${freePlanLimitReached ? ' download-hint--warning' : ''}`} role="status">
+                {freePlanLimitReached
+                  ? t(
+                      'workspace.subscription.freeLimitHint',
+                      'Free plan limit reached for this 15-day window. Next refresh on {resetDate}. Upgrade for unlimited PDFs.',
+                      { resetDate: downloadResetLabel },
+                    )
+                  : t(
+                      'workspace.subscription.freeHint',
+                      '{remaining} downloads left in this 15-day window (resets on {resetDate}).',
+                      {
+                        remaining: Math.max(0, Number.isFinite(remainingDownloads) ? remainingDownloads : 0),
+                        resetDate: downloadResetLabel,
+                      },
+                    )}
+              </p>
+            )}
           </div>
 
           {invoiceView === 'edit' ? (
@@ -993,6 +1253,29 @@ export default function WorkspacePage() {
   }
 
   function renderTemplateGallery() {
+    const planTitle =
+      subscription.plan === 'premium'
+        ? t('workspace.subscription.premiumTitle', 'Premium plan active')
+        : t('workspace.subscription.freeTitle', 'Free plan');
+    const planDetail =
+      subscription.plan === 'premium'
+        ? t('workspace.subscription.premiumDetail', 'Unlimited downloads and every template are unlocked.')
+        : freePlanLimitReached
+        ? t(
+            'workspace.subscription.freeDepleted',
+            'You have used all {limit} downloads for this 15-day window. Refreshes on {resetDate}.',
+            { limit: FREE_PLAN_DOWNLOAD_LIMIT, resetDate: downloadResetLabel },
+          )
+        : t(
+            'workspace.subscription.freeDetail',
+            '{remaining} of {limit} downloads left in this 15-day window (resets on {resetDate}).',
+            {
+              remaining: Math.max(0, Number.isFinite(remainingDownloads) ? remainingDownloads : 0),
+              limit: FREE_PLAN_DOWNLOAD_LIMIT,
+              resetDate: downloadResetLabel,
+            },
+          );
+
     return (
       <div className="workspace-section">
         <div className="panel">
@@ -1003,12 +1286,40 @@ export default function WorkspacePage() {
                 {t('workspace.templates.galleryDescription', 'Explore each template layout before applying it to your invoice.')}
               </p>
             </div>
-            <span className="badge">
-              {t('workspace.templates.count', `${localizedTemplates.length} options`, {
-                count: localizedTemplates.length,
-              })}
-            </span>
+            <div className="panel__header-meta">
+              <span className="badge">
+                {t('workspace.templates.count', `${localizedTemplates.length} options`, {
+                  count: localizedTemplates.length,
+                })}
+              </span>
+            </div>
           </header>
+          <div
+            className={`subscription-banner${subscription.plan === 'premium' ? ' subscription-banner--premium' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="subscription-banner__copy">
+              <strong>{planTitle}</strong>
+              <p>{planDetail}</p>
+            </div>
+            {subscription.plan === 'premium' ? (
+              <span className="subscription-banner__meta">
+                {t('workspace.subscription.premiumMeta', 'Thanks for supporting Easy Invoice GM7.')}
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={handleStartSubscription}
+                disabled={subscribing}
+              >
+                {subscribing
+                  ? t('workspace.subscription.redirecting', 'Redirecting to Stripe…')
+                  : t('workspace.subscription.upgradeCta', 'Upgrade with Stripe')}
+              </button>
+            )}
+          </div>
           {renderTemplateThumbnails({ showDetails: true })}
         </div>
       </div>

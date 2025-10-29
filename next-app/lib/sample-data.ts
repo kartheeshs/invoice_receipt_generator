@@ -1,4 +1,5 @@
 import { InvoiceRecord } from './invoices';
+import { DEFAULT_TEMPLATE_ID } from './templates';
 
 export const sampleInvoices: InvoiceRecord[] = [
   {
@@ -8,7 +9,7 @@ export const sampleInvoices: InvoiceRecord[] = [
     clientAddress: '400 Market Street, Portland, OR 97205',
     businessName: 'Atlas Studio',
     businessAddress: '88 Harbor Lane, Portland, OR',
-    templateId: 'villa-coastal',
+    templateId: DEFAULT_TEMPLATE_ID,
     issueDate: '2024-11-12',
     dueDate: '2024-11-26',
     currency: 'USD',

@@ -1,3 +1,5 @@
+import { DEFAULT_TEMPLATE_ID } from './templates';
+
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 
 export interface InvoiceLine {
@@ -56,7 +58,7 @@ export function createEmptyDraft(): InvoiceDraft {
     clientAddress: '',
     businessName: '',
     businessAddress: '',
-    templateId: 'villa-coastal',
+    templateId: DEFAULT_TEMPLATE_ID,
     issueDate: formatISODate(today),
     dueDate: formatISODate(dueDate),
     currency: 'USD',
