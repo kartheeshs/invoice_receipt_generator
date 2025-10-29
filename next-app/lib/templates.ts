@@ -59,6 +59,7 @@ export type TemplateStructure = {
   showPaymentDetails: boolean;
   paymentDetailsLabel?: string;
   paymentDetailsValue?: string;
+  paymentLinkLabel?: string;
   showThankYou: boolean;
   thankYouLabel?: string;
 };
@@ -136,6 +137,7 @@ const templateStructures: Record<string, TemplateStructure> = {
     showPaymentDetails: true,
     paymentDetailsLabel: 'Payment details',
     paymentDetailsValue: 'Bank transfer — due on receipt',
+    paymentLinkLabel: 'Stripe決済リンク（テストモード） / Stripe checkout link (test mode)',
     showThankYou: true,
     thankYouLabel: 'いつもありがとうございます。',
   },

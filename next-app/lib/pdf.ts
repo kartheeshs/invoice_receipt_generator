@@ -43,6 +43,37 @@ type PdfImageResource = {
   displayHeight: number;
 };
 
+type PdfLinkAnnotation = {
+  rect: [number, number, number, number];
+  url: string;
+};
+
+function estimateTextWidth(text: string, size: number): number {
+  if (!text) return 0;
+  const averageWidth = 0.52; // Approximate width multiplier for Helvetica
+  return text.length * size * averageWidth;
+}
+
+function normaliseHttpUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const candidate = /^(https?:\/\/)/iu.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    return url.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
+function formatDisplayUrl(url: string): string {
+  return url.replace(/^https?:\/\//iu, '');
+}
+
 function escapePdfText(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
@@ -266,6 +297,7 @@ function prepareImageResource(name: string, dataUrl: string | undefined, maxDime
 type ContentResult = {
   content: string;
   images: PdfImageResource[];
+  links: PdfLinkAnnotation[];
 };
 
 function renderTotals(
@@ -430,6 +462,7 @@ function buildContentStream(
   const resolvedLabels: PdfLabels = { ...labels, ...(structure.labelOverrides ?? {}) };
   const ops: string[] = [];
   const images: PdfImageResource[] = [];
+  const links: PdfLinkAnnotation[] = [];
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 56;
@@ -674,12 +707,45 @@ function buildContentStream(
     notesY = notesBoxY - 18;
   }
 
-  if (structure.showPaymentDetails && structure.paymentDetailsLabel && structure.paymentDetailsValue) {
-    const paymentBoxHeight = 52;
+  const paymentLinkUrl = normaliseHttpUrl(draft.paymentLink);
+  const hasPaymentValue = Boolean(structure.paymentDetailsValue);
+  const hasPaymentLink = Boolean(paymentLinkUrl);
+  if (
+    structure.showPaymentDetails &&
+    structure.paymentDetailsLabel &&
+    (hasPaymentValue || hasPaymentLink)
+  ) {
+    const baseHeight = 40;
+    const paymentValueHeight = hasPaymentValue ? 18 : 0;
+    const linkAreaHeight = hasPaymentLink ? 62 : 0;
+    const paymentBoxHeight = baseHeight + paymentValueHeight + linkAreaHeight;
     const paymentY = notesY;
-    drawRect(ops, margin, paymentY - paymentBoxHeight, contentWidth, paymentBoxHeight, palette.tableStripe ?? palette.notesBackground);
+    const boxBottom = paymentY - paymentBoxHeight;
+    drawRect(ops, margin, boxBottom, contentWidth, paymentBoxHeight, palette.tableStripe ?? palette.notesBackground);
     writeText(ops, structure.paymentDetailsLabel, margin + 12, paymentY - 14, 10, 'F2', palette.mutedText);
-    writeText(ops, structure.paymentDetailsValue, margin + 12, paymentY - 30, 11, 'F1', palette.bodyText);
+    if (hasPaymentValue && structure.paymentDetailsValue) {
+      writeText(ops, structure.paymentDetailsValue, margin + 12, paymentY - 30, 11, 'F1', palette.bodyText);
+    }
+
+    if (hasPaymentLink && paymentLinkUrl) {
+      const buttonLabel = structure.paymentLinkLabel ?? 'Pay via Stripe (test mode)';
+      const buttonHeight = 28;
+      const buttonWidth = Math.min(
+        contentWidth - 24,
+        Math.max(220, estimateTextWidth(buttonLabel, 10) + 32),
+      );
+      const buttonX = margin + 12;
+      const buttonBottom = boxBottom + 20;
+      const buttonTop = buttonBottom + buttonHeight;
+      drawRect(ops, buttonX, buttonBottom, buttonWidth, buttonHeight, palette.header);
+      writeText(ops, buttonLabel, buttonX + 12, buttonTop - 10, 10, 'F2', palette.headerText);
+      links.push({ rect: [buttonX, buttonBottom, buttonX + buttonWidth, buttonTop], url: paymentLinkUrl });
+
+      const displayUrl = formatDisplayUrl(paymentLinkUrl);
+      const truncatedUrl = displayUrl.length > 68 ? `${displayUrl.slice(0, 65)}…` : displayUrl;
+      writeText(ops, truncatedUrl, buttonX, buttonBottom - 12, 9, 'F1', palette.mutedText);
+    }
+
     notesY = paymentY - paymentBoxHeight - 18;
   }
 
@@ -724,7 +790,7 @@ function buildContentStream(
     images.push({ ...sealImage });
   }
 
-  return { content: ops.join('\n'), images };
+  return { content: ops.join('\n'), images, links };
 }
 
 function createImageObject(objectNumber: number, image: PdfImageResource): string {
@@ -768,7 +834,7 @@ export function generateInvoicePdf({ draft, totals, locale, currency, labels, te
   const template = getInvoiceTemplate(templateId);
   const logo = prepareImageResource('ImLogo', draft.businessLogo, 110);
   const seal = prepareImageResource('ImSeal', draft.businessSeal, template.supportsJapanese ? 70 : 64);
-  const { content, images } = buildContentStream(draft, totals, locale, currency, labels, template, logo, seal);
+  const { content, images, links } = buildContentStream(draft, totals, locale, currency, labels, template, logo, seal);
   const encoder = new TextEncoder();
   const contentBytes = encoder.encode(content);
 
@@ -779,23 +845,39 @@ export function generateInvoicePdf({ draft, totals, locale, currency, labels, te
   objects.push('1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj');
   objects.push('2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj');
 
+  const baseObjectNumber = 7;
+  let nextObjectNumber = baseObjectNumber;
+  const imageObjectNumbers = images.map(() => nextObjectNumber++);
+  const annotationObjectNumbers = links.map(() => nextObjectNumber++);
+
   let resourceDictionary = '/Font << /F1 5 0 R /F2 6 0 R >>';
   if (images.length > 0) {
     const xObjectEntries = images
-      .map((image, index) => `/${image.name} ${7 + index} 0 R`)
+      .map((image, index) => `/${image.name} ${imageObjectNumbers[index]} 0 R`)
       .join(' ');
     resourceDictionary += ` /XObject << ${xObjectEntries} >>`;
   }
 
-  objects.push(
-    `3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents 4 0 R /Resources << ${resourceDictionary} >> >> endobj`,
-  );
+  let pageObject = `3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents 4 0 R /Resources << ${resourceDictionary} >>`;
+  if (annotationObjectNumbers.length > 0) {
+    const annotationRefs = annotationObjectNumbers.map((number) => `${number} 0 R`).join(' ');
+    pageObject += ` /Annots [${annotationRefs}]`;
+  }
+  pageObject += ' >> endobj';
+  objects.push(pageObject);
   objects.push(`4 0 obj << /Length ${contentBytes.length} >> stream\n${content}\nendstream\nendobj`);
   objects.push('5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj');
   objects.push('6 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj');
 
   images.forEach((image, index) => {
-    objects.push(createImageObject(7 + index, image));
+    objects.push(createImageObject(imageObjectNumbers[index], image));
+  });
+
+  links.forEach((link, index) => {
+    const objectNumber = annotationObjectNumbers[index];
+    const rect = link.rect.map((value) => value.toFixed(2));
+    const annotation = `${objectNumber} 0 obj << /Type /Annot /Subtype /Link /Rect [${rect.join(' ')}] /Border [0 0 0] /A << /S /URI /URI ${encodePdfString(link.url)} >> >> endobj`;
+    objects.push(annotation);
   });
 
   const pdfBytes = buildPdfStream(objects);

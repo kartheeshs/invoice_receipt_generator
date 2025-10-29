@@ -73,6 +73,27 @@ function formatFriendlyDate(value?: string, locale?: string): string {
   });
 }
 
+function normaliseHttpUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const candidate = /^(https?:\/\/)/iu.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    return url.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
+function formatDisplayUrl(url: string): string {
+  return url.replace(/^https?:\/\//iu, '');
+}
+
 function ensureLine(line: InvoiceLine, field: keyof InvoiceLine, value: string): InvoiceLine {
   if (field === 'description') {
     return { ...line, description: value };
@@ -245,30 +266,36 @@ export default function WorkspacePage() {
     return Array.from(summaries.values()).sort((a, b) => b.outstanding - a.outstanding);
   }, [recentInvoices]);
 
-  const activityFeed = useMemo(() => {
-    return recentInvoices
-      .map((invoice) => {
-        const statusLabel =
-          statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
-        const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
-        return {
-          id: invoice.id,
-          title: `${clientName} — ${statusLabel}`,
-          amount: formatCurrency(invoice.total, invoice.currency, locale),
-          timestamp: invoice.createdAt || invoice.issueDate,
-          status: invoice.status,
-        };
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.timestamp ?? '').getTime();
-        const dateB = new Date(b.timestamp ?? '').getTime();
-        return dateB - dateA;
-      });
-  }, [locale, recentInvoices, statusLookup, t]);
+    const activityFeed = useMemo(() => {
+      return recentInvoices
+        .map((invoice) => {
+          const statusLabel =
+            statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
+          const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
+          return {
+            id: invoice.id,
+            title: `${clientName} — ${statusLabel}`,
+            amount: formatCurrency(invoice.total, invoice.currency, locale),
+            timestamp: invoice.createdAt || invoice.issueDate,
+            status: invoice.status,
+          };
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.timestamp ?? '').getTime();
+          const dateB = new Date(b.timestamp ?? '').getTime();
+          return dateB - dateA;
+        });
+    }, [locale, recentInvoices, statusLookup, t]);
 
-  function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
-    setDraft((prev) => ({ ...prev, [field]: value }));
-  }
+    const paymentLinkUrl = useMemo(() => normaliseHttpUrl(draft.paymentLink), [draft.paymentLink]);
+    const paymentLinkDisplay = useMemo(
+      () => (paymentLinkUrl ? formatDisplayUrl(paymentLinkUrl) : ''),
+      [paymentLinkUrl],
+    );
+
+    function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
+      setDraft((prev) => ({ ...prev, [field]: value }));
+    }
 
   function addLine() {
     setDraft((prev) => ({ ...prev, lines: [...prev.lines, createEmptyLine()] }));
@@ -341,6 +368,7 @@ export default function WorkspacePage() {
       businessName: draft.businessName.trim(),
       businessAddress: draft.businessAddress.trim(),
       notes: draft.notes.trim(),
+      paymentLink: draft.paymentLink.trim(),
       lines: ensuredLines,
     };
 
@@ -811,6 +839,23 @@ export default function WorkspacePage() {
                       onChange={(event) => updateDraftField('notes', event.target.value)}
                     />
                   </div>
+                  <div>
+                    <label htmlFor="paymentLink">{t('workspace.field.paymentLink', 'Stripe checkout link')}</label>
+                    <input
+                      id="paymentLink"
+                      type="url"
+                      value={draft.paymentLink}
+                      placeholder={t('workspace.placeholder.paymentLink', 'https://buy.stripe.com/test_1234abcd')}
+                      onChange={(event) => updateDraftField('paymentLink', event.target.value)}
+                    />
+                    <p className="invoice-form__hint invoice-form__hint--test">
+                      <span className="invoice-form__badge">{t('workspace.paymentLink.badge', 'Test mode')}</span>
+                      {t(
+                        'workspace.paymentLink.hint',
+                        'Paste your Stripe Payment Link while Stripe is in test mode. Clients will see a test badge in the PDF.',
+                      )}
+                    </p>
+                  </div>
                 </section>
               </div>
 
@@ -1051,32 +1096,49 @@ export default function WorkspacePage() {
                         </div>
                       </div>
 
-                      {isSeikyu && (
-                        <div className="preview__hanko">
-                          <span>{t('workspace.preview.hankoLabel', '印')}</span>
-                          <small>{t('workspace.preview.hankoCaption', 'Authorised seal')}</small>
-                        </div>
-                      )}
-
-                      <div className="preview__notes">
-                        <strong>
-                          {isSeikyu
-                            ? t('workspace.preview.notesDual', '備考 / Notes')
-                            : t('workspace.preview.notes', 'Notes')}
-                        </strong>
-                        <p>
-                          {draft.notes ||
-                            t('workspace.preview.notesPlaceholder', 'Add payment instructions or a thank you message.')}
-                        </p>
                         {isSeikyu && (
-                          <small>
-                            {t(
-                              'workspace.preview.notesHint',
-                              'Please remit payment before the due date.',
-                            )}
-                          </small>
+                          <div className="preview__hanko">
+                            <span>{t('workspace.preview.hankoLabel', '印')}</span>
+                            <small>{t('workspace.preview.hankoCaption', 'Authorised seal')}</small>
+                          </div>
                         )}
-                      </div>
+
+                        <div className="preview__notes">
+                          <strong>
+                            {isSeikyu
+                              ? t('workspace.preview.notesDual', '備考 / Notes')
+                              : t('workspace.preview.notes', 'Notes')}
+                          </strong>
+                          <p>
+                            {draft.notes ||
+                              t('workspace.preview.notesPlaceholder', 'Add payment instructions or a thank you message.')}
+                          </p>
+                          {isSeikyu && (
+                            <small>
+                              {t(
+                                'workspace.preview.notesHint',
+                                'Please remit payment before the due date.',
+                              )}
+                            </small>
+                          )}
+                        </div>
+
+                        {paymentLinkUrl && (
+                          <div className="preview__payment-link">
+                            <a
+                              href={paymentLinkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="preview__payment-link-button"
+                            >
+                              <span>{t('workspace.preview.paymentLinkCta', 'Open Stripe checkout')}</span>
+                              <small>{t('workspace.preview.paymentLinkMode', 'Test mode')}</small>
+                            </a>
+                            {paymentLinkDisplay && (
+                              <span className="preview__payment-link-url">{paymentLinkDisplay}</span>
+                            )}
+                          </div>
+                        )}
                     </>
                   );
                 })()}

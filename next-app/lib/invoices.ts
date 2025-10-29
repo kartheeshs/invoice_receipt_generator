@@ -20,6 +20,7 @@ export interface InvoiceDraft {
   status: InvoiceStatus;
   taxRate: number;
   notes: string;
+  paymentLink: string;
   lines: InvoiceLine[];
 }
 
@@ -62,6 +63,7 @@ export function createEmptyDraft(): InvoiceDraft {
     status: 'draft',
     taxRate: 0.07,
     notes: '',
+    paymentLink: '',
     lines: [createEmptyLine()],
   };
 }
