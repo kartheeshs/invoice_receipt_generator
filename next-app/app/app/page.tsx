@@ -23,6 +23,7 @@ import { matchClients, type ClientDirectoryEntry } from '../../lib/clients';
 import { clearSession, loadSession, SESSION_STORAGE_KEY, type StoredSession } from '../../lib/auth';
 import LanguageSwitcher from '../components/language-switcher';
 import InvoicePreview from '../components/invoice-preview';
+import AdSlot from '../components/ad-slot';
 import {
   FREE_PLAN_DOWNLOAD_LIMIT,
   SubscriptionState,
@@ -777,6 +778,15 @@ export default function WorkspacePage() {
           </article>
         </div>
 
+        <AdSlot
+          label={t('ads.workspace.dashboardLeaderboard', 'Dashboard leaderboard (970×250)')}
+          description={t(
+            'ads.workspace.dashboardLeaderboardDescription',
+            'Perfect for sponsor campaigns, webinar promotions, or integration announcements in the workspace overview.',
+          )}
+          className="workspace-ad"
+        />
+
         <div className="panel">
           <header className="panel__header">
             <div>
@@ -877,69 +887,78 @@ export default function WorkspacePage() {
             paymentLinkDisplay={paymentLinkDisplay}
           />
         </div>
-        <section className="panel panel--stack">
-          <header className="panel__header panel__header--stacked">
-            <div>
-              <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
-              <p>{t('workspace.invoice.description', 'Toggle between editing your draft and reviewing the formatted preview.')}</p>
-            </div>
-            <div className="view-toggle" role="group" aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}>
-              <button
-                type="button"
-                className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
-                onClick={() => setInvoiceView('edit')}
-                aria-pressed={invoiceView === 'edit'}
-              >
-                ✏️ {t('workspace.view.edit', 'Edit draft')}
-              </button>
-              <button
-                type="button"
-                className={`view-toggle__button${invoiceView === 'preview' ? ' view-toggle__button--active' : ''}`}
-                onClick={() => setInvoiceView('preview')}
-                aria-pressed={invoiceView === 'preview'}
-              >
-                👀 {t('workspace.view.preview', 'Preview')}
-              </button>
-            </div>
-          </header>
-
-          <div className="panel__section">
-            <header className="panel__section-header">
-              <div>
-                <h3>{t('workspace.nav.templates', 'Templates')}</h3>
-                <p>{t('workspace.templates.instructions', 'Select a template thumbnail to style your invoice.')}</p>
-              </div>
-              <span className="badge">
-                {t('workspace.templates.count', `${localizedTemplates.length} options`, {
-                  count: localizedTemplates.length,
-                })}
-              </span>
-            </header>
-            {renderTemplateThumbnails()}
-            {subscription.plan !== 'premium' && (
-              <p className={`download-hint${freePlanLimitReached ? ' download-hint--warning' : ''}`} role="status">
-                {freePlanLimitReached
-                  ? t(
-                      'workspace.subscription.freeLimitHint',
-                      'Free plan limit reached for this 15-day window. Next refresh on {resetDate}. Upgrade for unlimited PDFs.',
-                      { resetDate: downloadResetLabel },
-                    )
-                  : t(
-                      'workspace.subscription.freeHint',
-                      '{remaining} downloads left in this 15-day window (resets on {resetDate}).',
-                      {
-                        remaining: Math.max(0, Number.isFinite(remainingDownloads) ? remainingDownloads : 0),
-                        resetDate: downloadResetLabel,
-                      },
+          <div className="workspace-ad-grid">
+            <section className="panel panel--stack">
+              <header className="panel__header panel__header--stacked">
+                <div>
+                  <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
+                  <p>
+                    {t(
+                      'workspace.invoice.description',
+                      'Toggle between editing your draft and reviewing the formatted preview.',
                     )}
-              </p>
-            )}
-          </div>
+                  </p>
+                </div>
+                <div
+                  className="view-toggle"
+                  role="group"
+                  aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}
+                >
+                  <button
+                    type="button"
+                    className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
+                    onClick={() => setInvoiceView('edit')}
+                    aria-pressed={invoiceView === 'edit'}
+                  >
+                    ✏️ {t('workspace.view.edit', 'Edit draft')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`view-toggle__button${invoiceView === 'preview' ? ' view-toggle__button--active' : ''}`}
+                    onClick={() => setInvoiceView('preview')}
+                    aria-pressed={invoiceView === 'preview'}
+                  >
+                    👀 {t('workspace.view.preview', 'Preview')}
+                  </button>
+                </div>
+              </header>
+              <div className="panel__section">
+                <header className="panel__section-header">
+                  <div>
+                    <h3>{t('workspace.nav.templates', 'Templates')}</h3>
+                    <p>{t('workspace.templates.instructions', 'Select a template thumbnail to style your invoice.')}</p>
+                  </div>
+                  <span className="badge">
+                    {t('workspace.templates.count', `${localizedTemplates.length} options`, {
+                      count: localizedTemplates.length,
+                    })}
+                  </span>
+                </header>
+                {renderTemplateThumbnails()}
+                {subscription.plan !== 'premium' && (
+                  <p className={`download-hint${freePlanLimitReached ? ' download-hint--warning' : ''}`} role="status">
+                    {freePlanLimitReached
+                      ? t(
+                          'workspace.subscription.freeLimitHint',
+                          'Free plan limit reached for this 15-day window. Next refresh on {resetDate}. Upgrade for unlimited PDFs.',
+                          { resetDate: downloadResetLabel },
+                        )
+                      : t(
+                          'workspace.subscription.freeHint',
+                          '{remaining} downloads left in this 15-day window (resets on {resetDate}).',
+                          {
+                            remaining: Math.max(0, Number.isFinite(remainingDownloads) ? remainingDownloads : 0),
+                            resetDate: downloadResetLabel,
+                          },
+                        )}
+                  </p>
+                )}
+              </div>
 
-          {invoiceView === 'edit' ? (
-            <form id={formId} className="invoice-form" onSubmit={handleSave}>
-              <div className="invoice-form__grid">
-                <section className="editor-card invoice-form__card">
+              {invoiceView === 'edit' ? (
+                <form id={formId} className="invoice-form" onSubmit={handleSave}>
+                  <div className="invoice-form__grid">
+                    <section className="editor-card invoice-form__card">
                   <header className="editor-card__header">
                     <div>
                       <h2>{t('workspace.section.business', 'Business & client')}</h2>
@@ -1247,7 +1266,17 @@ export default function WorkspacePage() {
               paymentLinkDisplay={paymentLinkDisplay}
             />
           )}
-        </section>
+          </section>
+          <AdSlot
+            label={t('ads.workspace.editorSidebar', 'Editor sidebar (300×600)')}
+            description={t(
+              'ads.workspace.editorSidebarDescription',
+              'Use this tall placement for educational tips, premium upgrades, or accounting partner offers beside the editor.',
+            )}
+            orientation="vertical"
+            className="workspace-ad"
+          />
+        </div>
       </div>
     );
   }

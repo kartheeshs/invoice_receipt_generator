@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useTranslation } from '../lib/i18n';
+import AdSlot from './components/ad-slot';
 
 type TemplatePreview = {
   slug: string;
@@ -343,6 +344,16 @@ export default function LandingPage() {
         </aside>
       </section>
 
+      <section className="container ad-section">
+        <AdSlot
+          label={t('ads.landing.heroLeaderboard', 'Homepage leaderboard (970×250)')}
+          description={t(
+            'ads.landing.heroLeaderboardDescription',
+            'Reserve this hero banner for high-impact campaigns or important partner announcements.',
+          )}
+        />
+      </section>
+
       <section className="container" id="features">
         <div className="section-heading">
           <h2>{t('landing.features.heading', 'Everything you need to move from draft to paid')}</h2>
@@ -387,6 +398,15 @@ export default function LandingPage() {
             );
           })}
         </div>
+        <div className="template-gallery__ad">
+          <AdSlot
+            label={t('ads.landing.midPage', 'Template gallery spotlight (728×90)')}
+            description={t(
+              'ads.landing.midPageDescription',
+              'Ideal for showcasing design partners, integrations, or seasonal promotions alongside templates.',
+            )}
+          />
+        </div>
       </section>
 
       <section className="container" id="workflow">
@@ -408,6 +428,16 @@ export default function LandingPage() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="container ad-section">
+        <AdSlot
+          label={t('ads.landing.pricingNative', 'Native placement beside pricing (300×250)')}
+          description={t(
+            'ads.landing.pricingNativeDescription',
+            'Use this space for upgrade nudges, referral programmes, or sponsor content near the pricing table.',
+          )}
+        />
       </section>
 
       <section className="container" id="pricing">
