@@ -27,9 +27,6 @@ export default function SiteHeader() {
           <Link href="/privacy-policy" prefetch={false}>
             {t('nav.privacy', 'Privacy')}
           </Link>
-          <Link href="/login" prefetch={false}>
-            {t('nav.signIn', 'Sign in')}
-          </Link>
           <Link href="/app" className="button button--primary" prefetch={false}>
             {t('nav.launchApp', 'Launch app')}
           </Link>

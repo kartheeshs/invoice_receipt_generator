@@ -15,6 +15,155 @@ export type TemplatePdfPalette = {
   accentBar?: RGB;
 };
 
+export type TemplateColumnLabels = {
+  description?: string;
+  descriptionSecondary?: string;
+  quantity?: string;
+  rate?: string;
+  amount?: string;
+};
+
+export type TemplateLabelKey =
+  | 'invoiceTitle'
+  | 'billTo'
+  | 'issueDate'
+  | 'dueDate'
+  | 'statusLabel'
+  | 'statusValue'
+  | 'currency'
+  | 'description'
+  | 'quantity'
+  | 'rate'
+  | 'amount'
+  | 'subtotal'
+  | 'tax'
+  | 'total'
+  | 'notes';
+
+export type TemplateLabelOverrides = Partial<Record<TemplateLabelKey, string>>;
+
+export const DEFAULT_TEMPLATE_ID = 'villa-coastal';
+
+export type TemplateStructure = {
+  headerLayout: 'standard' | 'japanese' | 'compact';
+  totalsStyle: 'table' | 'underline' | 'side-panel' | 'badge' | 'stacked' | 'japanese';
+  infoLayout: 'standard' | 'split' | 'japanese';
+  lineItemStyle:
+    | 'default'
+    | 'striped'
+    | 'striped-light'
+    | 'outlined'
+    | 'ledger'
+    | 'separated'
+    | 'japanese';
+  columnLabels?: TemplateColumnLabels;
+  labelOverrides?: TemplateLabelOverrides;
+  showPaymentDetails: boolean;
+  paymentDetailsLabel?: string;
+  paymentDetailsValue?: string;
+  paymentLinkLabel?: string;
+  showThankYou: boolean;
+  thankYouLabel?: string;
+};
+
+const defaultTemplateStructure: TemplateStructure = {
+  headerLayout: 'standard',
+  totalsStyle: 'side-panel',
+  infoLayout: 'standard',
+  lineItemStyle: 'striped',
+  showPaymentDetails: false,
+  showThankYou: false,
+};
+
+const templateStructures: Record<string, TemplateStructure> = {
+  'villa-coastal': {
+    headerLayout: 'standard',
+    totalsStyle: 'side-panel',
+    infoLayout: 'split',
+    lineItemStyle: 'striped-light',
+    columnLabels: {
+      quantity: 'Nights',
+    },
+    showPaymentDetails: false,
+    showThankYou: true,
+    thankYouLabel: 'We appreciate your stay with us.',
+  },
+  'atelier-minimal': {
+    headerLayout: 'standard',
+    totalsStyle: 'underline',
+    infoLayout: 'split',
+    lineItemStyle: 'outlined',
+    showPaymentDetails: false,
+    showThankYou: false,
+  },
+  'royal-balance': {
+    headerLayout: 'standard',
+    totalsStyle: 'badge',
+    infoLayout: 'standard',
+    lineItemStyle: 'striped',
+    showPaymentDetails: false,
+    showThankYou: true,
+    thankYouLabel: 'Thank you for your business.',
+  },
+  'harbour-slate': {
+    headerLayout: 'standard',
+    totalsStyle: 'table',
+    infoLayout: 'split',
+    lineItemStyle: 'separated',
+    showPaymentDetails: false,
+    showThankYou: false,
+  },
+  seikyu: {
+    headerLayout: 'japanese',
+    totalsStyle: 'japanese',
+    infoLayout: 'japanese',
+    lineItemStyle: 'japanese',
+    columnLabels: {
+      descriptionSecondary: '品目',
+      quantity: '数量',
+      rate: '単価',
+      amount: '金額',
+    },
+    labelOverrides: {
+      invoiceTitle: '請求書 / Invoice',
+      billTo: '請求先 / Bill to',
+      issueDate: '発行日 / Issued',
+      dueDate: '支払期日 / Due',
+      statusLabel: 'ステータス / Status',
+      currency: '通貨 / Currency',
+      subtotal: '小計 / Subtotal',
+      tax: '税額 / Tax',
+      total: '合計 / Total',
+      notes: '備考 / Notes',
+    },
+    showPaymentDetails: true,
+    paymentDetailsLabel: 'Payment details',
+    paymentDetailsValue: 'Bank transfer — due on receipt',
+    paymentLinkLabel: 'Stripe決済リンク（テストモード） / Stripe checkout link (test mode)',
+    showThankYou: true,
+    thankYouLabel: 'いつもありがとうございます。',
+  },
+  'aqua-ledger': {
+    headerLayout: 'standard',
+    totalsStyle: 'stacked',
+    infoLayout: 'standard',
+    lineItemStyle: 'striped',
+    showPaymentDetails: false,
+    showThankYou: false,
+  },
+  'classic-ledger': {
+    headerLayout: 'standard',
+    totalsStyle: 'underline',
+    infoLayout: 'standard',
+    lineItemStyle: 'ledger',
+    showPaymentDetails: false,
+    showThankYou: true,
+    thankYouLabel: 'Authorised signature',
+  },
+};
+
+export type TemplateTier = 'free' | 'premium';
+
 export type InvoiceTemplate = {
   id: string;
   name: string;
@@ -24,7 +173,10 @@ export type InvoiceTemplate = {
   bestFor: string;
   highlights: string[];
   pdfPalette: TemplatePdfPalette;
+  tagline?: string;
+  structure?: TemplateStructure;
   supportsJapanese?: boolean;
+  tier: TemplateTier;
 };
 
 function rgb(hex: string): RGB {
@@ -39,7 +191,7 @@ function rgb(hex: string): RGB {
 
 export const invoiceTemplates: InvoiceTemplate[] = [
   {
-    id: 'villa-coastal',
+    id: DEFAULT_TEMPLATE_ID,
     name: 'Villa Coastal',
     description:
       'Deep azure header, booking summary capsule, and anchored totals designed after boutique resort receipts.',
@@ -65,6 +217,8 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f2f8ff'),
       accentBar: rgb('#1d5fbf'),
     },
+    structure: templateStructures[DEFAULT_TEMPLATE_ID],
+    tier: 'free',
   },
   {
     id: 'atelier-minimal',
@@ -87,6 +241,8 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       border: rgb('#e2e8f0'),
       notesBackground: rgb('#f8fafc'),
     },
+    structure: templateStructures['atelier-minimal'],
+    tier: 'premium',
   },
   {
     id: 'royal-balance',
@@ -110,6 +266,8 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#fdf2f8'),
       accentBar: rgb('#f472b6'),
     },
+    structure: templateStructures['royal-balance'],
+    tier: 'premium',
   },
   {
     id: 'harbour-slate',
@@ -133,6 +291,8 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#f1f5f9'),
       accentBar: rgb('#5fa8d3'),
     },
+    structure: templateStructures['harbour-slate'],
+    tier: 'premium',
   },
   {
     id: 'seikyu',
@@ -156,7 +316,9 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#fff7ed'),
       accentBar: rgb('#f97316'),
     },
+    structure: templateStructures.seikyu,
     supportsJapanese: true,
+    tier: 'premium',
   },
   {
     id: 'aqua-ledger',
@@ -180,6 +342,8 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       notesBackground: rgb('#ecfdf5'),
       accentBar: rgb('#14b8a6'),
     },
+    structure: templateStructures['aqua-ledger'],
+    tier: 'premium',
   },
   {
     id: 'classic-ledger',
@@ -202,9 +366,16 @@ export const invoiceTemplates: InvoiceTemplate[] = [
       border: rgb('#d1d5db'),
       notesBackground: rgb('#f9fafb'),
     },
+    structure: templateStructures['classic-ledger'],
+    tier: 'premium',
   },
 ];
 
-export function getInvoiceTemplate(id: string): InvoiceTemplate {
-  return invoiceTemplates.find((template) => template.id === id) ?? invoiceTemplates[0];
+export function getInvoiceTemplate(id: string): InvoiceTemplate & { structure: TemplateStructure } {
+  const template = invoiceTemplates.find((entry) => entry.id === id) ?? invoiceTemplates[0];
+  const structure = template.structure ?? templateStructures[template.id] ?? defaultTemplateStructure;
+  return {
+    ...template,
+    structure,
+  };
 }

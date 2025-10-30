@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   InvoiceDraft,
@@ -16,11 +16,25 @@ import {
 import { firebaseConfigured, fetchRecentInvoices, saveInvoice } from '../../lib/firebase';
 import { sampleInvoices } from '../../lib/sample-data';
 import { useTranslation } from '../../lib/i18n';
+import { formatFriendlyDate } from '../../lib/format';
 import { generateInvoicePdf } from '../../lib/pdf';
-import { invoiceTemplates } from '../../lib/templates';
+import { DEFAULT_TEMPLATE_ID, invoiceTemplates } from '../../lib/templates';
 import { matchClients, type ClientDirectoryEntry } from '../../lib/clients';
 import { clearSession, loadSession, SESSION_STORAGE_KEY, type StoredSession } from '../../lib/auth';
 import LanguageSwitcher from '../components/language-switcher';
+import InvoicePreview from '../components/invoice-preview';
+import AdSlot from '../components/ad-slot';
+import {
+  FREE_PLAN_DOWNLOAD_LIMIT,
+  SubscriptionState,
+  downloadsRemaining,
+  downloadWindowReset,
+  ensureSubscriptionWindow,
+  incrementDownloadCount,
+  loadSubscriptionState,
+  markSubscriptionPlan,
+  persistSubscriptionState,
+} from '../../lib/subscription';
 
 type SectionId = 'dashboard' | 'invoices' | 'templates' | 'clients' | 'activity' | 'settings';
 
@@ -58,19 +72,110 @@ const statusOptions: { value: InvoiceStatus; label: string }[] = [
   { value: 'overdue', label: 'Overdue' },
 ];
 
-const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
+const FALLBACK_CURRENCIES = [
+  'USD',
+  'EUR',
+  'GBP',
+  'AUD',
+  'CAD',
+  'JPY',
+  'SGD',
+  'NZD',
+  'CHF',
+  'CNY',
+  'HKD',
+  'INR',
+  'SEK',
+  'NOK',
+  'DKK',
+  'ZAR',
+  'BRL',
+  'MXN',
+  'KRW',
+  'IDR',
+  'PHP',
+  'THB',
+  'AED',
+  'SAR',
+];
 
-function formatFriendlyDate(value?: string, locale?: string): string {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
+function resolveCurrencyCodes(): string[] {
+  if (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl && typeof Intl.supportedValuesOf === 'function') {
+    try {
+      const values = Intl.supportedValuesOf('currency');
+      if (Array.isArray(values) && values.length) {
+        return values as string[];
+      }
+    } catch {
+      // ignored — fall back to curated list
+    }
   }
-  return parsed.toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
+
+  return FALLBACK_CURRENCIES;
+}
+
+const stripePublishableKey =
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_51SMrPSRuLo7evHJI5TuYsmpqHAtIOGahp0NCsder674sXQ7wDrgNomfKKmZWyB6fFgREw88cprnFjJmcfIXu628L00o5NvgAzJ';
+
+type StripeClient = {
+  redirectToCheckout: (options: { sessionId: string }) => Promise<{ error?: { message?: string } }>;
+};
+
+declare global {
+  interface Window {
+    Stripe?: (publishableKey: string) => StripeClient | null;
+  }
+}
+
+let stripeClientPromise: Promise<StripeClient | null> | null = null;
+
+function loadStripeClient(): Promise<StripeClient | null> {
+  if (!stripePublishableKey) {
+    return Promise.resolve(null);
+  }
+  if (stripeClientPromise) {
+    return stripeClientPromise;
+  }
+  stripeClientPromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      resolve(null);
+      return;
+    }
+    if (typeof window.Stripe === 'function') {
+      resolve(window.Stripe(stripePublishableKey) ?? null);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.stripe.com/v3/';
+    script.async = true;
+    script.onload = () => {
+      resolve(typeof window.Stripe === 'function' ? window.Stripe(stripePublishableKey) ?? null : null);
+    };
+    script.onerror = () => reject(new Error('Stripe.js failed to load.'));
+    document.head.appendChild(script);
   });
+  return stripeClientPromise;
+}
+
+function normaliseHttpUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const candidate = /^(https?:\/\/)/iu.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return null;
+    }
+    return url.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
+function formatDisplayUrl(url: string): string {
+  return url.replace(/^https?:\/\//iu, '');
 }
 
 function ensureLine(line: InvoiceLine, field: keyof InvoiceLine, value: string): InvoiceLine {
@@ -95,14 +200,101 @@ export default function WorkspacePage() {
   const [alertMessage, setAlertMessage] = useState<string>('');
   const [invoiceView, setInvoiceView] = useState<'edit' | 'preview'>('edit');
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => loadSubscriptionState());
+  const [subscribing, setSubscribing] = useState<boolean>(false);
   const [session, setSession] = useState<StoredSession | null>(null);
   const [clientMatches, setClientMatches] = useState<ClientDirectoryEntry[]>([]);
   const [showClientMatches, setShowClientMatches] = useState<boolean>(false);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
+  const currencyOptions = useMemo(() => {
+    const codes = new Set(resolveCurrencyCodes());
+    for (const currency of FALLBACK_CURRENCIES) {
+      codes.add(currency);
+    }
+    if (draft.currency) {
+      codes.add(draft.currency.toUpperCase());
+    }
+
+    const validCodes = Array.from(codes).filter((code) => /^[A-Z]{3}$/u.test(code));
+    validCodes.sort((a, b) => a.localeCompare(b));
+
+    let currencyNames: Intl.DisplayNames | null = null;
+    if (typeof Intl.DisplayNames === 'function') {
+      try {
+        currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
+      } catch {
+        currencyNames = null;
+      }
+    }
+
+    return validCodes.map((code) => {
+      const readable = currencyNames?.of(code);
+      return {
+        code,
+        label: readable && readable !== code ? `${code} — ${readable}` : code,
+      };
+    });
+  }, [draft.currency, locale]);
   const isSignedIn = Boolean(session);
   const isAdmin = session?.role === 'admin';
   const sessionDisplayName = session?.displayName ?? session?.email ?? '';
+
+  const syncSubscription = useCallback(
+    (updater: SubscriptionState | ((current: SubscriptionState) => SubscriptionState)) => {
+      setSubscription((current) => {
+        const next = typeof updater === 'function' ? (updater as (state: SubscriptionState) => SubscriptionState)(current) : updater;
+        persistSubscriptionState(next);
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const initial = loadSubscriptionState();
+    syncSubscription(initial);
+  }, [syncSubscription]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const url = new URL(window.location.href);
+    const status = url.searchParams.get('subscription');
+    if (!status) {
+      return;
+    }
+    url.searchParams.delete('subscription');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setSubscribing(false);
+
+    if (status === 'success') {
+      syncSubscription((current) => markSubscriptionPlan(current, 'premium'));
+      setAlertMessage(
+        t('workspace.subscription.success', 'Premium plan activated. Unlimited templates and downloads unlocked.'),
+      );
+      setSaveState('success');
+    } else if (status === 'canceled') {
+      setAlertMessage(t('workspace.subscription.canceled', 'Subscription checkout was canceled.'));
+      setSaveState('idle');
+    }
+  }, [syncSubscription, t]);
+
+  useEffect(() => {
+    const ensured = ensureSubscriptionWindow(subscription);
+    if (
+      ensured.downloadCount !== subscription.downloadCount ||
+      ensured.windowStart !== subscription.windowStart ||
+      ensured.plan !== subscription.plan
+    ) {
+      syncSubscription(ensured);
+    }
+  }, [subscription, syncSubscription]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -153,6 +345,21 @@ export default function WorkspacePage() {
   }, [t]);
 
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
+  const printableLines = useMemo(() => {
+    const sanitized = cleanLines(draft.lines);
+    return sanitized.length ? sanitized : draft.lines;
+  }, [draft.lines]);
+  const previewDraft = useMemo(
+    () => ({
+      ...draft,
+      lines: printableLines,
+    }),
+    [draft, printableLines],
+  );
+  const previewTotals = useMemo(
+    () => calculateTotals(printableLines, draft.taxRate),
+    [printableLines, draft.taxRate],
+  );
   const localizedSections = useMemo(
     () =>
       sections.map((section) => ({
@@ -180,11 +387,30 @@ export default function WorkspacePage() {
     [t],
   );
   const statusLookup = useMemo(() => new Map(localizedStatusOptions.map((option) => [option.value, option.label])), [localizedStatusOptions]);
-  const selectedTemplateId = draft.templateId || invoiceTemplates[0]?.id || 'villa-coastal';
+  const selectedTemplateId = useMemo(() => {
+    const candidate = draft.templateId || DEFAULT_TEMPLATE_ID;
+    const template = invoiceTemplates.find((entry) => entry.id === candidate);
+    if (subscription.plan !== 'premium' && template && template.tier === 'premium') {
+      return DEFAULT_TEMPLATE_ID;
+    }
+    return candidate;
+  }, [draft.templateId, subscription.plan]);
   const activeTemplate = useMemo(
     () => localizedTemplates.find((template) => template.id === selectedTemplateId) ?? localizedTemplates[0],
     [localizedTemplates, selectedTemplateId],
   );
+
+  useEffect(() => {
+    if (draft.templateId !== selectedTemplateId) {
+      setDraft((prev) => ({ ...prev, templateId: selectedTemplateId }));
+    }
+  }, [draft.templateId, selectedTemplateId]);
+
+  const remainingDownloads = downloadsRemaining(subscription);
+  const downloadResetsAt = downloadWindowReset(subscription);
+  const downloadResetLabel = formatFriendlyDate(new Date(downloadResetsAt).toISOString(), locale);
+  const freePlanLimitReached =
+    subscription.plan !== 'premium' && Number.isFinite(remainingDownloads) && remainingDownloads <= 0;
 
   const outstandingTotal = useMemo(
     () =>
@@ -245,30 +471,36 @@ export default function WorkspacePage() {
     return Array.from(summaries.values()).sort((a, b) => b.outstanding - a.outstanding);
   }, [recentInvoices]);
 
-  const activityFeed = useMemo(() => {
-    return recentInvoices
-      .map((invoice) => {
-        const statusLabel =
-          statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
-        const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
-        return {
-          id: invoice.id,
-          title: `${clientName} — ${statusLabel}`,
-          amount: formatCurrency(invoice.total, invoice.currency, locale),
-          timestamp: invoice.createdAt || invoice.issueDate,
-          status: invoice.status,
-        };
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.timestamp ?? '').getTime();
-        const dateB = new Date(b.timestamp ?? '').getTime();
-        return dateB - dateA;
-      });
-  }, [locale, recentInvoices, statusLookup, t]);
+    const activityFeed = useMemo(() => {
+      return recentInvoices
+        .map((invoice) => {
+          const statusLabel =
+            statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
+          const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
+          return {
+            id: invoice.id,
+            title: `${clientName} — ${statusLabel}`,
+            amount: formatCurrency(invoice.total, invoice.currency, locale),
+            timestamp: invoice.createdAt || invoice.issueDate,
+            status: invoice.status,
+          };
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.timestamp ?? '').getTime();
+          const dateB = new Date(b.timestamp ?? '').getTime();
+          return dateB - dateA;
+        });
+    }, [locale, recentInvoices, statusLookup, t]);
 
-  function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
-    setDraft((prev) => ({ ...prev, [field]: value }));
-  }
+    const paymentLinkUrl = useMemo(() => normaliseHttpUrl(draft.paymentLink), [draft.paymentLink]);
+    const paymentLinkDisplay = useMemo(
+      () => (paymentLinkUrl ? formatDisplayUrl(paymentLinkUrl) : ''),
+      [paymentLinkUrl],
+    );
+
+    function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
+      setDraft((prev) => ({ ...prev, [field]: value }));
+    }
 
   function addLine() {
     setDraft((prev) => ({ ...prev, lines: [...prev.lines, createEmptyLine()] }));
@@ -341,6 +573,7 @@ export default function WorkspacePage() {
       businessName: draft.businessName.trim(),
       businessAddress: draft.businessAddress.trim(),
       notes: draft.notes.trim(),
+      paymentLink: draft.paymentLink.trim(),
       lines: ensuredLines,
     };
 
@@ -386,49 +619,75 @@ export default function WorkspacePage() {
       return;
     }
 
+    const now = Date.now();
+    const normalisedState = ensureSubscriptionWindow(subscription, now);
+    if (
+      normalisedState.downloadCount !== subscription.downloadCount ||
+      normalisedState.windowStart !== subscription.windowStart ||
+      normalisedState.plan !== subscription.plan
+    ) {
+      syncSubscription(normalisedState);
+    }
+
+    if (normalisedState.plan !== 'premium' && normalisedState.downloadCount >= FREE_PLAN_DOWNLOAD_LIMIT) {
+      const resetDateIso = new Date(downloadWindowReset(normalisedState)).toISOString();
+      const resetLabel = formatFriendlyDate(resetDateIso, locale);
+      setAlertMessage(
+        t(
+          'workspace.subscription.limitReached',
+          'Free plan limit reached for this 15-day window. Refreshes on {resetDate}. Upgrade for unlimited exports.',
+          { resetDate: resetLabel },
+        ),
+      );
+      setSaveState('error');
+      return;
+    }
+
     try {
       setDownloadingPdf(true);
-      const cleanedLines = cleanLines(draft.lines);
-      const pdfDraft: InvoiceDraft = { ...draft, lines: cleanedLines.length ? cleanedLines : draft.lines };
-      const pdfTotals = calculateTotals(pdfDraft.lines, pdfDraft.taxRate);
-      const pdfLabel = (key: string, fallback: string) => t(key, fallback);
-      const statusValue = statusLookup.get(draft.status) ?? draft.status;
-      const pdfLabels = {
-        invoiceTitle: pdfLabel('workspace.pdf.invoiceTitle', 'Invoice'),
-        billTo: pdfLabel('workspace.pdf.billTo', 'Bill to'),
-        issueDate: pdfLabel('workspace.pdf.issueDate', 'Issue date'),
-        dueDate: pdfLabel('workspace.pdf.dueDate', 'Due date'),
-        statusLabel: pdfLabel('workspace.pdf.status', 'Status'),
-        statusValue,
-        currency: pdfLabel('workspace.pdf.currency', 'Currency'),
-        description: pdfLabel('workspace.pdf.description', 'Description'),
-        quantity: pdfLabel('workspace.pdf.quantity', 'Qty'),
-        rate: pdfLabel('workspace.pdf.rate', 'Rate'),
-        amount: pdfLabel('workspace.pdf.amount', 'Amount'),
-        subtotal: pdfLabel('workspace.pdf.subtotal', 'Subtotal'),
-        tax: pdfLabel('workspace.pdf.tax', 'Tax'),
-        total: pdfLabel('workspace.pdf.total', 'Total'),
-        notes: pdfLabel('workspace.pdf.notes', 'Notes'),
-      };
-
-      const blob = generateInvoicePdf({
-        draft: pdfDraft,
-        totals: pdfTotals,
-        locale,
-        currency: draft.currency,
-        labels: pdfLabels,
-        templateId: selectedTemplateId,
+      const previewElement = previewRef.current;
+      if (!previewElement) {
+        throw new Error('Preview is not ready to export.');
+      }
+      const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
+      const blob = await generateInvoicePdf({
+        element: previewElement,
+        margin: 32,
+        scale,
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const safeClient = pdfDraft.clientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'invoice';
+      const safeClient =
+        previewDraft.clientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'invoice';
       link.href = url;
-      link.download = `${safeClient}-${pdfDraft.issueDate || 'draft'}.pdf`;
+      link.download = `${safeClient}-${previewDraft.issueDate || 'draft'}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setAlertMessage(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'));
+      if (normalisedState.plan !== 'premium') {
+        const updatedState = incrementDownloadCount(normalisedState, now);
+        syncSubscription(updatedState);
+        const remaining = downloadsRemaining(updatedState);
+        const resetDateIso = new Date(downloadWindowReset(updatedState)).toISOString();
+        const resetLabel = formatFriendlyDate(resetDateIso, locale);
+        const baseMessage = t('workspace.alert.downloaded', 'Invoice PDF downloaded.');
+        const detailMessage =
+          remaining > 0 && Number.isFinite(remaining)
+            ? t(
+                'workspace.subscription.remaining',
+                '{remaining} downloads left in this 15-day window (resets on {resetDate}).',
+                { remaining, resetDate: resetLabel },
+              )
+            : t(
+                'workspace.subscription.noneRemaining',
+                'No free downloads left until {resetDate}. Limits reset every 15 days.',
+                { resetDate: resetLabel },
+              );
+        setAlertMessage(`${baseMessage} ${detailMessage}`);
+      } else {
+        setAlertMessage(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'));
+      }
       setSaveState('success');
     } catch (error) {
       console.error(error);
@@ -440,7 +699,59 @@ export default function WorkspacePage() {
   }
 
   function handleSelectTemplate(templateId: string) {
+    const template = invoiceTemplates.find((entry) => entry.id === templateId);
+    if (!template) {
+      return;
+    }
+    if (subscription.plan !== 'premium' && template.tier === 'premium') {
+      setAlertMessage(
+        t(
+          'workspace.subscription.templateLocked',
+          'Upgrade to the Premium plan to use this template and unlock unlimited downloads.',
+        ),
+      );
+      setSaveState('error');
+      return;
+    }
     setDraft((prev) => ({ ...prev, templateId }));
+  }
+
+  async function handleStartSubscription() {
+    try {
+      setAlertMessage('');
+      setSubscribing(true);
+      const stripe = await loadStripeClient();
+      if (!stripe) {
+        throw new Error(t('workspace.subscription.missingStripe', 'Stripe failed to initialise.'));
+      }
+      const response = await fetch('/api/subscription/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(t('workspace.subscription.checkoutError', 'Unable to start Stripe checkout right now.'));
+      }
+      const payload = (await response.json()) as { sessionId?: string; url?: string };
+      if (payload.sessionId) {
+        const { error } = await stripe.redirectToCheckout({ sessionId: payload.sessionId });
+        if (error) {
+          throw new Error(error.message ?? 'Stripe redirect failed.');
+        }
+      } else if (payload.url) {
+        window.location.assign(payload.url);
+      } else {
+        throw new Error('Stripe session could not be created.');
+      }
+    } catch (error) {
+      console.error(error);
+      setSubscribing(false);
+      setAlertMessage(
+        error instanceof Error
+          ? error.message
+          : t('workspace.subscription.checkoutError', 'Unable to start Stripe checkout right now.'),
+      );
+      setSaveState('error');
+    }
   }
 
   function renderTemplateThumbnails({ showDetails = false }: { showDetails?: boolean } = {}) {
@@ -448,15 +759,29 @@ export default function WorkspacePage() {
       <div className={`template-thumbnail-grid${showDetails ? ' template-thumbnail-grid--detailed' : ''}`}>
         {localizedTemplates.map((template) => {
           const isActive = template.id === selectedTemplateId;
+          const isLocked = subscription.plan !== 'premium' && template.tier === 'premium';
           const primaryHighlight = template.highlights[0] ?? template.description;
           return (
             <button
               key={template.id}
               type="button"
               onClick={() => handleSelectTemplate(template.id)}
-              className={`template-thumbnail${isActive ? ' template-thumbnail--active' : ''}`}
+              className={`template-thumbnail${isActive ? ' template-thumbnail--active' : ''}${
+                isLocked ? ' template-thumbnail--locked' : ''
+              }`}
               aria-pressed={isActive}
+              aria-disabled={isLocked}
+              title={
+                isLocked
+                  ? t('workspace.subscription.templateLockedTitle', 'Premium template — upgrade to apply')
+                  : undefined
+              }
             >
+              {isLocked && (
+                <span className="template-thumbnail__lock" aria-hidden="true">
+                  🔒 {t('workspace.subscription.premiumBadge', 'Premium')}
+                </span>
+              )}
               <span className="template-thumbnail__preview" style={{ background: template.accent }} aria-hidden="true">
                 <span className="template-thumbnail__preview-header">{template.name}</span>
                 <span className="template-thumbnail__preview-body" />
@@ -521,6 +846,15 @@ export default function WorkspacePage() {
             <p>{t('workspace.dashboard.templatesHint', 'Switch templates from the gallery')}</p>
           </article>
         </div>
+
+        <AdSlot
+          label={t('ads.workspace.dashboardLeaderboard', 'Dashboard leaderboard (970×250)')}
+          description={t(
+            'ads.workspace.dashboardLeaderboardDescription',
+            'Perfect for sponsor campaigns, webinar promotions, or integration announcements in the workspace overview.',
+          )}
+          className="workspace-ad"
+        />
 
         <div className="panel">
           <header className="panel__header">
@@ -596,51 +930,104 @@ export default function WorkspacePage() {
   function renderInvoices() {
     return (
       <div className="workspace-section">
-        <section className="panel panel--stack">
-          <header className="panel__header panel__header--stacked">
-            <div>
-              <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
-              <p>{t('workspace.invoice.description', 'Toggle between editing your draft and reviewing the formatted preview.')}</p>
-            </div>
-            <div className="view-toggle" role="group" aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}>
-              <button
-                type="button"
-                className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
-                onClick={() => setInvoiceView('edit')}
-                aria-pressed={invoiceView === 'edit'}
-              >
-                ✏️ {t('workspace.view.edit', 'Edit draft')}
-              </button>
-              <button
-                type="button"
-                className={`view-toggle__button${invoiceView === 'preview' ? ' view-toggle__button--active' : ''}`}
-                onClick={() => setInvoiceView('preview')}
-                aria-pressed={invoiceView === 'preview'}
-              >
-                👀 {t('workspace.view.preview', 'Preview')}
-              </button>
-            </div>
-          </header>
-
-          <div className="panel__section">
-            <header className="panel__section-header">
-              <div>
-                <h3>{t('workspace.nav.templates', 'Templates')}</h3>
-                <p>{t('workspace.templates.instructions', 'Select a template thumbnail to style your invoice.')}</p>
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            pointerEvents: 'none',
+            visibility: 'hidden',
+            width: 'auto',
+            height: 'auto',
+            zIndex: -1,
+          }}
+        >
+          <InvoicePreview
+            ref={previewRef}
+            draft={previewDraft}
+            totals={previewTotals}
+            template={activeTemplate}
+            locale={locale}
+            currency={previewDraft.currency}
+            statusLookup={statusLookup}
+            t={t}
+            paymentLinkUrl={paymentLinkUrl}
+            paymentLinkDisplay={paymentLinkDisplay}
+          />
+        </div>
+          <div className="workspace-ad-grid">
+            <section className="panel panel--stack">
+              <header className="panel__header panel__header--stacked">
+                <div>
+                  <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
+                  <p>
+                    {t(
+                      'workspace.invoice.description',
+                      'Toggle between editing your draft and reviewing the formatted preview.',
+                    )}
+                  </p>
+                </div>
+                <div
+                  className="view-toggle"
+                  role="group"
+                  aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}
+                >
+                  <button
+                    type="button"
+                    className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
+                    onClick={() => setInvoiceView('edit')}
+                    aria-pressed={invoiceView === 'edit'}
+                  >
+                    ✏️ {t('workspace.view.edit', 'Edit draft')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`view-toggle__button${invoiceView === 'preview' ? ' view-toggle__button--active' : ''}`}
+                    onClick={() => setInvoiceView('preview')}
+                    aria-pressed={invoiceView === 'preview'}
+                  >
+                    👀 {t('workspace.view.preview', 'Preview')}
+                  </button>
+                </div>
+              </header>
+              <div className="panel__section">
+                <header className="panel__section-header">
+                  <div>
+                    <h3>{t('workspace.nav.templates', 'Templates')}</h3>
+                    <p>{t('workspace.templates.instructions', 'Select a template thumbnail to style your invoice.')}</p>
+                  </div>
+                  <span className="badge">
+                    {t('workspace.templates.count', `${localizedTemplates.length} options`, {
+                      count: localizedTemplates.length,
+                    })}
+                  </span>
+                </header>
+                {renderTemplateThumbnails()}
+                {subscription.plan !== 'premium' && (
+                  <p className={`download-hint${freePlanLimitReached ? ' download-hint--warning' : ''}`} role="status">
+                    {freePlanLimitReached
+                      ? t(
+                          'workspace.subscription.freeLimitHint',
+                          'Free plan limit reached for this 15-day window. Next refresh on {resetDate}. Upgrade for unlimited PDFs.',
+                          { resetDate: downloadResetLabel },
+                        )
+                      : t(
+                          'workspace.subscription.freeHint',
+                          '{remaining} downloads left in this 15-day window (resets on {resetDate}).',
+                          {
+                            remaining: Math.max(0, Number.isFinite(remainingDownloads) ? remainingDownloads : 0),
+                            resetDate: downloadResetLabel,
+                          },
+                        )}
+                  </p>
+                )}
               </div>
-              <span className="badge">
-                {t('workspace.templates.count', `${localizedTemplates.length} options`, {
-                  count: localizedTemplates.length,
-                })}
-              </span>
-            </header>
-            {renderTemplateThumbnails()}
-          </div>
 
-          {invoiceView === 'edit' ? (
-            <form id={formId} className="invoice-form" onSubmit={handleSave}>
-              <div className="invoice-form__grid">
-                <section className="editor-card invoice-form__card">
+              {invoiceView === 'edit' ? (
+                <form id={formId} className="invoice-form" onSubmit={handleSave}>
+                  <div className="invoice-form__grid">
+                    <section className="editor-card invoice-form__card">
                   <header className="editor-card__header">
                     <div>
                       <h2>{t('workspace.section.business', 'Business & client')}</h2>
@@ -762,12 +1149,17 @@ export default function WorkspacePage() {
                       <label htmlFor="currency">{t('workspace.field.currency', 'Currency')}</label>
                       <select
                         id="currency"
-                        value={draft.currency}
-                        onChange={(event) => updateDraftField('currency', event.target.value)}
+                        value={draft.currency.toUpperCase()}
+                        onChange={(event) => {
+                          const next = event.target.value.trim().toUpperCase();
+                          if (/^[A-Z]{3}$/u.test(next)) {
+                            updateDraftField('currency', next);
+                          }
+                        }}
                       >
-                        {currencyOptions.map((currency) => (
-                          <option key={currency} value={currency}>
-                            {currency}
+                        {currencyOptions.map((option) => (
+                          <option key={option.code} value={option.code}>
+                            {option.label}
                           </option>
                         ))}
                       </select>
@@ -810,6 +1202,23 @@ export default function WorkspacePage() {
                       rows={3}
                       onChange={(event) => updateDraftField('notes', event.target.value)}
                     />
+                  </div>
+                  <div>
+                    <label htmlFor="paymentLink">{t('workspace.field.paymentLink', 'Stripe checkout link')}</label>
+                    <input
+                      id="paymentLink"
+                      type="url"
+                      value={draft.paymentLink}
+                      placeholder={t('workspace.placeholder.paymentLink', 'https://buy.stripe.com/test_1234abcd')}
+                      onChange={(event) => updateDraftField('paymentLink', event.target.value)}
+                    />
+                    <p className="invoice-form__hint invoice-form__hint--test">
+                      <span className="invoice-form__badge">{t('workspace.paymentLink.badge', 'Test mode')}</span>
+                      {t(
+                        'workspace.paymentLink.hint',
+                        'Paste your Stripe Payment Link while Stripe is in test mode. Clients will see a test badge in the PDF.',
+                      )}
+                    </p>
                   </div>
                 </section>
               </div>
@@ -919,176 +1328,57 @@ export default function WorkspacePage() {
               </section>
             </form>
           ) : (
-            <div className="preview" data-template={activeTemplate.id}>
-              <header className="preview__header" style={{ background: activeTemplate.accent }}>
-                <div className="preview__header-info">
-                  <span className="preview__eyebrow">{activeTemplate.name}</span>
-                  <strong>
-                    {draft.businessName || t('workspace.preview.businessPlaceholder', 'Your business name')}
-                  </strong>
-                  <span>{draft.businessAddress || t('workspace.preview.addressPlaceholder', 'Add your business address')}</span>
-                  <span className="preview__tagline">{activeTemplate.description}</span>
-                </div>
-                <div className="preview__badge">
-                  <span>{t('workspace.preview.totalDue', 'Total due')}</span>
-                  <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
-                  <small>
-                    {t('workspace.preview.status', 'Status')}: {statusLookup.get(draft.status)}
-                  </small>
-                </div>
-              </header>
-
-              <div className="preview__body">
-                {(() => {
-                  const isSeikyu = activeTemplate.id === 'seikyu';
-                  const billToLabel = isSeikyu
-                    ? t('workspace.preview.billToDual', '請求先 / Bill to')
-                    : t('workspace.preview.billTo', 'Bill to');
-                  const issuedLabel = isSeikyu
-                    ? t('workspace.preview.issuedDual', '発行日 / Issued')
-                    : t('workspace.preview.issued', 'Issued');
-                  const dueLabel = isSeikyu
-                    ? t('workspace.preview.dueDual', '支払期日 / Due')
-                    : t('workspace.preview.due', 'Due');
-                  const descriptionLabel = isSeikyu
-                    ? t('workspace.preview.descriptionDual', '品目 / Item')
-                    : t('workspace.preview.description', 'Description');
-                  const quantityLabel = isSeikyu
-                    ? t('workspace.preview.quantityDual', '数量 / Qty')
-                    : t('workspace.preview.quantity', 'Qty');
-                  const rateLabel = isSeikyu
-                    ? t('workspace.preview.rateDual', '単価 / Rate')
-                    : t('workspace.preview.rate', 'Rate');
-                  const amountLabel = isSeikyu
-                    ? t('workspace.preview.amountDual', '金額 / Total')
-                    : t('workspace.preview.amount', 'Amount');
-                  const subtotalLabel = isSeikyu
-                    ? t('workspace.preview.subtotalDual', '小計 / Subtotal')
-                    : t('workspace.summary.subtotal', 'Subtotal');
-                  const taxLabel = isSeikyu
-                    ? t('workspace.preview.taxDual', '税額 / Tax')
-                    : t('workspace.summary.tax', 'Tax');
-                  const totalLabel = isSeikyu
-                    ? t('workspace.preview.totalDual', '合計 / Total')
-                    : t('workspace.summary.total', 'Total');
-
-                  return (
-                    <>
-                      <div className="preview__meta">
-                        <div>
-                          <span className="preview__label">{billToLabel}</span>
-                          <strong>{draft.clientName || t('workspace.preview.clientPlaceholder', 'Client name')}</strong>
-                          <span>{draft.clientEmail || t('workspace.preview.emailPlaceholder', 'client@email.com')}</span>
-                          {draft.clientAddress && <span className="preview__address">{draft.clientAddress}</span>}
-                        </div>
-                        <div>
-                          <span className="preview__label">{issuedLabel}</span>
-                          <strong>{formatFriendlyDate(draft.issueDate, locale)}</strong>
-                        </div>
-                        <div>
-                          <span className="preview__label">{dueLabel}</span>
-                          <strong>{formatFriendlyDate(draft.dueDate, locale)}</strong>
-                        </div>
-                      </div>
-
-                      <div className="preview__table">
-                        <div className="preview__table-row preview__table-row--head">
-                          <span>{descriptionLabel}</span>
-                          <span>{quantityLabel}</span>
-                          <span>{rateLabel}</span>
-                          <span>{amountLabel}</span>
-                        </div>
-                        {draft.lines.map((line) => (
-                          <div key={line.id} className="preview__table-row">
-                            <span>
-                              {line.description ||
-                                (isSeikyu
-                                  ? t('workspace.preview.linePlaceholderJa', 'Service item')
-                                  : t('workspace.preview.linePlaceholder', 'Line description'))}
-                            </span>
-                            <span>{line.quantity}</span>
-                            <span>{formatCurrency(line.rate, draft.currency, locale)}</span>
-                            <span>{formatCurrency(line.quantity * line.rate, draft.currency, locale)}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {activeTemplate.id === 'aqua-ledger' && (
-                        <div className="preview__summary-card">
-                          <header>
-                            <span>{t('workspace.preview.paymentSummary', 'Payment summary')}</span>
-                            <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
-                          </header>
-                          <ul>
-                            <li>
-                              <span>{t('workspace.summary.subtotal', 'Subtotal')}</span>
-                              <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
-                            </li>
-                            <li>
-                              <span>{t('workspace.summary.tax', 'Tax')}</span>
-                              <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
-                            </li>
-                            <li>
-                              <span>{t('workspace.preview.status', 'Status')}</span>
-                              <strong>{statusLookup.get(draft.status)}</strong>
-                            </li>
-                          </ul>
-                        </div>
-                      )}
-
-                      <div className="preview__totals">
-                        <div>
-                          <span>{subtotalLabel}</span>
-                          <strong>{formatCurrency(totals.subtotal, draft.currency, locale)}</strong>
-                        </div>
-                        <div>
-                          <span>{taxLabel}</span>
-                          <strong>{formatCurrency(totals.taxAmount, draft.currency, locale)}</strong>
-                        </div>
-                        <div>
-                          <span>{totalLabel}</span>
-                          <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
-                        </div>
-                      </div>
-
-                      {isSeikyu && (
-                        <div className="preview__hanko">
-                          <span>{t('workspace.preview.hankoLabel', '印')}</span>
-                          <small>{t('workspace.preview.hankoCaption', 'Authorised seal')}</small>
-                        </div>
-                      )}
-
-                      <div className="preview__notes">
-                        <strong>
-                          {isSeikyu
-                            ? t('workspace.preview.notesDual', '備考 / Notes')
-                            : t('workspace.preview.notes', 'Notes')}
-                        </strong>
-                        <p>
-                          {draft.notes ||
-                            t('workspace.preview.notesPlaceholder', 'Add payment instructions or a thank you message.')}
-                        </p>
-                        {isSeikyu && (
-                          <small>
-                            {t(
-                              'workspace.preview.notesHint',
-                              'Please remit payment before the due date.',
-                            )}
-                          </small>
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
+            <InvoicePreview
+              draft={previewDraft}
+              totals={previewTotals}
+              template={activeTemplate}
+              locale={locale}
+              currency={previewDraft.currency}
+              statusLookup={statusLookup}
+              t={t}
+              paymentLinkUrl={paymentLinkUrl}
+              paymentLinkDisplay={paymentLinkDisplay}
+            />
           )}
-        </section>
+          </section>
+          <AdSlot
+            label={t('ads.workspace.editorSidebar', 'Editor sidebar (300×600)')}
+            description={t(
+              'ads.workspace.editorSidebarDescription',
+              'Use this tall placement for educational tips, premium upgrades, or accounting partner offers beside the editor.',
+            )}
+            orientation="vertical"
+            className="workspace-ad"
+          />
+        </div>
       </div>
     );
   }
 
   function renderTemplateGallery() {
+    const planTitle =
+      subscription.plan === 'premium'
+        ? t('workspace.subscription.premiumTitle', 'Premium plan active')
+        : t('workspace.subscription.freeTitle', 'Free plan');
+    const planDetail =
+      subscription.plan === 'premium'
+        ? t('workspace.subscription.premiumDetail', 'Unlimited downloads and every template are unlocked.')
+        : freePlanLimitReached
+        ? t(
+            'workspace.subscription.freeDepleted',
+            'You have used all {limit} downloads for this 15-day window. Refreshes on {resetDate}.',
+            { limit: FREE_PLAN_DOWNLOAD_LIMIT, resetDate: downloadResetLabel },
+          )
+        : t(
+            'workspace.subscription.freeDetail',
+            '{remaining} of {limit} downloads left in this 15-day window (resets on {resetDate}).',
+            {
+              remaining: Math.max(0, Number.isFinite(remainingDownloads) ? remainingDownloads : 0),
+              limit: FREE_PLAN_DOWNLOAD_LIMIT,
+              resetDate: downloadResetLabel,
+            },
+          );
+
     return (
       <div className="workspace-section">
         <div className="panel">
@@ -1099,12 +1389,40 @@ export default function WorkspacePage() {
                 {t('workspace.templates.galleryDescription', 'Explore each template layout before applying it to your invoice.')}
               </p>
             </div>
-            <span className="badge">
-              {t('workspace.templates.count', `${localizedTemplates.length} options`, {
-                count: localizedTemplates.length,
-              })}
-            </span>
+            <div className="panel__header-meta">
+              <span className="badge">
+                {t('workspace.templates.count', `${localizedTemplates.length} options`, {
+                  count: localizedTemplates.length,
+                })}
+              </span>
+            </div>
           </header>
+          <div
+            className={`subscription-banner${subscription.plan === 'premium' ? ' subscription-banner--premium' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="subscription-banner__copy">
+              <strong>{planTitle}</strong>
+              <p>{planDetail}</p>
+            </div>
+            {subscription.plan === 'premium' ? (
+              <span className="subscription-banner__meta">
+                {t('workspace.subscription.premiumMeta', 'Thanks for supporting Easy Invoice GM7.')}
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={handleStartSubscription}
+                disabled={subscribing}
+              >
+                {subscribing
+                  ? t('workspace.subscription.redirecting', 'Redirecting to Stripe…')
+                  : t('workspace.subscription.upgradeCta', 'Upgrade with Stripe')}
+              </button>
+            )}
+          </div>
           {renderTemplateThumbnails({ showDetails: true })}
         </div>
       </div>
