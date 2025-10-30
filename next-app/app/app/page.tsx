@@ -72,7 +72,47 @@ const statusOptions: { value: InvoiceStatus; label: string }[] = [
   { value: 'overdue', label: 'Overdue' },
 ];
 
-const currencyOptions = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'JPY', 'SGD'];
+const FALLBACK_CURRENCIES = [
+  'USD',
+  'EUR',
+  'GBP',
+  'AUD',
+  'CAD',
+  'JPY',
+  'SGD',
+  'NZD',
+  'CHF',
+  'CNY',
+  'HKD',
+  'INR',
+  'SEK',
+  'NOK',
+  'DKK',
+  'ZAR',
+  'BRL',
+  'MXN',
+  'KRW',
+  'IDR',
+  'PHP',
+  'THB',
+  'AED',
+  'SAR',
+];
+
+function resolveCurrencyCodes(): string[] {
+  if (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl && typeof Intl.supportedValuesOf === 'function') {
+    try {
+      const values = Intl.supportedValuesOf('currency');
+      if (Array.isArray(values) && values.length) {
+        return values as string[];
+      }
+    } catch {
+      // ignored — fall back to curated list
+    }
+  }
+
+  return FALLBACK_CURRENCIES;
+}
 
 const stripePublishableKey =
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_test_51SMrPSRuLo7evHJI5TuYsmpqHAtIOGahp0NCsder674sXQ7wDrgNomfKKmZWyB6fFgREw88cprnFjJmcfIXu628L00o5NvgAzJ';
@@ -168,6 +208,35 @@ export default function WorkspacePage() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
+  const currencyOptions = useMemo(() => {
+    const codes = new Set(resolveCurrencyCodes());
+    for (const currency of FALLBACK_CURRENCIES) {
+      codes.add(currency);
+    }
+    if (draft.currency) {
+      codes.add(draft.currency.toUpperCase());
+    }
+
+    const validCodes = Array.from(codes).filter((code) => /^[A-Z]{3}$/u.test(code));
+    validCodes.sort((a, b) => a.localeCompare(b));
+
+    let currencyNames: Intl.DisplayNames | null = null;
+    if (typeof Intl.DisplayNames === 'function') {
+      try {
+        currencyNames = new Intl.DisplayNames([locale], { type: 'currency' });
+      } catch {
+        currencyNames = null;
+      }
+    }
+
+    return validCodes.map((code) => {
+      const readable = currencyNames?.of(code);
+      return {
+        code,
+        label: readable && readable !== code ? `${code} — ${readable}` : code,
+      };
+    });
+  }, [draft.currency, locale]);
   const isSignedIn = Boolean(session);
   const isAdmin = session?.role === 'admin';
   const sessionDisplayName = session?.displayName ?? session?.email ?? '';
@@ -1080,12 +1149,17 @@ export default function WorkspacePage() {
                       <label htmlFor="currency">{t('workspace.field.currency', 'Currency')}</label>
                       <select
                         id="currency"
-                        value={draft.currency}
-                        onChange={(event) => updateDraftField('currency', event.target.value)}
+                        value={draft.currency.toUpperCase()}
+                        onChange={(event) => {
+                          const next = event.target.value.trim().toUpperCase();
+                          if (/^[A-Z]{3}$/u.test(next)) {
+                            updateDraftField('currency', next);
+                          }
+                        }}
                       >
-                        {currencyOptions.map((currency) => (
-                          <option key={currency} value={currency}>
-                            {currency}
+                        {currencyOptions.map((option) => (
+                          <option key={option.code} value={option.code}>
+                            {option.label}
                           </option>
                         ))}
                       </select>
