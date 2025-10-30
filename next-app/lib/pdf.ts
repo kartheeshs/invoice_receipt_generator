@@ -7,6 +7,9 @@ type PdfImageResource = {
   height: number;
 };
 
+const TRANSPARENT_PIXEL =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
 type GenerateInvoicePdfOptions = {
   element: HTMLElement;
   scale?: number;
@@ -98,39 +101,93 @@ async function fetchAsDataUrl(url: string): Promise<string | null> {
   }
 }
 
+function pickFirstSrcFromSrcset(srcset: string | null): string | null {
+  if (!srcset) {
+    return null;
+  }
+  const [firstCandidate] = srcset.split(',');
+  if (!firstCandidate) {
+    return null;
+  }
+  const [url] = firstCandidate.trim().split(/\s+/);
+  return url || null;
+}
+
+function clearImageSource(element: HTMLImageElement): void {
+  element.removeAttribute('src');
+  element.removeAttribute('srcset');
+  element.removeAttribute('sizes');
+  element.srcset = '';
+  element.sizes = '';
+  element.src = TRANSPARENT_PIXEL;
+}
+
+async function inlineSourceCandidate(
+  candidate: HTMLImageElement | HTMLSourceElement,
+  fallback?: () => void,
+): Promise<void> {
+  const srcAttribute =
+    candidate instanceof HTMLImageElement
+      ? candidate.getAttribute('src')
+      : candidate.getAttribute('src');
+  const srcsetAttribute = candidate.getAttribute('srcset');
+  const source = srcAttribute || pickFirstSrcFromSrcset(srcsetAttribute);
+  if (!source || source.startsWith('data:')) {
+    return;
+  }
+  const dataUrl = await fetchAsDataUrl(source);
+  if (dataUrl) {
+    if (candidate instanceof HTMLImageElement) {
+      candidate.setAttribute('src', dataUrl);
+      candidate.src = dataUrl;
+      candidate.srcset = '';
+      candidate.sizes = '';
+      candidate.removeAttribute('srcset');
+    } else {
+      candidate.setAttribute('srcset', `${dataUrl} 1x`);
+      candidate.srcset = `${dataUrl} 1x`;
+      candidate.removeAttribute('src');
+      candidate.src = dataUrl;
+      candidate.sizes = '';
+    }
+    candidate.removeAttribute('sizes');
+  } else {
+    if (fallback) {
+      fallback();
+    }
+    candidate.removeAttribute('src');
+    if (!(candidate instanceof HTMLImageElement)) {
+      candidate.src = '';
+      candidate.sizes = '';
+    }
+    candidate.removeAttribute('srcset');
+    if (candidate instanceof HTMLImageElement) {
+      candidate.srcset = '';
+      candidate.sizes = '';
+    } else {
+      candidate.srcset = '';
+    }
+    candidate.removeAttribute('sizes');
+  }
+}
+
 async function inlineExternalImages(root: HTMLElement): Promise<void> {
+  const pictures = Array.from(root.querySelectorAll('picture'));
+  await Promise.all(
+    pictures.map(async (picture) => {
+      const sources = Array.from(picture.querySelectorAll('source'));
+      await Promise.all(
+        sources.map(async (source) => {
+          await inlineSourceCandidate(source);
+        }),
+      );
+    }),
+  );
+
   const images = Array.from(root.querySelectorAll('img'));
   await Promise.all(
     images.map(async (image) => {
-      const srcAttribute = image.getAttribute('src');
-      const srcsetAttribute = image.getAttribute('srcset');
-
-      function firstSrcFromSrcset(srcset: string | null): string | null {
-        if (!srcset) {
-          return null;
-        }
-        const [firstCandidate] = srcset.split(',');
-        if (!firstCandidate) {
-          return null;
-        }
-        const [url] = firstCandidate.trim().split(/\s+/);
-        return url || null;
-      }
-
-      const source = srcAttribute || firstSrcFromSrcset(srcsetAttribute);
-      if (!source || source.startsWith('data:')) {
-        return;
-      }
-      const dataUrl = await fetchAsDataUrl(source);
-      if (dataUrl) {
-        image.setAttribute('src', dataUrl);
-        image.removeAttribute('srcset');
-        image.removeAttribute('sizes');
-      } else {
-        image.removeAttribute('src');
-        image.removeAttribute('srcset');
-        image.removeAttribute('sizes');
-      }
+      await inlineSourceCandidate(image, () => clearImageSource(image));
     }),
   );
 }
