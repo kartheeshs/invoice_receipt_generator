@@ -617,15 +617,14 @@ export default function WorkspacePage() {
 
     try {
       setDownloadingPdf(true);
-      const previewElement = previewRef.current;
-      if (!previewElement) {
-        throw new Error('Preview is not ready to export.');
-      }
-      const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 2));
       const blob = await generateInvoicePdf({
-        element: previewElement,
-        margin: 32,
-        scale,
+        draft: previewDraft,
+        totals: previewTotals,
+        template: activeTemplate,
+        locale,
+        currency: previewDraft.currency,
+        statusLookup,
+        translate: t,
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
