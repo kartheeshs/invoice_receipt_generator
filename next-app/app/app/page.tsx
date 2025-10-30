@@ -926,8 +926,15 @@ export default function WorkspacePage() {
             t={t}
           />
         </div>
-          <div className="workspace-ad-grid">
-            <section className="panel panel--stack">
+        <AdSlot
+          label={t('ads.workspace.editorBanner', 'Workspace banner (970×250)')}
+          description={t(
+            'ads.workspace.editorBannerDescription',
+            'Feature sponsor campaigns or upgrade prompts before the invoice editor.',
+          )}
+          className="workspace-ad workspace-ad--banner"
+        />
+        <section className="panel panel--stack">
               <header className="panel__header panel__header--stacked">
                 <div>
                   <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
@@ -1291,17 +1298,7 @@ export default function WorkspacePage() {
               t={t}
             />
           )}
-          </section>
-          <AdSlot
-            label={t('ads.workspace.editorSidebar', 'Editor sidebar (300×600)')}
-            description={t(
-              'ads.workspace.editorSidebarDescription',
-              'Use this tall placement for educational tips, premium upgrades, or accounting partner offers beside the editor.',
-            )}
-            orientation="vertical"
-            className="workspace-ad"
-          />
-        </div>
+        </section>
       </div>
     );
   }

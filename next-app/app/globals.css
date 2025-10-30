@@ -3526,17 +3526,12 @@ svg {
   margin-top: 2.5rem;
 }
 
-.workspace-ad-grid {
-  display: grid;
-  gap: 1.5rem;
+.workspace-ad--banner {
+  margin-top: 0;
+  margin-bottom: 2rem;
 }
 
 @media (min-width: 960px) {
-  .workspace-ad-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
-    align-items: start;
-  }
-
   .ad-slot--vertical {
     min-height: 420px;
   }

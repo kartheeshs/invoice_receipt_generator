@@ -69,6 +69,15 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+function isProbablySameOrigin(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchAsDataUrl(url: string): Promise<string | null> {
   if (typeof fetch !== 'function') {
     return null;
@@ -76,7 +85,7 @@ async function fetchAsDataUrl(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, {
       mode: 'cors',
-      credentials: 'omit',
+      credentials: isProbablySameOrigin(url) ? 'include' : 'omit',
     });
     if (!response.ok) {
       return null;
@@ -126,43 +135,45 @@ async function inlineExternalImages(root: HTMLElement): Promise<void> {
   );
 }
 
-async function inlineBackgroundImages(root: HTMLElement): Promise<void> {
+async function inlineStyleUrls(root: HTMLElement): Promise<void> {
+  const urlPattern = /url\((['"]?)([^'"\)]+)\1\)/gi;
   const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+
   await Promise.all(
     elements.map(async (element) => {
       const { style } = element;
-      const backgroundImage = style.backgroundImage;
-      const background = style.background;
-
-      async function replaceUrls(value: string, setter: (next: string) => void) {
-        if (!value || !value.includes('url(')) {
-          return;
-        }
-        let nextValue = value;
-        const urlPattern = /url\((['"]?)([^'"\)]+)\1\)/gi;
-        const matches = Array.from(value.matchAll(urlPattern));
-        for (const match of matches) {
-          const [, , url] = match;
-          if (!url || url.startsWith('data:')) {
-            continue;
-          }
-          const dataUrl = await fetchAsDataUrl(url);
-          if (dataUrl) {
-            nextValue = nextValue.replace(match[0], `url("${dataUrl}")`);
-          } else {
-            nextValue = nextValue.replace(match[0], 'none');
-          }
-        }
-        setter(nextValue);
+      if (!style) {
+        return;
       }
-
-      await replaceUrls(backgroundImage, (next) => {
-        style.backgroundImage = next;
-      });
-
-      await replaceUrls(background, (next) => {
-        style.background = next;
-      });
+      const properties = Array.from(style);
+      await Promise.all(
+        properties.map(async (property) => {
+          const value = style.getPropertyValue(property);
+          if (!value || !value.includes('url(')) {
+            return;
+          }
+          let nextValue = value;
+          let mutated = false;
+          const matches = Array.from(value.matchAll(urlPattern));
+          for (const match of matches) {
+            const [, , url] = match;
+            if (!url || url.startsWith('data:') || url.startsWith('#')) {
+              continue;
+            }
+            const dataUrl = await fetchAsDataUrl(url);
+            if (dataUrl) {
+              nextValue = nextValue.replace(match[0], `url("${dataUrl}")`);
+            } else {
+              nextValue = nextValue.replace(match[0], 'none');
+            }
+            mutated = true;
+          }
+          if (mutated) {
+            const priority = style.getPropertyPriority(property);
+            style.setProperty(property, nextValue, priority);
+          }
+        }),
+      );
     }),
   );
 }
@@ -173,6 +184,7 @@ function loadSvgImage(svg: string): Promise<HTMLImageElement> {
     const url = URL.createObjectURL(blob);
     const image = new Image();
     image.decoding = 'async';
+    image.crossOrigin = 'anonymous';
     image.onload = () => {
       URL.revokeObjectURL(url);
       resolve(image);
@@ -191,7 +203,7 @@ async function renderElementToCanvas(element: HTMLElement, scale: number): Promi
   const height = Math.max(1, Math.ceil(rect.height));
   const clone = cloneWithInlineStyles(element, width, height);
   await inlineExternalImages(clone);
-  await inlineBackgroundImages(clone);
+  await inlineStyleUrls(clone);
   const serialized = new XMLSerializer().serializeToString(clone);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${serialized}</foreignObject></svg>`;
   const image = await loadSvgImage(svg);
