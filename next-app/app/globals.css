@@ -203,6 +203,12 @@ svg {
   color: var(--text-body);
 }
 
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
 .language-switcher {
   position: relative;
   display: inline-flex;

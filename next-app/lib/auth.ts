@@ -1,4 +1,4 @@
-import { firebaseApiKey, firebaseConfigured } from './firebase';
+import { firebaseApiKey, firebaseConfig, firebaseConfigured } from './firebase';
 
 const identityBaseUrl = 'https://identitytoolkit.googleapis.com/v1/accounts';
 const fallbackAdminEmails = new Set(['admin@easyinvoicegm7.example.com']);
@@ -19,7 +19,21 @@ export interface PersistOptions {
   remember: boolean;
 }
 
-export const SESSION_STORAGE_KEY = 'easyinvoicegm7.session';
+const BASE_SESSION_STORAGE_KEY = 'easyinvoicegm7.session';
+const projectKeySuffix =
+  firebaseConfigured && firebaseConfig.projectId
+    ? `.${firebaseConfig.projectId}`
+    : '';
+
+export const SESSION_STORAGE_KEY = `${BASE_SESSION_STORAGE_KEY}${projectKeySuffix}`;
+
+const LEGACY_SESSION_KEYS = projectKeySuffix ? [BASE_SESSION_STORAGE_KEY] : [];
+
+function removeLegacySessionEntries(storage: Storage) {
+  for (const key of LEGACY_SESSION_KEYS) {
+    storage.removeItem(key);
+  }
+}
 
 function normaliseExpiresIn(expiresIn: string | number | undefined): number {
   if (!expiresIn) {
@@ -182,6 +196,8 @@ export function persistSession(session: AuthSession, options: PersistOptions = {
 
   storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
   alternateStorage.removeItem(SESSION_STORAGE_KEY);
+  removeLegacySessionEntries(storage);
+  removeLegacySessionEntries(alternateStorage);
 }
 
 export function clearSession(): void {
@@ -191,6 +207,8 @@ export function clearSession(): void {
 
   window.localStorage.removeItem(SESSION_STORAGE_KEY);
   window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  removeLegacySessionEntries(window.localStorage);
+  removeLegacySessionEntries(window.sessionStorage);
 }
 
 export type StoredSession = {
@@ -208,7 +226,17 @@ export function loadSession(): StoredSession | null {
     return null;
   }
 
-  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY) ?? window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  const storages: Storage[] = [window.localStorage, window.sessionStorage];
+  storages.forEach((storage) => removeLegacySessionEntries(storage));
+
+  let raw: string | null = null;
+  for (const storage of storages) {
+    raw = storage.getItem(SESSION_STORAGE_KEY);
+    if (raw) {
+      break;
+    }
+  }
+
   if (!raw) {
     return null;
   }
