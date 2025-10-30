@@ -158,7 +158,6 @@ function parseDocument(document: FirestoreDocument): InvoiceRecord | null {
     status,
     taxRate: decodeNumber(fields.taxRate),
     notes: decodeString(fields.notes),
-    paymentLink: decodeString(fields.paymentLink),
     lines,
   };
 
@@ -250,7 +249,6 @@ export async function saveInvoice({ draft }: SaveInvoiceOptions): Promise<Invoic
     taxAmount: buildNumber(totals.taxAmount),
     total: buildNumber(totals.total),
     createdAt: { timestampValue: createdAt },
-    paymentLink: buildString(draft.paymentLink.trim()),
     lines: {
       arrayValue: {
         values: cleanedLines.map((line) => encodeLine(line)),
@@ -282,6 +280,5 @@ export async function saveInvoice({ draft }: SaveInvoiceOptions): Promise<Invoic
     taxAmount: totals.taxAmount,
     total: totals.total,
     createdAt,
-    paymentLink: draft.paymentLink.trim(),
   };
 }

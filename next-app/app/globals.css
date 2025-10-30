@@ -2663,45 +2663,6 @@ svg {
   color: var(--text-muted);
 }
 
-.preview__payment-link {
-  margin-top: 1rem;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.preview__payment-link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.55rem 1.1rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-weight: 600;
-  font-size: 0.92rem;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.preview__payment-link-button:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
-.preview__payment-link-button small {
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--accent-strong);
-}
-
-.preview__payment-link-url {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  word-break: break-all;
-}
-
 .preview__summary-card {
   display: flex;
   flex-direction: column;

@@ -157,27 +157,6 @@ function loadStripeClient(): Promise<StripeClient | null> {
   return stripeClientPromise;
 }
 
-function normaliseHttpUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const candidate = /^(https?:\/\/)/iu.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const url = new URL(candidate);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      return null;
-    }
-    return url.toString();
-  } catch (error) {
-    return null;
-  }
-}
-
-function formatDisplayUrl(url: string): string {
-  return url.replace(/^https?:\/\//iu, '');
-}
-
 function ensureLine(line: InvoiceLine, field: keyof InvoiceLine, value: string): InvoiceLine {
   if (field === 'description') {
     return { ...line, description: value };
@@ -492,12 +471,6 @@ export default function WorkspacePage() {
         });
     }, [locale, recentInvoices, statusLookup, t]);
 
-    const paymentLinkUrl = useMemo(() => normaliseHttpUrl(draft.paymentLink), [draft.paymentLink]);
-    const paymentLinkDisplay = useMemo(
-      () => (paymentLinkUrl ? formatDisplayUrl(paymentLinkUrl) : ''),
-      [paymentLinkUrl],
-    );
-
     function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
       setDraft((prev) => ({ ...prev, [field]: value }));
     }
@@ -573,7 +546,6 @@ export default function WorkspacePage() {
       businessName: draft.businessName.trim(),
       businessAddress: draft.businessAddress.trim(),
       notes: draft.notes.trim(),
-      paymentLink: draft.paymentLink.trim(),
       lines: ensuredLines,
     };
 
@@ -952,8 +924,6 @@ export default function WorkspacePage() {
             currency={previewDraft.currency}
             statusLookup={statusLookup}
             t={t}
-            paymentLinkUrl={paymentLinkUrl}
-            paymentLinkDisplay={paymentLinkDisplay}
           />
         </div>
           <div className="workspace-ad-grid">
@@ -1203,23 +1173,6 @@ export default function WorkspacePage() {
                       onChange={(event) => updateDraftField('notes', event.target.value)}
                     />
                   </div>
-                  <div>
-                    <label htmlFor="paymentLink">{t('workspace.field.paymentLink', 'Stripe checkout link')}</label>
-                    <input
-                      id="paymentLink"
-                      type="url"
-                      value={draft.paymentLink}
-                      placeholder={t('workspace.placeholder.paymentLink', 'https://buy.stripe.com/test_1234abcd')}
-                      onChange={(event) => updateDraftField('paymentLink', event.target.value)}
-                    />
-                    <p className="invoice-form__hint invoice-form__hint--test">
-                      <span className="invoice-form__badge">{t('workspace.paymentLink.badge', 'Test mode')}</span>
-                      {t(
-                        'workspace.paymentLink.hint',
-                        'Paste your Stripe Payment Link while Stripe is in test mode. Clients will see a test badge in the PDF.',
-                      )}
-                    </p>
-                  </div>
                 </section>
               </div>
 
@@ -1336,8 +1289,6 @@ export default function WorkspacePage() {
               currency={previewDraft.currency}
               statusLookup={statusLookup}
               t={t}
-              paymentLinkUrl={paymentLinkUrl}
-              paymentLinkDisplay={paymentLinkDisplay}
             />
           )}
           </section>
