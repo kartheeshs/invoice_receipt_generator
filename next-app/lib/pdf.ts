@@ -93,15 +93,34 @@ async function inlineExternalImages(root: HTMLElement): Promise<void> {
   const images = Array.from(root.querySelectorAll('img'));
   await Promise.all(
     images.map(async (image) => {
-      const source = image.getAttribute('src');
+      const srcAttribute = image.getAttribute('src');
+      const srcsetAttribute = image.getAttribute('srcset');
+
+      function firstSrcFromSrcset(srcset: string | null): string | null {
+        if (!srcset) {
+          return null;
+        }
+        const [firstCandidate] = srcset.split(',');
+        if (!firstCandidate) {
+          return null;
+        }
+        const [url] = firstCandidate.trim().split(/\s+/);
+        return url || null;
+      }
+
+      const source = srcAttribute || firstSrcFromSrcset(srcsetAttribute);
       if (!source || source.startsWith('data:')) {
         return;
       }
       const dataUrl = await fetchAsDataUrl(source);
       if (dataUrl) {
         image.setAttribute('src', dataUrl);
+        image.removeAttribute('srcset');
+        image.removeAttribute('sizes');
       } else {
         image.removeAttribute('src');
+        image.removeAttribute('srcset');
+        image.removeAttribute('sizes');
       }
     }),
   );
