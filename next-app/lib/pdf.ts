@@ -122,9 +122,14 @@ function clearImageSource(element: HTMLImageElement): void {
   element.src = TRANSPARENT_PIXEL;
 }
 
+type InlineSourceOptions = {
+  fallback?: () => void;
+  aggressive?: boolean;
+};
+
 async function inlineSourceCandidate(
   candidate: HTMLImageElement | HTMLSourceElement,
-  fallback?: () => void,
+  { fallback, aggressive = false }: InlineSourceOptions = {},
 ): Promise<void> {
   const srcAttribute =
     candidate instanceof HTMLImageElement
@@ -133,6 +138,26 @@ async function inlineSourceCandidate(
   const srcsetAttribute = candidate.getAttribute('srcset');
   const source = srcAttribute || pickFirstSrcFromSrcset(srcsetAttribute);
   if (!source || source.startsWith('data:')) {
+    return;
+  }
+  if (aggressive) {
+    if (fallback) {
+      fallback();
+    }
+    candidate.removeAttribute('src');
+    candidate.removeAttribute('srcset');
+    candidate.removeAttribute('sizes');
+    if (candidate instanceof HTMLImageElement) {
+      candidate.src = TRANSPARENT_PIXEL;
+      candidate.srcset = '';
+      candidate.sizes = '';
+    } else {
+      try {
+        candidate.src = '';
+      } catch {}
+      candidate.srcset = '';
+      candidate.sizes = '';
+    }
     return;
   }
   const dataUrl = await fetchAsDataUrl(source);
@@ -171,14 +196,18 @@ async function inlineSourceCandidate(
   }
 }
 
-async function inlineExternalImages(root: HTMLElement): Promise<void> {
+async function inlineExternalImages(
+  root: HTMLElement,
+  options: { aggressive?: boolean } = {},
+): Promise<void> {
+  const { aggressive = false } = options;
   const pictures = Array.from(root.querySelectorAll('picture'));
   await Promise.all(
     pictures.map(async (picture) => {
       const sources = Array.from(picture.querySelectorAll('source'));
       await Promise.all(
         sources.map(async (source) => {
-          await inlineSourceCandidate(source);
+          await inlineSourceCandidate(source, { aggressive });
         }),
       );
     }),
@@ -187,12 +216,19 @@ async function inlineExternalImages(root: HTMLElement): Promise<void> {
   const images = Array.from(root.querySelectorAll('img'));
   await Promise.all(
     images.map(async (image) => {
-      await inlineSourceCandidate(image, () => clearImageSource(image));
+      await inlineSourceCandidate(image, { fallback: () => clearImageSource(image), aggressive });
+      if (aggressive) {
+        clearImageSource(image);
+      }
     }),
   );
 }
 
-async function inlineStyleUrls(root: HTMLElement): Promise<void> {
+async function inlineStyleUrls(
+  root: HTMLElement,
+  options: { aggressive?: boolean } = {},
+): Promise<void> {
+  const { aggressive = false } = options;
   const urlPattern = /url\((['"]?)([^'"\)]+)\1\)/gi;
   const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
 
@@ -217,11 +253,15 @@ async function inlineStyleUrls(root: HTMLElement): Promise<void> {
             if (!url || url.startsWith('data:') || url.startsWith('#')) {
               continue;
             }
-            const dataUrl = await fetchAsDataUrl(url);
-            if (dataUrl) {
-              nextValue = nextValue.replace(match[0], `url("${dataUrl}")`);
-            } else {
+            if (aggressive) {
               nextValue = nextValue.replace(match[0], 'none');
+            } else {
+              const dataUrl = await fetchAsDataUrl(url);
+              if (dataUrl) {
+                nextValue = nextValue.replace(match[0], `url("${dataUrl}")`);
+              } else {
+                nextValue = nextValue.replace(match[0], 'none');
+              }
             }
             mutated = true;
           }
@@ -233,6 +273,45 @@ async function inlineStyleUrls(root: HTMLElement): Promise<void> {
       );
     }),
   );
+}
+
+function stripPotentiallyTaintedAttributes(root: HTMLElement): void {
+  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+  elements.forEach((element) => {
+    if (element instanceof HTMLImageElement) {
+      if (!element.src.startsWith('data:')) {
+        clearImageSource(element);
+      }
+      return;
+    }
+    if (element instanceof HTMLSourceElement) {
+      if (element.src && !element.src.startsWith('data:')) {
+        try {
+          element.src = '';
+        } catch {}
+      }
+      if (element.srcset && !element.srcset.startsWith('data:')) {
+        element.srcset = '';
+      }
+      element.removeAttribute('sizes');
+    }
+    if (element instanceof HTMLCanvasElement) {
+      const context = element.getContext('2d');
+      if (context) {
+        context.clearRect(0, 0, element.width, element.height);
+      }
+    }
+    const style = element.getAttribute('style');
+    if (style && style.includes('url(')) {
+      const sanitized = style.replace(/url\((['"]?)([^'"\)]+)\1\)/gi, (match, quote, url) => {
+        if (typeof url === 'string' && url.startsWith('data:')) {
+          return match;
+        }
+        return 'none';
+      });
+      element.setAttribute('style', sanitized);
+    }
+  });
 }
 
 function loadSvgImage(svg: string): Promise<HTMLImageElement> {
@@ -254,13 +333,21 @@ function loadSvgImage(svg: string): Promise<HTMLImageElement> {
   });
 }
 
-async function renderElementToCanvas(element: HTMLElement, scale: number): Promise<HTMLCanvasElement> {
+async function renderElementToCanvas(
+  element: HTMLElement,
+  scale: number,
+  options: { aggressive?: boolean } = {},
+): Promise<HTMLCanvasElement> {
+  const { aggressive = false } = options;
   const rect = element.getBoundingClientRect();
   const width = Math.max(1, Math.ceil(rect.width));
   const height = Math.max(1, Math.ceil(rect.height));
   const clone = cloneWithInlineStyles(element, width, height);
-  await inlineExternalImages(clone);
-  await inlineStyleUrls(clone);
+  await inlineExternalImages(clone, { aggressive });
+  await inlineStyleUrls(clone, { aggressive });
+  if (aggressive) {
+    stripPotentiallyTaintedAttributes(clone);
+  }
   const serialized = new XMLSerializer().serializeToString(clone);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${serialized}</foreignObject></svg>`;
   const image = await loadSvgImage(svg);
@@ -341,8 +428,19 @@ export async function generateInvoicePdf({ element, scale = 2, margin = 32 }: Ge
     }
   }
 
-  const canvas = await renderElementToCanvas(element, scale);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+  let canvas = await renderElementToCanvas(element, scale);
+  let dataUrl: string;
+  try {
+    dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'SecurityError') {
+      console.warn('Invoice canvas tainted during export. Retrying without external assets.');
+      canvas = await renderElementToCanvas(element, scale, { aggressive: true });
+      dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    } else {
+      throw error;
+    }
+  }
   const imageData = decodeDataUrl(dataUrl);
 
   const rect = element.getBoundingClientRect();
