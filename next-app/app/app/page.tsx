@@ -176,7 +176,11 @@ export default function WorkspacePage() {
   const [recentInvoices, setRecentInvoices] = useState<InvoiceRecord[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-  const [alertMessage, setAlertMessage] = useState<string>('');
+  type ToastStatus = 'info' | 'success' | 'error' | 'loading';
+  type Toast = { id: string; status: ToastStatus; message: string };
+
+  const toastTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [invoiceView, setInvoiceView] = useState<'edit' | 'preview'>('edit');
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
   const [subscription, setSubscription] = useState<SubscriptionState>(() => loadSubscriptionState());
@@ -184,9 +188,53 @@ export default function WorkspacePage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [clientMatches, setClientMatches] = useState<ClientDirectoryEntry[]>([]);
   const [showClientMatches, setShowClientMatches] = useState<boolean>(false);
+  const [showSavedInvoices, setShowSavedInvoices] = useState<boolean>(false);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    const timer = toastTimers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      toastTimers.current.delete(id);
+    }
+  }, []);
+
+  const showToast = useCallback(
+    (
+      message: string,
+      status: ToastStatus,
+      { id, duration = 4000 }: { id?: string; duration?: number } = {},
+    ): string => {
+      const toastId = id ?? `toast-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      setToasts((prev) => {
+        const filtered = prev.filter((toast) => toast.id !== toastId);
+        return [...filtered, { id: toastId, message, status }];
+      });
+
+      const existingTimer = toastTimers.current.get(toastId);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+        toastTimers.current.delete(toastId);
+      }
+
+      if (duration && duration > 0) {
+        const timer = setTimeout(() => {
+          removeToast(toastId);
+        }, duration);
+        toastTimers.current.set(toastId, timer);
+      }
+
+      return toastId;
+    },
+    [removeToast],
+  );
+
+  const dismissToast = useCallback((id: string) => {
+    removeToast(id);
+  }, [removeToast]);
   const currencyOptions = useMemo(() => {
     const codes = new Set(resolveCurrencyCodes());
     for (const currency of FALLBACK_CURRENCIES) {
@@ -254,15 +302,16 @@ export default function WorkspacePage() {
 
     if (status === 'success') {
       syncSubscription((current) => markSubscriptionPlan(current, 'premium'));
-      setAlertMessage(
+      showToast(
         t('workspace.subscription.success', 'Premium plan activated. Unlimited templates and downloads unlocked.'),
+        'success',
       );
       setSaveState('success');
     } else if (status === 'canceled') {
-      setAlertMessage(t('workspace.subscription.canceled', 'Subscription checkout was canceled.'));
+      showToast(t('workspace.subscription.canceled', 'Subscription checkout was canceled.'), 'info');
       setSaveState('idle');
     }
-  }, [syncSubscription, t]);
+  }, [showToast, syncSubscription, t]);
 
   useEffect(() => {
     const ensured = ensureSubscriptionWindow(subscription);
@@ -292,6 +341,33 @@ export default function WorkspacePage() {
   }, []);
 
   useEffect(() => {
+    const timers = toastTimers.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined' || !showSavedInvoices) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowSavedInvoices(false);
+      }
+    };
+    const originalOverflow = document.body.style.overflow;
+    window.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [showSavedInvoices]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadInvoices() {
@@ -306,7 +382,7 @@ export default function WorkspacePage() {
       } catch (error) {
         console.error(error);
         if (!active) return;
-        setAlertMessage(t('workspace.alert.offline', 'Unable to reach Firestore. Displaying sample invoices.'));
+        showToast(t('workspace.alert.offline', 'Unable to reach Firestore. Displaying sample invoices.'), 'error');
         setSaveState('error');
         setRecentInvoices(sampleInvoices);
       } finally {
@@ -321,7 +397,7 @@ export default function WorkspacePage() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [showToast, t]);
 
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
   const printableLines = useMemo(() => {
@@ -499,9 +575,7 @@ export default function WorkspacePage() {
   function handleSignOut() {
     clearSession();
     setSession(null);
-    setAlertMessage(
-      t('workspace.alert.signedOut', 'Signed out. Sign in again to sync invoices with Firebase.'),
-    );
+    showToast(t('workspace.alert.signedOut', 'Signed out. Sign in again to sync invoices with Firebase.'), 'success');
     setSaveState('success');
   }
 
@@ -534,7 +608,9 @@ export default function WorkspacePage() {
     }
 
     setSaveState('saving');
-    setAlertMessage('');
+    const savingToastId = showToast(t('workspace.toast.saving', 'Saving invoice…'), 'loading', {
+      duration: 0,
+    });
 
     const cleanedLines = cleanLines(draft.lines);
     const ensuredLines = cleanedLines.length ? cleanedLines : [createEmptyLine()];
@@ -565,7 +641,11 @@ export default function WorkspacePage() {
         };
 
         setRecentInvoices((prev) => [offlineRecord, ...prev].slice(0, 12));
-        setAlertMessage(t('workspace.alert.offlineStored', 'Firebase is not configured. Stored invoice locally for this session.'));
+        showToast(
+          t('workspace.alert.offlineStored', 'Firebase is not configured. Stored invoice locally for this session.'),
+          'success',
+          { id: savingToastId },
+        );
         setSaveState('success');
         setLoadingInvoices(false);
         return;
@@ -576,11 +656,20 @@ export default function WorkspacePage() {
         const filtered = prev.filter((invoice) => invoice.id !== saved.id);
         return [saved, ...filtered].slice(0, 12);
       });
-      setAlertMessage(t('workspace.alert.success', 'Invoice saved to Firestore.'));
+      showToast(t('workspace.alert.success', 'Invoice saved to Firestore.'), 'success', {
+        id: savingToastId,
+      });
       setSaveState('success');
     } catch (error) {
       console.error(error);
-      setAlertMessage(error instanceof Error ? error.message : t('workspace.alert.error', 'Unable to save invoice.'));
+      showToast(
+        error instanceof Error ? error.message : t('workspace.alert.error', 'Unable to save invoice.'),
+        'error',
+        {
+          id: savingToastId,
+          duration: 5000,
+        },
+      );
       setSaveState('error');
     }
   }
@@ -604,19 +693,25 @@ export default function WorkspacePage() {
     if (normalisedState.plan !== 'premium' && normalisedState.downloadCount >= FREE_PLAN_DOWNLOAD_LIMIT) {
       const resetDateIso = new Date(downloadWindowReset(normalisedState)).toISOString();
       const resetLabel = formatFriendlyDate(resetDateIso, locale);
-      setAlertMessage(
+      showToast(
         t(
           'workspace.subscription.limitReached',
           'Free plan limit reached for this 15-day window. Refreshes on {resetDate}. Upgrade for unlimited exports.',
           { resetDate: resetLabel },
         ),
+        'error',
+        { duration: 6000 },
       );
       setSaveState('error');
       return;
     }
 
+    let downloadToastId: string | null = null;
     try {
       setDownloadingPdf(true);
+      downloadToastId = showToast(t('workspace.toast.downloading', 'Generating PDF…'), 'loading', {
+        duration: 0,
+      });
       const blob = await generateInvoicePdf({
         draft: previewDraft,
         totals: previewTotals,
@@ -655,14 +750,22 @@ export default function WorkspacePage() {
                 'No free downloads left until {resetDate}. Limits reset every 15 days.',
                 { resetDate: resetLabel },
               );
-        setAlertMessage(`${baseMessage} ${detailMessage}`);
+        showToast(`${baseMessage} ${detailMessage}`, 'success', {
+          id: downloadToastId ?? undefined,
+          duration: 5000,
+        });
       } else {
-        setAlertMessage(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'));
+        showToast(t('workspace.alert.downloaded', 'Invoice PDF downloaded.'), 'success', {
+          id: downloadToastId ?? undefined,
+        });
       }
       setSaveState('success');
     } catch (error) {
       console.error(error);
-      setAlertMessage(t('workspace.alert.error', 'Unable to save invoice.'));
+      showToast(t('workspace.alert.error', 'Unable to save invoice.'), 'error', {
+        id: downloadToastId ?? undefined,
+        duration: 5000,
+      });
       setSaveState('error');
     } finally {
       setDownloadingPdf(false);
@@ -675,11 +778,13 @@ export default function WorkspacePage() {
       return;
     }
     if (subscription.plan !== 'premium' && template.tier === 'premium') {
-      setAlertMessage(
+      showToast(
         t(
           'workspace.subscription.templateLocked',
           'Upgrade to the Premium plan to use this template and unlock unlimited downloads.',
         ),
+        'error',
+        { duration: 5000 },
       );
       setSaveState('error');
       return;
@@ -689,7 +794,6 @@ export default function WorkspacePage() {
 
   async function handleStartSubscription() {
     try {
-      setAlertMessage('');
       setSubscribing(true);
       const stripe = await loadStripeClient();
       if (!stripe) {
@@ -716,10 +820,12 @@ export default function WorkspacePage() {
     } catch (error) {
       console.error(error);
       setSubscribing(false);
-      setAlertMessage(
+      showToast(
         error instanceof Error
           ? error.message
           : t('workspace.subscription.checkoutError', 'Unable to start Stripe checkout right now.'),
+        'error',
+        { duration: 5000 },
       );
       setSaveState('error');
     }
@@ -934,39 +1040,17 @@ export default function WorkspacePage() {
           className="workspace-ad workspace-ad--banner"
         />
         <section className="panel panel--stack">
-              <header className="panel__header panel__header--stacked">
-                <div>
-                  <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
-                  <p>
-                    {t(
-                      'workspace.invoice.description',
-                      'Toggle between editing your draft and reviewing the formatted preview.',
-                    )}
-                  </p>
-                </div>
-                <div
-                  className="view-toggle"
-                  role="group"
-                  aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}
-                >
-                  <button
-                    type="button"
-                    className={`view-toggle__button${invoiceView === 'edit' ? ' view-toggle__button--active' : ''}`}
-                    onClick={() => setInvoiceView('edit')}
-                    aria-pressed={invoiceView === 'edit'}
-                  >
-                    ✏️ {t('workspace.view.edit', 'Edit draft')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`view-toggle__button${invoiceView === 'preview' ? ' view-toggle__button--active' : ''}`}
-                    onClick={() => setInvoiceView('preview')}
-                    aria-pressed={invoiceView === 'preview'}
-                  >
-                    👀 {t('workspace.view.preview', 'Preview')}
-                  </button>
-                </div>
-              </header>
+          <header className="panel__header panel__header--stacked">
+            <div>
+              <h2>{t('workspace.invoice.heading', 'Invoice workspace')}</h2>
+              <p>
+                {t(
+                  'workspace.invoice.description',
+                  'Toggle between editing your draft and reviewing the formatted preview.',
+                )}
+              </p>
+            </div>
+          </header>
               <div className="panel__section">
                 <header className="panel__section-header">
                   <div>
@@ -1274,16 +1358,6 @@ export default function WorkspacePage() {
                     <strong>{formatCurrency(totals.total, draft.currency, locale)}</strong>
                   </div>
                 </div>
-                <div className="invoice-form__actions">
-                  <button type="button" className="button button--ghost" onClick={() => setInvoiceView('preview')}>
-                    {t('workspace.actions.preview', 'Preview invoice')}
-                  </button>
-                  <button type="submit" className="button button--primary" disabled={saveState === 'saving'}>
-                    {saveState === 'saving'
-                      ? t('workspace.actions.saving', 'Saving…')
-                      : t('workspace.actions.save', 'Save invoice')}
-                  </button>
-                </div>
               </section>
             </form>
           ) : (
@@ -1297,6 +1371,67 @@ export default function WorkspacePage() {
               t={t}
             />
           )}
+          <div
+            className="workspace-action-dock"
+            role="region"
+            aria-label={t('workspace.invoice.actions', 'Invoice actions')}
+          >
+            <div
+              className="workspace-action-dock__toggle"
+              role="group"
+              aria-label={t('workspace.invoice.viewLabel', 'Invoice workspace view')}
+            >
+              <button
+                type="button"
+                className={`workspace-action-dock__toggle-button${
+                  invoiceView === 'edit' ? ' workspace-action-dock__toggle-button--active' : ''
+                }`}
+                onClick={() => setInvoiceView('edit')}
+                aria-pressed={invoiceView === 'edit'}
+              >
+                ✏️ {t('workspace.view.edit', 'Edit draft')}
+              </button>
+              <button
+                type="button"
+                className={`workspace-action-dock__toggle-button${
+                  invoiceView === 'preview' ? ' workspace-action-dock__toggle-button--active' : ''
+                }`}
+                onClick={() => setInvoiceView('preview')}
+                aria-pressed={invoiceView === 'preview'}
+              >
+                👀 {t('workspace.view.preview', 'Preview')}
+              </button>
+            </div>
+            <div className="workspace-action-dock__buttons">
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={() => setShowSavedInvoices(true)}
+              >
+                📂 {t('workspace.actions.savedInvoices', 'Saved invoices')}
+              </button>
+              <button
+                type="button"
+                className="button button--ghost"
+                onClick={handleDownload}
+                disabled={downloadingPdf}
+              >
+                {downloadingPdf
+                  ? t('workspace.actions.downloading', 'Generating…')
+                  : t('workspace.actions.download', 'Download PDF')}
+              </button>
+              <button
+                type="submit"
+                form={formId}
+                className="button button--primary"
+                disabled={saveState === 'saving'}
+              >
+                {saveState === 'saving'
+                  ? t('workspace.actions.saving', 'Saving…')
+                  : t('workspace.actions.save', 'Save invoice')}
+              </button>
+            </div>
+          </div>
         </section>
       </div>
     );
@@ -1540,6 +1675,36 @@ export default function WorkspacePage() {
 
   return (
     <div className="workspace-shell workspace-shell--topnav">
+      <div className="workspace-toast-stack" aria-live="polite" aria-atomic="false">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`workspace-toast workspace-toast--${toast.status}`}
+            role="status"
+          >
+            <span className="workspace-toast__icon" aria-hidden="true">
+              {toast.status === 'loading' ? (
+                <span className="workspace-toast__spinner" />
+              ) : toast.status === 'success' ? (
+                '✔'
+              ) : toast.status === 'error' ? (
+                '⚠️'
+              ) : (
+                'ℹ️'
+              )}
+            </span>
+            <span className="workspace-toast__message">{toast.message}</span>
+            <button
+              type="button"
+              className="workspace-toast__close"
+              onClick={() => dismissToast(toast.id)}
+              aria-label={t('workspace.toast.dismiss', 'Dismiss notification')}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
       <div className="workspace-topbar">
         <div className="workspace-shell__brand">
           <img
@@ -1612,8 +1777,11 @@ export default function WorkspacePage() {
               )}
             </div>
           </div>
-          {activeSection !== 'invoices' ? (
+          {activeSection !== 'invoices' && (
             <div className="workspace-shell__actions">
+              <button type="button" className="button button--ghost" onClick={() => setShowSavedInvoices(true)}>
+                📂 {t('workspace.actions.savedInvoices', 'Saved invoices')}
+              </button>
               <button type="button" className="button button--ghost" onClick={() => setActiveSection('invoices')}>
                 {t('workspace.actions.createInvoice', 'Create invoice')}
               </button>
@@ -1621,36 +1789,105 @@ export default function WorkspacePage() {
                 {t('workspace.actions.viewDashboard', 'View dashboard')}
               </button>
             </div>
-          ) : (
-            <div className="workspace-shell__actions">
-              <button type="button" className="button button--ghost" onClick={handleDownload} disabled={downloadingPdf}>
-                {downloadingPdf
-                  ? t('workspace.actions.downloading', 'Generating…')
-                  : t('workspace.actions.download', 'Download PDF')}
-              </button>
-              <button
-                type="submit"
-                form={formId}
-                className="button button--primary"
-                disabled={saveState === 'saving'}
-              >
-                {saveState === 'saving' ? t('workspace.actions.saving', 'Saving…') : t('workspace.actions.save', 'Save invoice')}
-              </button>
-            </div>
           )}
         </header>
 
-        {alertMessage && (
-          <div
-            className={`workspace-shell__alert${saveState !== 'idle' ? ` workspace-shell__alert--${saveState}` : ''}`}
-            role="status"
-          >
-            {alertMessage}
-          </div>
-        )}
-
         {renderActiveSection()}
       </div>
+
+      {showSavedInvoices && (
+        <div className="workspace-saved-overlay" role="presentation" onClick={() => setShowSavedInvoices(false)}>
+          <div
+            className="workspace-saved-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="saved-invoices-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="workspace-saved-panel__header">
+              <div>
+                <h2 id="saved-invoices-title">{t('workspace.saved.heading', 'Saved invoices')}</h2>
+                <p>{t('workspace.saved.description', 'Review invoices you have saved to Firebase or this session.')}</p>
+              </div>
+              <button
+                type="button"
+                className="workspace-saved-panel__close"
+                onClick={() => setShowSavedInvoices(false)}
+                autoFocus
+                aria-label={t('workspace.saved.close', 'Close saved invoices')}
+              >
+                ×
+              </button>
+            </header>
+            <div className="workspace-saved-panel__body">
+              {loadingInvoices ? (
+                <div className="workspace-saved-panel__empty">
+                  {t('workspace.saved.loading', 'Loading saved invoices…')}
+                </div>
+              ) : recentInvoices.length ? (
+                <ul className="workspace-saved-list">
+                  {recentInvoices.map((invoice) => (
+                    <li key={invoice.id} className="workspace-saved-list__item">
+                      <div className="workspace-saved-list__meta">
+                        <strong>{invoice.clientName || t('workspace.table.clientPlaceholder', 'Client')}</strong>
+                        <span>{invoice.clientEmail || '—'}</span>
+                      </div>
+                      <div className="workspace-saved-list__details">
+                        <span>{formatFriendlyDate(invoice.issueDate, locale)}</span>
+                        <span>{formatCurrency(invoice.total, invoice.currency, locale)}</span>
+                        <span className={`status-pill status-pill--${invoice.status}`}>
+                          {statusLookup.get(invoice.status) ?? invoice.status}
+                        </span>
+                      </div>
+                      <div className="workspace-saved-list__actions">
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          onClick={() => {
+                            const sanitizedLines = invoice.lines.map((line) => ({
+                              ...line,
+                              id:
+                                line.id ||
+                                (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                                  ? crypto.randomUUID()
+                                  : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+                            }));
+                            const loadedDraft: InvoiceDraft = {
+                              clientName: invoice.clientName,
+                              clientEmail: invoice.clientEmail,
+                              clientAddress: invoice.clientAddress,
+                              businessName: invoice.businessName,
+                              businessAddress: invoice.businessAddress,
+                              templateId: invoice.templateId,
+                              issueDate: invoice.issueDate,
+                              dueDate: invoice.dueDate,
+                              currency: invoice.currency,
+                              status: invoice.status,
+                              taxRate: invoice.taxRate,
+                              notes: invoice.notes,
+                              lines: sanitizedLines,
+                            };
+                            setDraft(loadedDraft);
+                            setInvoiceView('edit');
+                            showToast(t('workspace.saved.loaded', 'Invoice loaded into the editor.'), 'success');
+                            setShowSavedInvoices(false);
+                          }}
+                        >
+                          {t('workspace.saved.open', 'Open in workspace')}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="workspace-saved-panel__empty">
+                  {t('workspace.saved.empty', 'No saved invoices yet. Save one from the editor to see it here.')}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
