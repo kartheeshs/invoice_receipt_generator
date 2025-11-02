@@ -1,11 +1,11 @@
-import AdminLandingView from './admin-landing-view';
+import ManageUsersView from './manage-users-view';
 
 export const metadata = {
-  title: 'Admin Access — Easy Invoice GM7',
+  title: 'Admin Management — Easy Invoice GM7',
   description:
-    'Secure entry point for Easy Invoice GM7 administrators. Launch the dedicated admin console within the web application.',
+    'Review workspace members, adjust roles, and invite administrators through the Easy Invoice GM7 admin area.',
 };
 
 export default function AdminLandingPage() {
-  return <AdminLandingView />;
+  return <ManageUsersView />;
 }

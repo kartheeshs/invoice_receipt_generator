@@ -9,10 +9,16 @@ import { useTranslation } from '../../lib/i18n';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
-export default function LoginView(): JSX.Element {
+type LoginViewProps = {
+  mode?: 'member' | 'admin';
+  requireRole?: 'admin' | null;
+};
+
+export default function LoginView({ mode = 'member', requireRole = null }: LoginViewProps): JSX.Element {
   const router = useRouter();
   const params = useSearchParams();
   const { t } = useTranslation();
+  const isAdminMode = mode === 'admin';
 
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string>('');
@@ -31,7 +37,11 @@ export default function LoginView(): JSX.Element {
       return;
     }
     if (reason === 'access-denied') {
-      setMessage(t('login.error.accessDenied', 'Please sign in with an administrator account to open the console.'));
+      setMessage(
+        isAdminMode
+          ? t('login.error.adminOnly', 'An administrator account is required to continue.')
+          : t('login.error.accessDenied', 'Please sign in with an administrator account to open the console.'),
+      );
       return;
     }
     if (customMessage) {
@@ -75,11 +85,21 @@ export default function LoginView(): JSX.Element {
 
     try {
       const authSession = await signInWithEmailPassword(email, password);
+      if (requireRole === 'admin' && authSession.role !== 'admin') {
+        setStatus('error');
+        setMessage(t('login.error.adminOnly', 'An administrator account is required to continue.'));
+        return;
+      }
       persistSession(authSession, { remember });
       setStatus('success');
       setMessage(t('login.status.success', 'Signed in successfully. Redirecting…'));
       const redirectParam = params?.get('next');
-      const fallbackRedirect = authSession.role === 'admin' ? '/admin/console' : '/app';
+      const fallbackRedirect =
+        requireRole === 'admin'
+          ? '/admin/console'
+          : authSession.role === 'admin'
+          ? '/admin/console'
+          : '/app';
       const redirectTarget = redirectParam && redirectParam.startsWith('/') ? redirectParam : fallbackRedirect;
       router.replace(redirectTarget);
     } catch (error) {
@@ -93,21 +113,51 @@ export default function LoginView(): JSX.Element {
   const isLoading = status === 'loading';
   const statusVariant = status === 'error' ? 'error' : status === 'success' ? 'success' : 'info';
   const statusClass = `auth-form__status auth-form__status--${statusVariant}`;
+  const badgeLabel = isAdminMode ? t('login.adminBadge', 'Administrator access') : t('login.badge', 'Welcome back');
+  const titleLabel = isAdminMode
+    ? t('login.adminTitle', 'Sign in to the admin console')
+    : t('login.title', 'Sign in to Easy Invoice GM7');
+  const subtitleLabel = isAdminMode
+    ? t('login.adminSubtitle', 'Use your administrator credentials to manage users, templates, and compliance logs.')
+    : t('login.subtitle', 'Enter your workspace email address to continue where you left off.');
+  const formAriaLabel = isAdminMode
+    ? t('login.adminFormLabel', 'Administrator sign in')
+    : t('login.formLabel', 'Member sign in');
+  const asideTitle = isAdminMode
+    ? t('login.adminAsideTitle', 'Bring governance to every workspace')
+    : t('login.aside.title', 'Everything from the dashboard, now in the browser');
+  const asidePoints = isAdminMode
+    ? [
+        t('login.adminAside.point1', 'Audit workspace activity and subscription changes in one dashboard.'),
+        t('login.adminAside.point2', 'Promote or suspend members without leaving your browser.'),
+        t('login.adminAside.point3', 'Monitor integration health before issues impact invoice delivery.'),
+      ]
+    : [
+        t('login.aside.point1', 'Create invoices with a template gallery that mirrors the Flutter experience.'),
+        t('login.aside.point2', 'Track payment status, reminders, and outstanding balances in one place.'),
+        t('login.aside.point3', 'Switch between dashboard, invoice editor, templates, and client directories from the top navigation bar.'),
+      ];
 
   return (
     <div className="auth-page">
       <div className="auth-hero">
         <div className="container">
-          <span className="badge">{t('login.badge', 'Welcome back')}</span>
-          <h1>{t('login.title', 'Sign in to Easy Invoice GM7')}</h1>
-          <p>{t('login.subtitle', 'Enter your workspace email address to continue where you left off.')}</p>
+          <span className="badge">{badgeLabel}</span>
+          <h1>{titleLabel}</h1>
+          <p>{subtitleLabel}</p>
         </div>
       </div>
 
       <div className="auth-body">
         <div className="container auth-layout">
           <section className="auth-card">
-            <form className="auth-form" aria-label="Member sign in" onSubmit={handleSubmit} noValidate suppressHydrationWarning>
+            <form
+              className="auth-form"
+              aria-label={formAriaLabel}
+              onSubmit={handleSubmit}
+              noValidate
+              suppressHydrationWarning
+            >
               <div className="auth-form__field">
                 <label htmlFor="email">{t('login.email', 'Email')}</label>
                 <input
@@ -165,35 +215,45 @@ export default function LoginView(): JSX.Element {
               >
                 {isLoading ? t('login.status.signingIn', 'Signing you in…') : t('login.submit', 'Continue')}
               </button>
-              <div className="auth-form__links">
-                <Link href="/reset" prefetch={false}>
-                  {t('login.link.forgot', 'Forgot password?')}
-                </Link>
-                <Link href="/signup" prefetch={false}>
-                  {t('login.link.signup', 'Create an account')}
-                </Link>
-              </div>
-              <p className="auth-form__hint">
-                {t('login.note.adminPrefix', 'Administrators manage workspace access inside the')}{' '}
-                <Link href="/admin/console" prefetch={false}>
-                  {t('login.note.adminLink', 'admin console')}
-                </Link>
-                .
-              </p>
+              {!isAdminMode && (
+                <>
+                  <div className="auth-form__links">
+                    <Link href="/reset" prefetch={false}>
+                      {t('login.link.forgot', 'Forgot password?')}
+                    </Link>
+                    <Link href="/signup" prefetch={false}>
+                      {t('login.link.signup', 'Create an account')}
+                    </Link>
+                  </div>
+                  <p className="auth-form__hint">
+                    {t('login.note.adminPrefix', 'Administrators manage workspace access inside the')}{' '}
+                    <Link href="/admin/console" prefetch={false}>
+                      {t('login.note.adminLink', 'admin console')}
+                    </Link>
+                    .
+                  </p>
+                </>
+              )}
             </form>
           </section>
 
           <aside className="auth-aside">
             <article className="auth-insight">
-              <h2>{t('login.aside.title', 'Everything from the dashboard, now in the browser')}</h2>
+              <h2>{asideTitle}</h2>
               <ul>
-                <li>{t('login.aside.point1', 'Create invoices with a template gallery that mirrors the Flutter experience.')}</li>
-                <li>{t('login.aside.point2', 'Track payment status, reminders, and outstanding balances in one place.')}</li>
-                <li>{t('login.aside.point3', 'Switch between dashboard, invoice editor, templates, and client directories from the top navigation bar.')}</li>
+                {asidePoints.map((point, index) => (
+                  <li key={index}>{point}</li>
+                ))}
               </ul>
-              <Link className="button button--ghost" href="/app" prefetch={false}>
-                {t('login.aside.cta', 'Explore the workspace')}
-              </Link>
+              {isAdminMode ? (
+                <Link className="button button--ghost" href="/admin/console" prefetch={false}>
+                  {t('login.adminAside.cta', 'Open admin console')}
+                </Link>
+              ) : (
+                <Link className="button button--ghost" href="/app" prefetch={false}>
+                  {t('login.aside.cta', 'Explore the workspace')}
+                </Link>
+              )}
             </article>
           </aside>
         </div>

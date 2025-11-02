@@ -19,7 +19,15 @@ import { useTranslation } from '../../lib/i18n';
 import { formatFriendlyDate } from '../../lib/format';
 import { generateInvoicePdf } from '../../lib/pdf';
 import { DEFAULT_TEMPLATE_ID, invoiceTemplates } from '../../lib/templates';
-import { matchClients, type ClientDirectoryEntry } from '../../lib/clients';
+import {
+  CLIENT_STORAGE_KEY,
+  createClientId,
+  clientDirectory,
+  loadManagedClients,
+  persistManagedClients,
+  type ClientDirectoryEntry,
+  type ManagedClient,
+} from '../../lib/clients';
 import { clearSession, loadSession, SESSION_STORAGE_KEY, type StoredSession } from '../../lib/auth';
 import LanguageSwitcher from '../components/language-switcher';
 import InvoicePreview from '../components/invoice-preview';
@@ -54,6 +62,37 @@ type ClientSummary = {
   lastInvoice?: string;
   status: InvoiceStatus;
   currency: string;
+};
+
+type ClientDetail = {
+  summary: ClientSummary;
+  source: 'manual' | 'invoice';
+  manualRecord: ManagedClient | null;
+  invoices: InvoiceRecord[];
+  address?: string;
+  phone?: string;
+  notes?: string;
+  company?: string;
+};
+
+type ClientFormState = {
+  id?: string;
+  name: string;
+  email: string;
+  address: string;
+  company: string;
+  phone: string;
+  notes: string;
+};
+
+const EMPTY_CLIENT_FORM: ClientFormState = {
+  id: undefined,
+  name: '',
+  email: '',
+  address: '',
+  company: '',
+  phone: '',
+  notes: '',
 };
 
 const sections: Section[] = [
@@ -189,9 +228,50 @@ export default function WorkspacePage() {
   const [clientMatches, setClientMatches] = useState<ClientDirectoryEntry[]>([]);
   const [showClientMatches, setShowClientMatches] = useState<boolean>(false);
   const [showSavedInvoices, setShowSavedInvoices] = useState<boolean>(false);
+  const [managedClients, setManagedClients] = useState<ManagedClient[]>([]);
+  const [showClientManager, setShowClientManager] = useState<boolean>(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | 'new' | null>(null);
+  const [clientSearch, setClientSearch] = useState<string>('');
+  const [clientForm, setClientForm] = useState<ClientFormState>(EMPTY_CLIENT_FORM);
+  const [clientFormError, setClientFormError] = useState<string>('');
   const previewRef = useRef<HTMLDivElement | null>(null);
   const { language, locale, t } = useTranslation();
   const formId = 'invoice-editor-form';
+  const updateManagedClientState = useCallback(
+    (updater: ManagedClient[] | ((clients: ManagedClient[]) => ManagedClient[])) => {
+      setManagedClients((current) => {
+        const next =
+          typeof updater === 'function'
+            ? (updater as (clients: ManagedClient[]) => ManagedClient[])(current)
+            : updater;
+        persistManagedClients(next);
+        return next;
+      });
+    },
+    [persistManagedClients],
+  );
+  const startCreateClient = useCallback(
+    (preset?: Partial<ClientFormState>) => {
+      setClientForm({ ...EMPTY_CLIENT_FORM, ...preset });
+      setClientFormError('');
+      setSelectedClientId('new');
+      setShowClientManager(true);
+    },
+    [],
+  );
+  const openClientManagerFor = useCallback((clientId: string) => {
+    setClientFormError('');
+    setSelectedClientId(clientId);
+    setShowClientManager(true);
+  }, []);
+  const closeClientManager = useCallback(() => {
+    setShowClientManager(false);
+    setClientSearch('');
+    setClientMatches([]);
+    setShowClientMatches(false);
+    setSelectedClientId(null);
+    setClientFormError('');
+  }, []);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -325,6 +405,25 @@ export default function WorkspacePage() {
   }, [subscription, syncSubscription]);
 
   useEffect(() => {
+    if (!selectedClientId || selectedClientId === 'new') {
+      return;
+    }
+
+    if (selectedManualClient) {
+      setClientForm({
+        id: selectedManualClient.id,
+        name: selectedManualClient.name,
+        email: selectedManualClient.email,
+        address: selectedManualClient.address,
+        company: selectedManualClient.company ?? '',
+        phone: selectedManualClient.phone ?? '',
+        notes: selectedManualClient.notes ?? '',
+      });
+      setClientFormError('');
+    }
+  }, [selectedClientId, selectedManualClient]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -339,6 +438,25 @@ export default function WorkspacePage() {
       window.removeEventListener('storage', handleStorage);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    setManagedClients(loadManagedClients());
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === CLIENT_STORAGE_KEY) {
+        setManagedClients(loadManagedClients());
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [loadManagedClients]);
 
   useEffect(() => {
     const timers = toastTimers.current;
@@ -363,9 +481,31 @@ export default function WorkspacePage() {
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = originalOverflow;
+    document.body.style.overflow = originalOverflow;
     };
   }, [showSavedInvoices]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined' || !showClientManager) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowClientManager(false);
+      }
+    };
+
+    const originalOverflow = document.body.style.overflow;
+    window.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [showClientManager]);
 
   useEffect(() => {
     let active = true;
@@ -398,6 +538,17 @@ export default function WorkspacePage() {
       active = false;
     };
   }, [showToast, t]);
+
+  useEffect(() => {
+    if (!showClientManager || selectedClientId) {
+      return;
+    }
+
+    const first = clientPanelEntries[0];
+    if (first) {
+      setSelectedClientId(first.summary.key);
+    }
+  }, [clientPanelEntries, selectedClientId, showClientManager]);
 
   const totals = useMemo(() => calculateTotals(draft.lines, draft.taxRate), [draft.lines, draft.taxRate]);
   const printableLines = useMemo(() => {
@@ -488,68 +639,198 @@ export default function WorkspacePage() {
       .reduce((sum, invoice) => sum + invoice.total, 0);
   }, [recentInvoices]);
 
-  const clientSummaries = useMemo(() => {
-    const summaries = new Map<string, ClientSummary>();
+  const clientComputation = useMemo(() => {
+    const summaryMap = new Map<string, ClientSummary>();
+    const detailMap = new Map<string, ClientDetail>();
+    const manualEmailMap = new Map<string, ManagedClient>();
+    const directoryMap = new Map<string, ClientDirectoryEntry>();
 
-    for (const invoice of recentInvoices) {
-      const key = invoice.clientEmail || invoice.clientName || invoice.id;
-      const outstanding = invoice.status === 'paid' ? 0 : invoice.total;
-      const candidateDate = invoice.issueDate ? new Date(invoice.issueDate) : undefined;
-      const existing = summaries.get(key);
+    const addDirectoryEntry = (entry: ClientDirectoryEntry) => {
+      const name = entry.name?.trim();
+      if (!name) {
+        return;
+      }
 
-      if (existing) {
-        const previousDate = existing.lastInvoice ? new Date(existing.lastInvoice) : undefined;
-        const shouldReplace = candidateDate && (!previousDate || candidateDate > previousDate);
-
-        summaries.set(key, {
-          ...existing,
-          invoices: existing.invoices + 1,
-          outstanding: existing.outstanding + outstanding,
-          lastInvoice: shouldReplace ? invoice.issueDate : existing.lastInvoice,
-          status: shouldReplace ? invoice.status : existing.status,
-          currency: invoice.currency || existing.currency,
-        });
-      } else {
-        summaries.set(key, {
-          key,
-          name: invoice.clientName || 'Client',
-          email: invoice.clientEmail,
-          invoices: 1,
-          outstanding,
-          lastInvoice: invoice.issueDate,
-          status: invoice.status,
-          currency: invoice.currency,
+      const emailValue = entry.email?.trim() ?? '';
+      const key = `${emailValue.toLowerCase()}::${name.toLowerCase()}`;
+      if (!directoryMap.has(key)) {
+        directoryMap.set(key, {
+          name,
+          email: emailValue,
+          address: entry.address?.trim() ?? '',
+          notes: entry.notes,
+          phone: entry.phone,
         });
       }
+    };
+
+    for (const entry of clientDirectory) {
+      addDirectoryEntry(entry);
     }
 
-    return Array.from(summaries.values()).sort((a, b) => b.outstanding - a.outstanding);
-  }, [recentInvoices]);
+    for (const client of managedClients) {
+      if (client.email) {
+        manualEmailMap.set(client.email.trim().toLowerCase(), client);
+      }
 
-    const activityFeed = useMemo(() => {
-      return recentInvoices
-        .map((invoice) => {
-          const statusLabel =
-            statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
-          const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
-          return {
-            id: invoice.id,
-            title: `${clientName} — ${statusLabel}`,
-            amount: formatCurrency(invoice.total, invoice.currency, locale),
-            timestamp: invoice.createdAt || invoice.issueDate,
-            status: invoice.status,
-          };
-        })
-        .sort((a, b) => {
-          const dateA = new Date(a.timestamp ?? '').getTime();
-          const dateB = new Date(b.timestamp ?? '').getTime();
-          return dateB - dateA;
-        });
-    }, [locale, recentInvoices, statusLookup, t]);
+      const summary: ClientSummary = {
+        key: client.id,
+        name: client.name,
+        email: client.email,
+        invoices: 0,
+        outstanding: 0,
+        lastInvoice: undefined,
+        status: 'draft',
+        currency: draft.currency,
+      };
 
-    function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
-      setDraft((prev) => ({ ...prev, [field]: value }));
+      summaryMap.set(client.id, summary);
+
+      detailMap.set(client.id, {
+        summary,
+        source: 'manual',
+        manualRecord: client,
+        invoices: [],
+        address: client.address,
+        phone: client.phone,
+        notes: client.notes,
+        company: client.company,
+      });
+
+      addDirectoryEntry({
+        name: client.name,
+        email: client.email,
+        address: client.address,
+        notes: client.notes,
+        phone: client.phone,
+      });
     }
+
+    const sortedInvoices = [...recentInvoices].sort((a, b) => {
+      const dateA = new Date(a.issueDate ?? a.createdAt ?? '').getTime();
+      const dateB = new Date(b.issueDate ?? b.createdAt ?? '').getTime();
+      return dateB - dateA;
+    });
+
+    for (const invoice of sortedInvoices) {
+      const emailKey = invoice.clientEmail?.trim().toLowerCase();
+      const manualMatch = emailKey ? manualEmailMap.get(emailKey) ?? null : null;
+      const key = manualMatch ? manualMatch.id : invoice.clientEmail || invoice.clientName || invoice.id;
+      const existingSummary = summaryMap.get(key);
+      const outstanding = invoice.status === 'paid' ? 0 : invoice.total;
+      const candidateDate = invoice.issueDate ? new Date(invoice.issueDate) : undefined;
+      const previousDate = existingSummary?.lastInvoice ? new Date(existingSummary.lastInvoice) : undefined;
+      const shouldReplace = candidateDate && (!previousDate || candidateDate > previousDate);
+
+      const nextSummary: ClientSummary = {
+        key,
+        name: manualMatch?.name || invoice.clientName || t('workspace.table.clientPlaceholder', 'Client'),
+        email: manualMatch?.email || invoice.clientEmail,
+        invoices: (existingSummary?.invoices ?? 0) + 1,
+        outstanding: (existingSummary?.outstanding ?? 0) + outstanding,
+        lastInvoice: shouldReplace ? invoice.issueDate : existingSummary?.lastInvoice,
+        status: shouldReplace ? invoice.status : existingSummary?.status ?? invoice.status,
+        currency: invoice.currency || existingSummary?.currency || draft.currency,
+      };
+
+      summaryMap.set(key, nextSummary);
+
+      const existingDetail = detailMap.get(key);
+      const invoices = existingDetail ? existingDetail.invoices.slice(0) : [];
+      invoices.push(invoice);
+      invoices.sort((a, b) => {
+        const dateA = new Date(a.issueDate ?? a.createdAt ?? '').getTime();
+        const dateB = new Date(b.issueDate ?? b.createdAt ?? '').getTime();
+        return dateB - dateA;
+      });
+
+      const detail: ClientDetail = {
+        summary: nextSummary,
+        source: existingDetail?.source ?? (manualMatch ? 'manual' : 'invoice'),
+        manualRecord: existingDetail?.manualRecord ?? manualMatch,
+        invoices: invoices.slice(0, 10),
+        address: invoice.clientAddress || existingDetail?.address || manualMatch?.address,
+        phone: existingDetail?.phone ?? manualMatch?.phone,
+        notes: existingDetail?.notes ?? manualMatch?.notes,
+        company: existingDetail?.company ?? manualMatch?.company,
+      };
+
+      detailMap.set(key, detail);
+
+      addDirectoryEntry({
+        name: nextSummary.name,
+        email: nextSummary.email ?? '',
+        address: detail.address ?? '',
+        notes: detail.notes,
+        phone: detail.phone,
+      });
+    }
+
+    return {
+      list: Array.from(summaryMap.values()).sort((a, b) => b.outstanding - a.outstanding),
+      details: detailMap,
+      directory: Array.from(directoryMap.values()),
+    };
+  }, [managedClients, recentInvoices, draft.currency, t]);
+
+  const clientSummaries = clientComputation.list;
+  const clientDetails = clientComputation.details;
+  const clientDirectoryEntries = clientComputation.directory;
+  const clientPanelEntries = useMemo(() => {
+    const searchTerm = clientSearch.trim().toLowerCase();
+    return clientSummaries
+      .map((summary) => ({
+        summary,
+        detail: clientDetails.get(summary.key) ?? null,
+      }))
+      .filter((entry) => {
+        if (!searchTerm) {
+          return true;
+        }
+        const email = entry.summary.email ?? '';
+        return (
+          entry.summary.name.toLowerCase().includes(searchTerm) ||
+          email.toLowerCase().includes(searchTerm)
+        );
+      })
+      .sort((a, b) => a.summary.name.localeCompare(b.summary.name));
+  }, [clientSummaries, clientDetails, clientSearch]);
+  const selectedClientDetail =
+    selectedClientId && selectedClientId !== 'new' ? clientDetails.get(selectedClientId) ?? null : null;
+  const selectedManualClient = useMemo(() => {
+    if (!selectedClientId || selectedClientId === 'new') {
+      return null;
+    }
+    if (selectedClientDetail?.manualRecord) {
+      return selectedClientDetail.manualRecord;
+    }
+    return managedClients.find((client) => client.id === selectedClientId) ?? null;
+  }, [managedClients, selectedClientDetail, selectedClientId]);
+
+  const activityFeed = useMemo(() => {
+    return recentInvoices
+      .map((invoice) => {
+        const statusLabel =
+          statusLookup.get(invoice.status) ?? t(`workspace.status.${invoice.status}`, invoice.status);
+        const clientName = invoice.clientName || t('workspace.table.clientPlaceholder', 'Client');
+        return {
+          id: invoice.id,
+          title: `${clientName} — ${statusLabel}`,
+          amount: formatCurrency(invoice.total, invoice.currency, locale),
+          timestamp: invoice.createdAt || invoice.issueDate,
+          status: invoice.status,
+        };
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.timestamp ?? '').getTime();
+        const dateB = new Date(b.timestamp ?? '').getTime();
+        return dateB - dateA;
+      });
+  }, [locale, recentInvoices, statusLookup, t]);
+
+  function updateDraftField<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
+    setDraft((prev) => ({ ...prev, [field]: value }));
+  }
 
   function addLine() {
     setDraft((prev) => ({ ...prev, lines: [...prev.lines, createEmptyLine()] }));
@@ -579,10 +860,25 @@ export default function WorkspacePage() {
     setSaveState('success');
   }
 
+  function findClientMatches(query: string): ClientDirectoryEntry[] {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) {
+      return [];
+    }
+
+    return clientDirectoryEntries
+      .filter((entry) => {
+        const nameMatch = entry.name.toLowerCase().includes(trimmed);
+        const emailMatch = entry.email?.toLowerCase().includes(trimmed);
+        return nameMatch || Boolean(emailMatch);
+      })
+      .slice(0, 5);
+  }
+
   function handleClientNameChange(value: string) {
     updateDraftField('clientName', value);
     if (value.trim().length >= 2) {
-      const matches = matchClients(value).slice(0, 5);
+      const matches = findClientMatches(value);
       setClientMatches(matches);
       setShowClientMatches(matches.length > 0);
     } else {
@@ -599,6 +895,119 @@ export default function WorkspacePage() {
     }));
     setClientMatches([]);
     setShowClientMatches(false);
+  }
+
+  function handleClientFieldChange(field: keyof ClientFormState, value: string) {
+    setClientForm((prev) => ({ ...prev, [field]: value }));
+    setClientFormError('');
+  }
+
+  function applyClientToDraftFields(payload: { name: string; email?: string; address?: string }) {
+    setDraft((prev) => ({
+      ...prev,
+      clientName: payload.name,
+      clientEmail: payload.email ?? '',
+      clientAddress: payload.address ?? '',
+    }));
+    setShowClientManager(false);
+    showToast(t('workspace.clients.applied', 'Client details added to the invoice.'), 'success');
+  }
+
+  function handleClientSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedName = clientForm.name.trim();
+    if (!trimmedName) {
+      setClientFormError(t('workspace.clients.errorName', 'Enter a client name to continue.'));
+      return;
+    }
+
+    const trimmedEmail = clientForm.email.trim();
+    if (trimmedEmail) {
+      const duplicate = managedClients.some(
+        (client) =>
+          client.id !== selectedManualClient?.id &&
+          client.email &&
+          client.email.toLowerCase() === trimmedEmail.toLowerCase(),
+      );
+      if (duplicate) {
+        setClientFormError(t('workspace.clients.errorDuplicate', 'A client with this email already exists.'));
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+
+    if (selectedClientId === 'new' || !selectedManualClient) {
+      const newClient: ManagedClient = {
+        id: createClientId(),
+        name: trimmedName,
+        email: trimmedEmail,
+        address: clientForm.address.trim(),
+        company: clientForm.company.trim() || undefined,
+        phone: clientForm.phone.trim() || undefined,
+        notes: clientForm.notes.trim() || undefined,
+        createdAt: now,
+        updatedAt: now,
+      };
+      updateManagedClientState((prev) => [newClient, ...prev]);
+      showToast(t('workspace.clients.added', 'Client saved to your directory.'), 'success');
+      setSelectedClientId(newClient.id);
+    } else {
+      const updatedClient: ManagedClient = {
+        ...selectedManualClient,
+        name: trimmedName,
+        email: trimmedEmail,
+        address: clientForm.address.trim(),
+        company: clientForm.company.trim() || undefined,
+        phone: clientForm.phone.trim() || undefined,
+        notes: clientForm.notes.trim() || undefined,
+        updatedAt: now,
+      };
+      updateManagedClientState((prev) =>
+        prev.map((client) => (client.id === updatedClient.id ? updatedClient : client)),
+      );
+      showToast(t('workspace.clients.updated', 'Client details updated.'), 'success');
+      setSelectedClientId(updatedClient.id);
+    }
+
+    setClientFormError('');
+  }
+
+  function handleDeleteClient() {
+    if (!selectedManualClient) {
+      return;
+    }
+    updateManagedClientState((prev) => prev.filter((client) => client.id !== selectedManualClient.id));
+    showToast(t('workspace.clients.removed', 'Client removed from your directory.'), 'success');
+    setSelectedClientId(null);
+    setClientForm({ ...EMPTY_CLIENT_FORM });
+  }
+
+  function handleUseClientDetail(detail: ClientDetail) {
+    applyClientToDraftFields({
+      name: detail.summary.name,
+      email: detail.summary.email ?? detail.manualRecord?.email ?? '',
+      address: detail.address ?? detail.manualRecord?.address ?? '',
+    });
+  }
+
+  function handleUseClientForm() {
+    applyClientToDraftFields({
+      name: clientForm.name.trim(),
+      email: clientForm.email.trim(),
+      address: clientForm.address.trim(),
+    });
+  }
+
+  function handleConvertDetail(detail: ClientDetail) {
+    startCreateClient({
+      name: detail.summary.name,
+      email: detail.summary.email ?? detail.manualRecord?.email ?? '',
+      address: detail.address ?? detail.manualRecord?.address ?? '',
+      notes: detail.notes ?? '',
+      company: detail.company ?? '',
+      phone: detail.phone ?? '',
+    });
   }
 
   async function handleSave(event?: FormEvent<HTMLFormElement>) {
@@ -1129,7 +1538,7 @@ export default function WorkspacePage() {
                         onChange={(event) => handleClientNameChange(event.target.value)}
                         onFocus={() => {
                           if (draft.clientName.trim().length >= 2) {
-                            const matches = matchClients(draft.clientName).slice(0, 5);
+                            const matches = findClientMatches(draft.clientName);
                             setClientMatches(matches);
                             setShowClientMatches(matches.length > 0);
                           }
@@ -1437,6 +1846,219 @@ export default function WorkspacePage() {
     );
   }
 
+  function renderClientForm(mode: 'create' | 'edit') {
+    const isCreate = mode === 'create';
+    const title = isCreate
+      ? t('workspace.clients.formTitleCreate', 'Add client to directory')
+      : t('workspace.clients.formTitleEdit', 'Edit client details');
+    const subtitle = isCreate
+      ? t('workspace.clients.formSubtitleCreate', 'Store frequent contacts so you can reuse them while drafting invoices.')
+      : t('workspace.clients.formSubtitleEdit', 'Update saved contact information to keep future invoices accurate.');
+    const submitLabel = isCreate
+      ? t('workspace.clients.formSubmitCreate', 'Save client')
+      : t('workspace.clients.formSubmitEdit', 'Update client');
+
+    return (
+      <form className="client-form" onSubmit={handleClientSubmit} noValidate>
+        <header className="client-form__header">
+          <div>
+            <h3>{title}</h3>
+            <p>{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={handleUseClientForm}
+            disabled={!clientForm.name.trim()}
+          >
+            {t('workspace.clients.useInInvoice', 'Use in invoice')}
+          </button>
+        </header>
+        <div className="client-form__grid">
+          <label className="client-form__field">
+            <span>{t('workspace.field.clientName', 'Client name')}</span>
+            <input
+              type="text"
+              value={clientForm.name}
+              onChange={(event) => handleClientFieldChange('name', event.target.value)}
+              placeholder={t('workspace.placeholder.clientName', 'Northwind Co.')}
+              required
+            />
+          </label>
+          <label className="client-form__field">
+            <span>{t('workspace.field.clientEmail', 'Client email')}</span>
+            <input
+              type="email"
+              value={clientForm.email}
+              onChange={(event) => handleClientFieldChange('email', event.target.value)}
+              placeholder={t('workspace.placeholder.clientEmail', 'client@email.com')}
+            />
+          </label>
+          <label className="client-form__field">
+            <span>{t('workspace.clients.company', 'Company')}</span>
+            <input
+              type="text"
+              value={clientForm.company}
+              onChange={(event) => handleClientFieldChange('company', event.target.value)}
+              placeholder={t('workspace.clients.companyPlaceholder', 'Department or business unit (optional)')}
+            />
+          </label>
+          <label className="client-form__field">
+            <span>{t('workspace.clients.phone', 'Phone')}</span>
+            <input
+              type="tel"
+              value={clientForm.phone}
+              onChange={(event) => handleClientFieldChange('phone', event.target.value)}
+              placeholder={t('workspace.clients.phonePlaceholder', '+1 555-0100')}
+            />
+          </label>
+          <label className="client-form__field client-form__field--full">
+            <span>{t('workspace.field.clientAddress', 'Client address')}</span>
+            <textarea
+              rows={3}
+              value={clientForm.address}
+              onChange={(event) => handleClientFieldChange('address', event.target.value)}
+              placeholder={t('workspace.placeholder.clientAddress', 'Via Tammaricella 128, Rome, Italy')}
+            />
+          </label>
+          <label className="client-form__field client-form__field--full">
+            <span>{t('workspace.clients.notes', 'Notes')}</span>
+            <textarea
+              rows={3}
+              value={clientForm.notes}
+              onChange={(event) => handleClientFieldChange('notes', event.target.value)}
+              placeholder={t('workspace.clients.notesPlaceholder', 'Preferred payment terms, languages, or reminders')}
+            />
+          </label>
+        </div>
+        {clientFormError && (
+          <div className="client-form__error" role="alert">
+            {clientFormError}
+          </div>
+        )}
+        <div className="client-form__actions">
+          <button type="button" className="button button--ghost" onClick={closeClientManager}>
+            {t('workspace.clients.cancel', 'Close')}
+          </button>
+          <div className="client-form__actions-secondary">
+            {mode === 'edit' && (
+              <button type="button" className="button button--ghost" onClick={handleDeleteClient}>
+                {t('workspace.clients.delete', 'Remove client')}
+              </button>
+            )}
+            <button type="submit" className="button button--primary">
+              {submitLabel}
+            </button>
+          </div>
+        </div>
+      </form>
+    );
+  }
+
+  function renderClientDetail(detail: ClientDetail) {
+    const invoiceCountLabel = t('workspace.clients.invoiceCount', '{count} invoices', {
+      count: detail.summary.invoices,
+    });
+    const outstandingLabel = formatCurrency(
+      detail.summary.outstanding,
+      detail.summary.currency || draft.currency,
+      locale,
+    );
+
+    return (
+      <div className="client-detail">
+        <header className="client-detail__header">
+          <div>
+            <h3>{detail.summary.name}</h3>
+            <p>{detail.summary.email || t('workspace.clients.noEmail', 'No email on record')}</p>
+            {detail.address && <span>{detail.address}</span>}
+          </div>
+          <div className="client-detail__actions">
+            <button type="button" className="button button--ghost" onClick={() => handleUseClientDetail(detail)}>
+              {t('workspace.clients.useInInvoice', 'Use in invoice')}
+            </button>
+            {detail.source === 'invoice' && !detail.manualRecord && (
+              <button type="button" className="button button--primary" onClick={() => handleConvertDetail(detail)}>
+                {t('workspace.clients.saveToDirectory', 'Save to directory')}
+              </button>
+            )}
+          </div>
+        </header>
+        <dl className="client-detail__stats">
+          <div>
+            <dt>{t('workspace.clients.outstanding', 'Outstanding')}</dt>
+            <dd>{outstandingLabel}</dd>
+          </div>
+          <div>
+            <dt>{t('workspace.clients.invoices', 'Invoices')}</dt>
+            <dd>{invoiceCountLabel}</dd>
+          </div>
+          <div>
+            <dt>{t('workspace.clients.lastInvoice', 'Last invoice')}</dt>
+            <dd>
+              {detail.summary.lastInvoice
+                ? formatFriendlyDate(detail.summary.lastInvoice, locale)
+                : t('workspace.clients.none', 'Not yet issued')}
+            </dd>
+          </div>
+          <div>
+            <dt>{t('workspace.clients.status', 'Latest status')}</dt>
+            <dd>
+              <span className={`status-pill status-pill--${detail.summary.status}`}>
+                {statusLookup.get(detail.summary.status) ?? detail.summary.status}
+              </span>
+            </dd>
+          </div>
+        </dl>
+        <section className="client-detail__section">
+          <h4>{t('workspace.clients.contactInfo', 'Contact details')}</h4>
+          <ul className="client-detail__meta">
+            {detail.company && (
+              <li>
+                <strong>{t('workspace.clients.company', 'Company')}:</strong> {detail.company}
+              </li>
+            )}
+            {detail.phone && (
+              <li>
+                <strong>{t('workspace.clients.phone', 'Phone')}:</strong> {detail.phone}
+              </li>
+            )}
+            {detail.notes && (
+              <li>
+                <strong>{t('workspace.clients.notes', 'Notes')}:</strong> {detail.notes}
+              </li>
+            )}
+          </ul>
+        </section>
+        <section className="client-detail__section">
+          <h4>{t('workspace.clients.recentInvoices', 'Recent invoices')}</h4>
+          {detail.invoices.length ? (
+            <ul className="client-detail__invoices">
+              {detail.invoices.map((invoice) => (
+                <li key={invoice.id}>
+                  <div>
+                    <strong>{formatFriendlyDate(invoice.issueDate, locale)}</strong>
+                    <span>{invoice.id}</span>
+                  </div>
+                  <div>
+                    <span>{formatCurrency(invoice.total, invoice.currency, locale)}</span>
+                    <span className={`status-pill status-pill--${invoice.status}`}>
+                      {statusLookup.get(invoice.status) ?? invoice.status}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="client-detail__empty">
+              {t('workspace.clients.noInvoices', 'No invoices recorded for this client yet.')}
+            </p>
+          )}
+        </section>
+      </div>
+    );
+  }
+
   function renderTemplateGallery() {
     const planTitle =
       subscription.plan === 'premium'
@@ -1520,14 +2142,26 @@ export default function WorkspacePage() {
               <h2>{t('workspace.clients.heading', 'Client insights')}</h2>
               <p>{t('workspace.clients.description', 'Outstanding balances and recent invoice activity per client.')}</p>
             </div>
-            <button type="button" className="button button--ghost">
+            <button type="button" className="button button--ghost" onClick={() => startCreateClient()}>
               {t('workspace.clients.add', 'Add client')}
             </button>
           </header>
           {clientSummaries.length ? (
             <div className="cards-grid">
               {clientSummaries.map((client) => (
-                <article key={client.key} className="client-card">
+                <article
+                  key={client.key}
+                  className="client-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openClientManagerFor(client.key)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openClientManagerFor(client.key);
+                    }
+                  }}
+                >
                   <header>
                     <div>
                       <strong>{client.name}</strong>
@@ -1884,6 +2518,92 @@ export default function WorkspacePage() {
                   {t('workspace.saved.empty', 'No saved invoices yet. Save one from the editor to see it here.')}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showClientManager && (
+        <div className="workspace-clients-overlay" role="presentation" onClick={closeClientManager}>
+          <div
+            className="workspace-clients-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-manager-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="workspace-clients-panel__header">
+              <div>
+                <h2 id="client-manager-title">{t('workspace.clients.managerTitle', 'Client directory')}</h2>
+                <p>
+                  {t(
+                    'workspace.clients.managerDescription',
+                    'View saved contacts, reopen invoice history, and add new clients to reuse later.',
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="workspace-clients-panel__close"
+                onClick={closeClientManager}
+                aria-label={t('workspace.clients.closeManager', 'Close client manager')}
+              >
+                ×
+              </button>
+            </header>
+            <div className="workspace-clients-panel__body">
+              <aside className="workspace-clients-panel__sidebar">
+                <div className="workspace-clients-panel__search">
+                  <input
+                    type="search"
+                    value={clientSearch}
+                    onChange={(event) => setClientSearch(event.target.value)}
+                    placeholder={t('workspace.clients.searchPlaceholder', 'Search clients')}
+                  />
+                </div>
+                <ul className="workspace-clients-panel__list">
+                  {clientPanelEntries.length ? (
+                    clientPanelEntries.map(({ summary }) => {
+                      const isActive = summary.key === selectedClientId;
+                      return (
+                        <li key={summary.key}>
+                          <button
+                            type="button"
+                            className={`workspace-clients-panel__list-button${
+                              isActive ? ' workspace-clients-panel__list-button--active' : ''
+                            }`}
+                            onClick={() => openClientManagerFor(summary.key)}
+                          >
+                            <strong>{summary.name}</strong>
+                            <span>{summary.email || t('workspace.clients.noEmail', 'No email on record')}</span>
+                            <small>{t('workspace.clients.invoiceCount', '{count} invoices', { count: summary.invoices })}</small>
+                          </button>
+                        </li>
+                      );
+                    })
+                  ) : (
+                    <li className="workspace-clients-panel__empty">
+                      {t('workspace.clients.emptyDirectory', 'No clients saved yet. Create one to get started.')}
+                    </li>
+                  )}
+                </ul>
+                <button type="button" className="button button--ghost workspace-clients-panel__add" onClick={() => startCreateClient()}>
+                  ➕ {t('workspace.clients.addShort', 'New client')}
+                </button>
+              </aside>
+              <section className="workspace-clients-panel__detail">
+                {selectedClientId === 'new'
+                  ? renderClientForm('create')
+                  : selectedManualClient
+                  ? renderClientForm('edit')
+                  : selectedClientDetail
+                  ? renderClientDetail(selectedClientDetail)
+                  : (
+                      <div className="workspace-clients-panel__empty">
+                        {t('workspace.clients.selectPrompt', 'Select a client to view details.')}
+                      </div>
+                    )}
+              </section>
             </div>
           </div>
         </div>

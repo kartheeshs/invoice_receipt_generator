@@ -3,7 +3,86 @@ export type ClientDirectoryEntry = {
   email: string;
   address: string;
   notes?: string;
+  phone?: string;
 };
+
+export type ManagedClient = {
+  id: string;
+  name: string;
+  email: string;
+  address: string;
+  company?: string;
+  phone?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const CLIENT_STORAGE_KEY = 'invoice-gm7-clients';
+
+export function createClientId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `client-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function loadManagedClients(): ManagedClient[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  const raw = window.localStorage.getItem(CLIENT_STORAGE_KEY);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((entry) => typeof entry === 'object' && entry)
+      .map((entry) => ({
+        id: typeof entry.id === 'string' ? entry.id : createClientId(),
+        name: typeof entry.name === 'string' ? entry.name : '',
+        email: typeof entry.email === 'string' ? entry.email : '',
+        address: typeof entry.address === 'string' ? entry.address : '',
+        company: typeof entry.company === 'string' ? entry.company : undefined,
+        phone: typeof entry.phone === 'string' ? entry.phone : undefined,
+        notes: typeof entry.notes === 'string' ? entry.notes : undefined,
+        createdAt:
+          typeof entry.createdAt === 'string' && entry.createdAt
+            ? entry.createdAt
+            : new Date().toISOString(),
+        updatedAt:
+          typeof entry.updatedAt === 'string' && entry.updatedAt
+            ? entry.updatedAt
+            : new Date().toISOString(),
+      }))
+      .filter((entry) => entry.name.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function persistManagedClients(clients: ManagedClient[]): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const payload = JSON.stringify(
+    clients.map((client) => ({
+      ...client,
+      createdAt: client.createdAt ?? new Date().toISOString(),
+      updatedAt: client.updatedAt ?? new Date().toISOString(),
+    })),
+  );
+
+  window.localStorage.setItem(CLIENT_STORAGE_KEY, payload);
+}
 
 export const clientDirectory: ClientDirectoryEntry[] = [
   {
