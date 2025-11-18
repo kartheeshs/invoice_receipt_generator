@@ -28,8 +28,6 @@ type InvoicePreviewProps = {
   currency: string;
   statusLookup: Map<InvoiceStatus, string>;
   t: TranslateFn;
-  paymentLinkUrl: string | null;
-  paymentLinkDisplay: string;
   className?: string;
 };
 
@@ -43,8 +41,6 @@ const InvoicePreview = forwardRef<HTMLDivElement, InvoicePreviewProps>(
       currency,
       statusLookup,
       t,
-      paymentLinkUrl,
-      paymentLinkDisplay,
       className,
     },
     ref,
@@ -206,20 +202,6 @@ const InvoicePreview = forwardRef<HTMLDivElement, InvoicePreviewProps>(
             )}
           </div>
 
-          {paymentLinkUrl && (
-            <div className="preview__payment-link">
-              <a
-                href={paymentLinkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="preview__payment-link-button"
-              >
-                <span>{t('workspace.preview.paymentLinkCta', 'Open Stripe checkout')}</span>
-                <small>{t('workspace.preview.paymentLinkMode', 'Test mode')}</small>
-              </a>
-              {paymentLinkDisplay && <span className="preview__payment-link-url">{paymentLinkDisplay}</span>}
-            </div>
-          )}
         </div>
       </div>
     );

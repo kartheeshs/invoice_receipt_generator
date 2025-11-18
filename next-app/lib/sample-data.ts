@@ -16,7 +16,6 @@ export const sampleInvoices: InvoiceRecord[] = [
     status: 'sent',
     taxRate: 0.07,
     notes: 'Payable by bank transfer. Late fees apply after 7 days.',
-    paymentLink: 'https://buy.stripe.com/test_4gw28c8ZJ2cd2GA7st',
     lines: [
       { id: 'sample-001-line-1', description: 'Brand strategy sprint', quantity: 1, rate: 2800 },
       { id: 'sample-001-line-2', description: 'Retention playbook', quantity: 1, rate: 1200 },
@@ -40,7 +39,6 @@ export const sampleInvoices: InvoiceRecord[] = [
     status: 'paid',
     taxRate: 0,
     notes: 'Thank you for the timely payment.',
-    paymentLink: '',
     lines: [
       { id: 'sample-002-line-1', description: 'Full-stack implementation', quantity: 52, rate: 95 },
     ],
@@ -63,7 +61,6 @@ export const sampleInvoices: InvoiceRecord[] = [
     status: 'overdue',
     taxRate: 0.05,
     notes: 'Second reminder sent October 2.',
-    paymentLink: '',
     lines: [
       { id: 'sample-003-line-1', description: 'Quarterly analytics retainer', quantity: 1, rate: 2100 },
       { id: 'sample-003-line-2', description: 'Signal report addendum', quantity: 1, rate: 450 },
