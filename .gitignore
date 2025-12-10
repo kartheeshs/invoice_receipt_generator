@@ -1,0 +1,20 @@
+node_modules/
+next-app/node_modules/
+.next/
+next-app/.next/
+next-app/out/
+.env
+server/.env
+dist/
+server/dist/
+stripe.log
+
+# Firebase
+.firebase/
+
+# Node dependencies (inside functions)
+functions/node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
